@@ -7,6 +7,7 @@ export type AssetId =
   | `terrain.${TerrainId}`
   | `building.capital.${FactionId}`
   | `building.village.${FactionId | 'neutral'}`
+  | `building.crown.${FactionId | 'neutral'}`
   | `unit.${UnitTypeId}.${FactionId}`
   | 'ui.highlight.move'
   | 'ui.highlight.attack'
@@ -37,6 +38,8 @@ export function allAssetIds(): AssetId[] {
   for (const f of factions) ids.push(`building.capital.${f}`);
   ids.push('building.village.neutral');
   for (const f of factions) ids.push(`building.village.${f}`);
+  ids.push('building.crown.neutral');
+  for (const f of factions) ids.push(`building.crown.${f}`);
   for (const u of units) for (const f of factions) ids.push(`unit.${u}.${f}`);
   ids.push('ui.highlight.move', 'ui.highlight.attack', 'ui.ring.select');
   return ids;
@@ -91,6 +94,8 @@ export function hexTextureSize(): { w: number; h: number } {
 function generateAsset(id: AssetId): HTMLCanvasElement {
   if (id.startsWith('terrain.')) return generateTerrain(id.slice(8) as TerrainId);
   if (id.startsWith('building.capital.')) return generateCapital(id.slice(17) as FactionId);
+  if (id.startsWith('building.crown.'))
+    return generateCrownFort(id.slice(15) as FactionId | 'neutral');
   if (id.startsWith('building.village.'))
     return generateVillage(id.slice(17) as FactionId | 'neutral');
   if (id.startsWith('unit.')) {
@@ -346,6 +351,83 @@ function generateCapital(owner: FactionId): HTMLCanvasElement {
   ctx.beginPath();
   ctx.arc(cx, base - 46, 2.2, 0, Math.PI * 2);
   ctx.fill();
+  return canvas;
+}
+
+/** 왕관 요새: 팔각 석탑 위 금색 왕관. 소유 세력 색 깃발 2개. */
+function generateCrownFort(owner: FactionId | 'neutral'): HTMLCanvasElement {
+  const w = 68;
+  const h = 68;
+  const [canvas, ctx] = makeCanvas(w, h);
+  const pal = factionPalette(owner);
+  const cx = w / 2;
+  const base = h / 2 + 18;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetY = 2;
+  // 원형 성곽
+  ctx.fillStyle = '#cbc2ab';
+  ctx.beginPath();
+  ctx.ellipse(cx, base - 6, 22, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = '#5c5443';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // 중앙 탑
+  ctx.fillStyle = '#d8d0bc';
+  ctx.fillRect(cx - 10, base - 36, 20, 30);
+  ctx.strokeRect(cx - 10, base - 36, 20, 30);
+  // 총안
+  for (let i = -1; i <= 1; i++) {
+    ctx.fillRect(cx + i * 7 - 1.8, base - 40, 3.6, 4.5);
+    ctx.strokeRect(cx + i * 7 - 1.8, base - 40, 3.6, 4.5);
+  }
+  // 성문
+  ctx.fillStyle = '#5c5443';
+  ctx.beginPath();
+  ctx.moveTo(cx - 4, base - 6);
+  ctx.lineTo(cx - 4, base - 15);
+  ctx.arc(cx, base - 15, 4, Math.PI, 0);
+  ctx.lineTo(cx + 4, base - 6);
+  ctx.closePath();
+  ctx.fill();
+  // 좌우 깃발
+  for (const side of [-1, 1]) {
+    const fx = cx + side * 14;
+    ctx.strokeStyle = '#4a4237';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fx, base - 36);
+    ctx.lineTo(fx, base - 48);
+    ctx.stroke();
+    ctx.fillStyle = pal.main;
+    ctx.beginPath();
+    ctx.moveTo(fx, base - 48);
+    ctx.lineTo(fx + side * 9, base - 45.5);
+    ctx.lineTo(fx, base - 43);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // 큰 금색 왕관
+  ctx.fillStyle = GOLD;
+  ctx.strokeStyle = '#8a6d14';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(cx - 9, base - 44);
+  ctx.lineTo(cx - 7.5, base - 54);
+  ctx.lineTo(cx - 3.5, base - 48);
+  ctx.lineTo(cx, base - 56);
+  ctx.lineTo(cx + 3.5, base - 48);
+  ctx.lineTo(cx + 7.5, base - 54);
+  ctx.lineTo(cx + 9, base - 44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillRect(cx - 9, base - 44, 18, 3.4);
+  ctx.strokeRect(cx - 9, base - 44, 18, 3.4);
   return canvas;
 }
 

@@ -18,8 +18,9 @@ import {
   VIOLET_HIGHGROUND_ATK,
 } from './doctrines';
 import { hexDistance, hexKey, neighbors } from './hex';
-import { generateMap } from './map';
+import { generateScenarioMap } from './map';
 import { movementRange, reconstructPath } from './pathfind';
+import { SCENARIOS } from './scenarios';
 import type {
   Axial,
   FactionId,
@@ -40,10 +41,12 @@ export const DEFAULT_CONFIG: GameConfig = {
 export function newGame(
   seed: number,
   config: Partial<GameConfig> = {},
-  maxTurns: number = DEFAULT_MAX_TURNS,
+  maxTurnsOverride?: number,
 ): GameState {
   const cfg: GameConfig = { ...DEFAULT_CONFIG, ...config };
-  const { tiles, capitals } = generateMap(seed);
+  const scenario = SCENARIOS[cfg.scenario];
+  const maxTurns = maxTurnsOverride ?? scenario.maxTurns ?? DEFAULT_MAX_TURNS;
+  const { tiles, capitals } = generateScenarioMap(cfg.scenario, seed);
   const controllers = {} as GameState['controllers'];
   const factions = {} as GameState['factions'];
   const stats = {} as GameState['stats'];
@@ -67,6 +70,9 @@ export function newGame(
     over: false,
     stats,
   };
+  if (scenario.victory === 'crown-hold') {
+    state.crownHold = { owner: null, turns: 0 };
+  }
 
   // 시작 유닛: 각 세력 교리에 따른 시작 배치를 수도 인접에 놓는다
   for (const fid of FACTION_IDS) {
@@ -429,6 +435,19 @@ export function advancePhase(state: GameState): void {
   for (const u of state.units) {
     u.moved = false;
     u.attacked = false;
+  }
+  // 왕관의 심장: 라운드 종료 시 연속 보유 판정
+  if (state.crownHold) {
+    const crownTile = state.tiles.find((t) => t.building === 'crown');
+    const owner = crownTile?.owner ?? null;
+    if (owner && owner === state.crownHold.owner) state.crownHold.turns++;
+    else state.crownHold = { owner, turns: owner ? 1 : 0 };
+    const need = SCENARIOS[state.config.scenario].crownHoldTurns ?? Infinity;
+    if (owner && state.crownHold.turns >= need) {
+      state.over = true;
+      state.winner = owner;
+      return;
+    }
   }
   state.turn++;
   state.current = state.order[0];

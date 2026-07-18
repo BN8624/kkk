@@ -1,7 +1,28 @@
 // 한 줄 목적: 상단 정보·유닛 패널·생산 시트·타이틀·일시정지·결과·튜토리얼 등 DOM HUD 전체를 관리한다
-import { FACTION_NAMES, TERRAIN_NAMES, UNIT_NAMES, UNIT_STATS } from '../core/data';
+import {
+  DIFFICULTY_NAMES,
+  FACTION_NAMES,
+  TERRAIN_NAMES,
+  UNIT_NAMES,
+  UNIT_STATS,
+} from '../core/data';
 import { factionScore } from '../core/game';
-import type { FactionId, GameState, Tile, Unit, UnitTypeId } from '../core/types';
+import { SCENARIOS } from '../core/scenarios';
+import type {
+  Difficulty,
+  FactionId,
+  GameState,
+  ScenarioId,
+  Tile,
+  Unit,
+  UnitTypeId,
+} from '../core/types';
+
+export interface GameSetup {
+  faction: FactionId;
+  scenario: ScenarioId;
+  difficulty: Difficulty;
+}
 
 export interface HudHandlers {
   onEndTurn: () => void;
@@ -215,6 +236,13 @@ export class Hud {
   color: #c6cede; font-size: 13.5px; line-height: 1.55;
 }
 .fac-desc b { color: #f2ead8; }
+.opt-row { display: flex; gap: 8px; width: min(430px, 92vw); }
+.opt-chip {
+  flex: 1; height: 40px; border-radius: 11px; border: 1.5px solid rgba(242,234,216,.25);
+  background: rgba(242,234,216,.05); color: #d8deeb; font-size: 14px;
+}
+.opt-chip.selected { border-color: #c9a227; background: rgba(201,162,39,.14); color: #f2ead8; }
+.opt-desc { width: min(430px, 92vw); color: #a9b4cc; font-size: 12.5px; line-height: 1.45; min-height: 18px; }
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }
@@ -269,8 +297,17 @@ export class Hud {
         </span>`;
       })
       .join('');
+    let crownChip = '';
+    if (state.crownHold) {
+      const need = SCENARIOS[state.config.scenario].crownHoldTurns ?? 0;
+      const owner = state.crownHold.owner;
+      crownChip = `<span class="hud-chip" style="border-color:${owner ? FACTION_CSS[owner] : '#c9a227'}">👑 ${
+        owner ? `${state.crownHold.turns}/${need}` : '무주'
+      }</span>`;
+    }
     this.topBar.innerHTML = `
       <span class="hud-chip">${state.turn > state.maxTurns ? state.maxTurns : state.turn}/${state.maxTurns}턴</span>
+      ${crownChip}
       <span class="hud-scores">${scores}</span>
       <span style="display:flex;gap:7px;align-items:center;">
         <span class="hud-chip">${COIN_SVG}${state.factions[state.config.humanFaction].gold}</span>
@@ -366,19 +403,25 @@ export class Hud {
     this.overlay.classList.add('show');
   }
 
-  /** 세력 선택 화면. 선택 후 시작 버튼으로 확정한다. */
-  showFactionSelect(
-    describe: (f: FactionId) => string,
-    onStart: (faction: FactionId) => void,
-    onBack: () => void,
-  ): void {
-    let selected: FactionId = 'azure';
+  /** 새 게임 설정 화면: 왕국·시나리오·난이도를 고르고 시작한다. */
+  showGameSetup(opts: {
+    describeFaction: (f: FactionId) => string;
+    scenarios: { id: ScenarioId; name: string; description: string }[];
+    initial?: Partial<GameSetup>;
+    onStart: (sel: GameSetup) => void;
+    onBack: () => void;
+  }): void {
+    const sel: GameSetup = {
+      faction: opts.initial?.faction ?? 'azure',
+      scenario: opts.initial?.scenario ?? 'three-crowns',
+      difficulty: opts.initial?.difficulty ?? 'normal',
+    };
     this.overlay.innerHTML = `
-      <h1 style="font-size:24px;">왕국 선택</h1>
+      <h1 style="font-size:22px;">새 게임</h1>
       <div class="fac-cards">
         ${(['azure', 'crimson', 'violet'] as FactionId[])
           .map(
-            (f) => `<button class="fac-card${f === selected ? ' selected' : ''}" data-f="${f}">
+            (f) => `<button class="fac-card" data-f="${f}">
               <span class="crest" style="background:${FACTION_CSS[f]}">${EMBLEM_SVG[f]}</span>
               <b>${FACTION_NAMES[f]}</b>
             </button>`,
@@ -386,24 +429,57 @@ export class Hud {
           .join('')}
       </div>
       <div class="fac-desc" id="fac-desc"></div>
+      <div class="opt-row" id="scn-row">
+        ${opts.scenarios
+          .map((s) => `<button class="opt-chip" data-s="${s.id}">${s.name}</button>`)
+          .join('')}
+      </div>
+      <div class="opt-desc" id="scn-desc"></div>
+      <div class="opt-row" id="dif-row">
+        ${(['easy', 'normal', 'hard'] as Difficulty[])
+          .map((d) => `<button class="opt-chip" data-d="${d}">${DIFFICULTY_NAMES[d]}</button>`)
+          .join('')}
+      </div>
       <button class="big-btn" id="btn-start">이 왕국으로 시작</button>
       <button class="sub-btn" id="btn-back">뒤로</button>`;
-    const descEl = this.overlay.querySelector('#fac-desc')!;
+    const facDesc = this.overlay.querySelector('#fac-desc')!;
+    const scnDesc = this.overlay.querySelector('#scn-desc')!;
     const render = () => {
-      descEl.innerHTML = describe(selected);
+      facDesc.innerHTML = opts.describeFaction(sel.faction);
+      scnDesc.textContent =
+        opts.scenarios.find((s) => s.id === sel.scenario)?.description ?? '';
       for (const card of this.overlay.querySelectorAll<HTMLButtonElement>('.fac-card')) {
-        card.classList.toggle('selected', card.dataset.f === selected);
+        card.classList.toggle('selected', card.dataset.f === sel.faction);
+      }
+      for (const chip of this.overlay.querySelectorAll<HTMLButtonElement>('#scn-row .opt-chip')) {
+        chip.classList.toggle('selected', chip.dataset.s === sel.scenario);
+      }
+      for (const chip of this.overlay.querySelectorAll<HTMLButtonElement>('#dif-row .opt-chip')) {
+        chip.classList.toggle('selected', chip.dataset.d === sel.difficulty);
       }
     };
     render();
     for (const card of this.overlay.querySelectorAll<HTMLButtonElement>('.fac-card')) {
       card.addEventListener('click', () => {
-        selected = card.dataset.f as FactionId;
+        sel.faction = card.dataset.f as FactionId;
         render();
       });
     }
-    this.overlay.querySelector('#btn-start')!.addEventListener('click', () => onStart(selected));
-    this.overlay.querySelector('#btn-back')!.addEventListener('click', onBack);
+    for (const chip of this.overlay.querySelectorAll<HTMLButtonElement>('#scn-row .opt-chip')) {
+      chip.addEventListener('click', () => {
+        sel.scenario = chip.dataset.s as ScenarioId;
+        render();
+      });
+    }
+    for (const chip of this.overlay.querySelectorAll<HTMLButtonElement>('#dif-row .opt-chip')) {
+      chip.addEventListener('click', () => {
+        sel.difficulty = chip.dataset.d as Difficulty;
+        render();
+      });
+    }
+    this.overlay.querySelector('#btn-start')!.addEventListener('click', () => onStartOnce());
+    const onStartOnce = () => opts.onStart({ ...sel });
+    this.overlay.querySelector('#btn-back')!.addEventListener('click', opts.onBack);
     this.overlay.classList.add('show');
   }
 

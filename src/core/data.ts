@@ -63,3 +63,9 @@ export const BUILDING_NAMES: Record<BuildingId, string> = {
   village: '마을',
   crown: '왕관 요새',
 };
+
+export const DIFFICULTY_NAMES = {
+  easy: '쉬움',
+  normal: '보통',
+  hard: '어려움',
+} as const;

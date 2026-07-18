@@ -1,8 +1,8 @@
-// 한 줄 목적: 시드 기반 결정론적 섬 지도(지형·수도·마을) 생성을 담당한다
+// 한 줄 목적: 시드 기반 결정론적 시나리오 지도 생성과 자동 검증·재생성·fallback을 담당한다
 import { FACTION_IDS } from './data';
 import { hexDistance, hexKey, hexLine, offsetToAxial } from './hex';
-import { mulberry32, shuffle } from './rng';
-import type { Axial, FactionId, Tile } from './types';
+import { mulberry32, shuffle, type Rng } from './rng';
+import type { Axial, FactionId, ScenarioId, Tile } from './types';
 
 export const MAP_COLS = 9;
 export const MAP_ROWS = 12;
@@ -10,13 +10,22 @@ export const MAP_ROWS = 12;
 export interface GeneratedMap {
   tiles: Tile[];
   capitals: Record<FactionId, Axial>;
+  /** 왕관의 심장 시나리오의 중앙 요새 위치 */
+  crown?: Axial;
 }
 
-/** 시드가 같으면 항상 같은 섬 지도를 생성한다. */
-export function generateMap(seed: number): GeneratedMap {
-  const rng = mulberry32(seed);
-  const tiles = new Map<string, Tile>();
+/** 세력 고유 본거지: 청람 남쪽, 진홍 북서, 자원 북동 */
+function capitalSpots(): Record<FactionId, Axial> {
+  return {
+    azure: offsetToAxial(4, 10),
+    crimson: offsetToAxial(2, 1),
+    violet: offsetToAxial(6, 2),
+  };
+}
 
+/** 타원형 섬 기본 지형을 생성한다. */
+function baseIsland(rng: Rng): Map<string, Tile> {
+  const tiles = new Map<string, Tile>();
   const cx = (MAP_COLS - 1) / 2;
   const cy = (MAP_ROWS - 1) / 2;
   const rx = MAP_COLS / 2 + 0.4;
@@ -40,38 +49,45 @@ export function generateMap(seed: number): GeneratedMap {
       tiles.set(hexKey(q, r), { q, r, terrain });
     }
   }
+  return tiles;
+}
 
-  // 수도 배치: 청람은 남쪽, 진홍은 북서, 자원은 북동(세력 고유 본거지)
-  const capitalSpots: Record<FactionId, Axial> = {
-    azure: offsetToAxial(4, 10),
-    crimson: offsetToAxial(2, 1),
-    violet: offsetToAxial(6, 2),
-  };
+function placeCapitals(tiles: Map<string, Tile>): Record<FactionId, Axial> {
+  const spots = capitalSpots();
+  const center = offsetToAxial(4, 6);
   for (const fid of FACTION_IDS) {
-    const pos = capitalSpots[fid];
+    const pos = spots[fid];
     const tile = tiles.get(hexKey(pos.q, pos.r))!;
     tile.terrain = 'plains';
     tile.building = 'capital';
     tile.owner = fid;
-    // 수도 주변 1칸은 지상 보장
-    for (const line of hexLine(pos, offsetToAxial(4, 6))) {
+    // 수도에서 중앙 방향 직선은 지상 보장
+    for (const line of hexLine(pos, center)) {
       const t = tiles.get(hexKey(line.q, line.r));
       if (t && t.terrain === 'water') t.terrain = 'plains';
     }
   }
+  return spots;
+}
 
-  // 중립 마을 배치: 수도에서 2칸 이상, 마을끼리 2칸 이상 떨어진 땅
+function placeVillages(
+  tiles: Map<string, Tile>,
+  rng: Rng,
+  capitals: Record<FactionId, Axial>,
+  count: number,
+  avoid?: Axial,
+): Axial[] {
   const landCandidates: Axial[] = [];
   for (const t of tiles.values()) {
     if (t.terrain === 'water' || t.building) continue;
-    const capDist = Math.min(
-      ...FACTION_IDS.map((f) => hexDistance(t, capitalSpots[f])),
-    );
-    if (capDist >= 2) landCandidates.push({ q: t.q, r: t.r });
+    const capDist = Math.min(...FACTION_IDS.map((f) => hexDistance(t, capitals[f])));
+    if (capDist < 2) continue;
+    if (avoid && hexDistance(t, avoid) < 2) continue;
+    landCandidates.push({ q: t.q, r: t.r });
   }
   const villages: Axial[] = [];
   for (const cand of shuffle(rng, landCandidates)) {
-    if (villages.length >= 6) break;
+    if (villages.length >= count) break;
     if (villages.every((v) => hexDistance(v, cand) >= 3)) villages.push(cand);
   }
   for (const v of villages) {
@@ -80,22 +96,18 @@ export function generateMap(seed: number): GeneratedMap {
     t.building = 'village';
     t.owner = undefined;
   }
+  return villages;
+}
 
-  // 연결성 보장: 기준 수도에서 모든 거점까지 지상 경로 확보
-  const baseCap = capitalSpots[FACTION_IDS[0]];
-  const pois: Axial[] = [
-    ...FACTION_IDS.slice(1).map((f) => capitalSpots[f]),
-    ...villages,
-  ];
+/** 기준 지점에서 모든 거점까지 지상 경로를 보장한다(막히면 직선 경로를 육지로 개통). */
+function ensureConnectivity(tiles: Map<string, Tile>, from: Axial, pois: Axial[]): void {
   for (const poi of pois) {
-    if (isReachable(tiles, baseCap, poi)) continue;
-    for (const step of hexLine(baseCap, poi)) {
+    if (isReachable(tiles, from, poi)) continue;
+    for (const step of hexLine(from, poi)) {
       const t = tiles.get(hexKey(step.q, step.r));
       if (t && (t.terrain === 'water' || t.terrain === 'mountain')) t.terrain = 'plains';
     }
   }
-
-  return { tiles: [...tiles.values()], capitals: capitalSpots };
 }
 
 function isReachable(tiles: Map<string, Tile>, from: Axial, to: Axial): boolean {
@@ -104,16 +116,8 @@ function isReachable(tiles: Map<string, Tile>, from: Axial, to: Axial): boolean 
   const target = hexKey(to.q, to.r);
   while (queue.length > 0) {
     const cur = queue.shift()!;
-    const curKey = hexKey(cur.q, cur.r);
-    if (curKey === target) return true;
-    for (const dir of [
-      { q: 1, r: 0 },
-      { q: 1, r: -1 },
-      { q: 0, r: -1 },
-      { q: -1, r: 0 },
-      { q: -1, r: 1 },
-      { q: 0, r: 1 },
-    ]) {
+    if (hexKey(cur.q, cur.r) === target) return true;
+    for (const dir of HEX_DIRS) {
       const n = { q: cur.q + dir.q, r: cur.r + dir.r };
       const nk = hexKey(n.q, n.r);
       if (visited.has(nk)) continue;
@@ -124,4 +128,184 @@ function isReachable(tiles: Map<string, Tile>, from: Axial, to: Axial): boolean 
     }
   }
   return false;
+}
+
+const HEX_DIRS: Axial[] = [
+  { q: 1, r: 0 },
+  { q: 1, r: -1 },
+  { q: 0, r: -1 },
+  { q: -1, r: 0 },
+  { q: -1, r: 1 },
+  { q: 0, r: 1 },
+];
+
+// ---------------- 시나리오별 생성기 ----------------
+
+/** 시나리오 1 — 세 왕관 전쟁: 표준 섬 */
+function genThreeCrowns(seed: number): GeneratedMap {
+  const rng = mulberry32(seed);
+  const tiles = baseIsland(rng);
+  const capitals = placeCapitals(tiles);
+  const villages = placeVillages(tiles, rng, capitals, 6);
+  finishConnectivity(tiles, capitals, villages);
+  return { tiles: [...tiles.values()], capitals };
+}
+
+/** 시나리오 2 — 갈라진 해협: 중앙 해협이 섬을 남북으로 가르고 좁은 육교 2개로 연결된다 */
+function genBrokenStrait(seed: number): GeneratedMap {
+  const rng = mulberry32(seed);
+  const tiles = baseIsland(rng);
+  // 중앙 두 줄을 바다로 만든다
+  const straitRows = [5, 6];
+  for (const row of straitRows) {
+    for (let col = 0; col < MAP_COLS; col++) {
+      const { q, r } = offsetToAxial(col, row);
+      const t = tiles.get(hexKey(q, r));
+      if (t) t.terrain = 'water';
+    }
+  }
+  // 좁은 육교 2개(서쪽·동쪽)를 개통한다
+  const westCol = 1 + Math.floor(rng() * 2); // 1~2
+  const eastCol = 6 + Math.floor(rng() * 2); // 6~7
+  for (const col of [westCol, eastCol]) {
+    for (const row of straitRows) {
+      const { q, r } = offsetToAxial(col, row);
+      const t = tiles.get(hexKey(q, r));
+      if (t) t.terrain = 'plains';
+    }
+  }
+  const capitals = placeCapitals(tiles);
+  // 육교 입구는 가치 있는 거점: 각 육교 남단에 마을 배치
+  const bridgeVillages: Axial[] = [];
+  for (const col of [westCol, eastCol]) {
+    const pos = offsetToAxial(col, 6);
+    const t = tiles.get(hexKey(pos.q, pos.r));
+    if (t && !t.building) {
+      t.terrain = 'plains';
+      t.building = 'village';
+      t.owner = undefined;
+      bridgeVillages.push(pos);
+    }
+  }
+  const villages = placeVillages(tiles, rng, capitals, 4);
+  finishConnectivity(tiles, capitals, [...bridgeVillages, ...villages]);
+  return { tiles: [...tiles.values()], capitals };
+}
+
+/** 시나리오 3 — 왕관의 심장: 중앙 왕관 요새를 연속 보유하면 승리 */
+function genCrownHeart(seed: number): GeneratedMap {
+  const rng = mulberry32(seed);
+  const tiles = baseIsland(rng);
+  const capitals = placeCapitals(tiles);
+  const crown = offsetToAxial(4, 6);
+  const crownTile = tiles.get(hexKey(crown.q, crown.r))!;
+  crownTile.terrain = 'plains';
+  crownTile.building = 'crown';
+  crownTile.owner = undefined;
+  // 요새 주변 1칸은 지상 보장(포위전이 성립하도록)
+  for (const dir of HEX_DIRS) {
+    const t = tiles.get(hexKey(crown.q + dir.q, crown.r + dir.r));
+    if (t && t.terrain === 'water') t.terrain = 'plains';
+  }
+  const villages = placeVillages(tiles, rng, capitals, 4, crown);
+  finishConnectivity(tiles, capitals, [crown, ...villages]);
+  return { tiles: [...tiles.values()], capitals, crown };
+}
+
+function finishConnectivity(
+  tiles: Map<string, Tile>,
+  capitals: Record<FactionId, Axial>,
+  extraPois: Axial[],
+): void {
+  const base = capitals[FACTION_IDS[0]];
+  const pois = [...FACTION_IDS.slice(1).map((f) => capitals[f]), ...extraPois];
+  ensureConnectivity(tiles, base, pois);
+}
+
+// ---------------- 검증·재생성 ----------------
+
+/** 지도 구조 결함 목록을 반환한다. 비어 있으면 유효한 지도다. */
+export function validateMap(map: GeneratedMap): string[] {
+  const issues: string[] = [];
+  const byKey = new Map(map.tiles.map((t) => [hexKey(t.q, t.r), t]));
+  const buildings = map.tiles.filter((t) => t.building);
+  // 거점 좌표 중복 없음(같은 타일에 두 건물이 있을 수는 없지만 방어적으로 검사)
+  const buildingKeys = new Set(buildings.map((t) => hexKey(t.q, t.r)));
+  if (buildingKeys.size !== buildings.length) issues.push('duplicate-building');
+
+  for (const fid of FACTION_IDS) {
+    const cap = map.capitals[fid];
+    const capTile = byKey.get(hexKey(cap.q, cap.r));
+    if (!capTile || capTile.terrain === 'water') issues.push(`capital-on-water:${fid}`);
+    if (capTile?.building !== 'capital' || capTile.owner !== fid)
+      issues.push(`capital-missing:${fid}`);
+    // 시작 유닛 배치 가능: 지상 이웃 2칸 이상
+    const landNeighbors = HEX_DIRS.filter((d) => {
+      const t = byKey.get(hexKey(cap.q + d.q, cap.r + d.r));
+      return t && t.terrain !== 'water';
+    }).length;
+    if (landNeighbors < 2) issues.push(`capital-cramped:${fid}`);
+  }
+
+  // 모든 거점이 기준 수도에서 지상 경로로 연결
+  const base = map.capitals[FACTION_IDS[0]];
+  for (const b of buildings) {
+    if (!isReachable(byKey, base, b)) issues.push(`unreachable:${b.q},${b.r}`);
+  }
+
+  // 공정성: 왕관 요새까지 수도별 거리 격차 2 이하
+  if (map.crown) {
+    const dists = FACTION_IDS.map((f) => hexDistance(map.capitals[f], map.crown!));
+    if (Math.max(...dists) - Math.min(...dists) > 2) issues.push('crown-unfair');
+  }
+  // 공정성: 가장 가까운 마을 거리 격차 4 이하
+  const villages = buildings.filter((t) => t.building === 'village');
+  if (villages.length > 0) {
+    const nearest = FACTION_IDS.map((f) =>
+      Math.min(...villages.map((v) => hexDistance(map.capitals[f], v))),
+    );
+    if (Math.max(...nearest) - Math.min(...nearest) > 4) issues.push('village-unfair');
+  }
+  return issues;
+}
+
+const GENERATORS: Record<ScenarioId, (seed: number) => GeneratedMap> = {
+  'three-crowns': genThreeCrowns,
+  'broken-strait': genBrokenStrait,
+  'crown-heart': genCrownHeart,
+};
+
+const MAX_ATTEMPTS = 8;
+
+/**
+ * 시나리오 지도를 생성한다. 검증 실패 시 파생 시드로 재생성하고,
+ * 제한 횟수를 넘기면 마지막 후보의 결함을 강제 개통으로 수리해 사용한다(항상 결정론적).
+ */
+export function generateScenarioMap(scenario: ScenarioId, seed: number): GeneratedMap {
+  const gen = GENERATORS[scenario];
+  let last: GeneratedMap | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const derived = attempt === 0 ? seed : (seed + attempt * 2654435761) >>> 0;
+    const map = gen(derived);
+    last = map;
+    if (validateMap(map).length === 0) return map;
+  }
+  // fallback: 마지막 후보를 강제 수리한다(수도 주변 개간 + 전체 연결 개통)
+  const map = last!;
+  const byKey = new Map(map.tiles.map((t) => [hexKey(t.q, t.r), t]));
+  for (const fid of FACTION_IDS) {
+    const cap = map.capitals[fid];
+    for (const dir of HEX_DIRS) {
+      const t = byKey.get(hexKey(cap.q + dir.q, cap.r + dir.r));
+      if (t && t.terrain === 'water') t.terrain = 'plains';
+    }
+  }
+  const base = map.capitals[FACTION_IDS[0]];
+  ensureConnectivity(byKey, base, map.tiles.filter((t) => t.building));
+  return map;
+}
+
+/** 기본(세 왕관 전쟁) 지도 생성 — 기존 호출부 호환용. */
+export function generateMap(seed: number): GeneratedMap {
+  return generateScenarioMap('three-crowns', seed);
 }

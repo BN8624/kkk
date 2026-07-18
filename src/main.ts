@@ -14,6 +14,7 @@ import {
   unitCost,
 } from './core/game';
 import { reachableDestinations } from './core/pathfind';
+import { SCENARIO_IDS, SCENARIOS } from './core/scenarios';
 import {
   clearSave,
   loadGame,
@@ -57,6 +58,7 @@ class App {
   private boardStarted = false;
   private tutorialStep = 0; // 0 = 비활성
   private lastTap: { q: number; r: number } | null = null;
+  private lastSetup: import('./ui/hud').GameSetup | null = null;
 
   constructor() {
     this.settings = loadSettings();
@@ -132,17 +134,24 @@ class App {
   }
 
   private startNewGame(): void {
-    this.hud.showFactionSelect(
-      (f) => describeFaction(f),
-      (faction) => {
+    this.hud.showGameSetup({
+      describeFaction,
+      scenarios: SCENARIO_IDS.map((id) => SCENARIOS[id]),
+      initial: this.lastSetup ?? undefined,
+      onStart: (sel) => {
+        this.lastSetup = sel;
         const param = new URLSearchParams(location.search).get('seed');
         const seed = param ? Number(param) >>> 0 : Date.now() >>> 0;
-        const state = newGame(seed, { humanFaction: faction });
+        const state = newGame(seed, {
+          humanFaction: sel.faction,
+          scenario: sel.scenario,
+          difficulty: sel.difficulty,
+        });
         this.launch(state);
         if (!this.settings.tutorialDone) this.startTutorial();
       },
-      () => this.toTitle(),
-    );
+      onBack: () => this.toTitle(),
+    });
   }
 
   private continueGame(): void {

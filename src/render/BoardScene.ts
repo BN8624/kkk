@@ -93,10 +93,7 @@ export class BoardScene extends Phaser.Scene {
       if (!tile.building) continue;
       const key = hexKey(tile.q, tile.r);
       const owner = tile.owner ?? 'neutral';
-      const assetId =
-        tile.building === 'capital'
-          ? (`building.capital.${owner}` as AssetId)
-          : (`building.village.${owner}` as AssetId);
+      const assetId = `building.${tile.building}.${owner}` as AssetId;
       let sprite = this.buildingSprites.get(key);
       const { x, y } = this.pos(tile);
       if (!sprite) {
@@ -106,7 +103,8 @@ export class BoardScene extends Phaser.Scene {
       } else if (sprite.texture.key !== textureKey(assetId)) {
         sprite.setTexture(textureKey(assetId));
       }
-      sprite.setDisplaySize(tile.building === 'capital' ? 62 : 54, tile.building === 'capital' ? 62 : 54);
+      const size = tile.building === 'village' ? 54 : 62;
+      sprite.setDisplaySize(size, size);
     }
 
     const alive = new Set(this.state.units.map((u) => u.id));
