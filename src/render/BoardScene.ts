@@ -124,7 +124,8 @@ export class BoardScene extends Phaser.Scene {
       view.container.setDepth(3 + y / 10000);
       this.drawHpBar(view.hpBar, unit);
       const done = unit.moved && unit.attacked;
-      view.container.setAlpha(done && unit.faction === 'player' && this.state.current === 'player' ? 0.55 : 1);
+      const humanTurn = this.state.controllers[this.state.current] === 'human';
+      view.container.setAlpha(done && unit.faction === this.state.current && humanTurn ? 0.55 : 1);
     }
   }
 

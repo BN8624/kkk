@@ -51,6 +51,7 @@ async function startNewGame(page: Page, seed: number): Promise<void> {
   });
   await page.goto(`/?seed=${seed}`);
   await page.getByRole('button', { name: '새 게임' }).click();
+  await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
   await page.waitForFunction(() => window.__tc?.state() !== null);
 }
 
@@ -61,7 +62,7 @@ test('시작→유닛 선택→이동→턴 종료→저장→이어하기', asy
   expect(state.units.length).toBe(6);
 
   // 유닛 선택
-  const unit = state.units.find((u) => u.faction === 'player')!;
+  const unit = state.units.find((u) => u.faction === 'azure')!;
   await tapHex(page, unit.q, unit.r);
   await expect(page.locator('.unit-panel')).toHaveClass(/show/);
 
@@ -104,20 +105,20 @@ test('시작→유닛 선택→이동→턴 종료→저장→이어하기', asy
 test('생산: 수도에서 보병을 생산하면 금이 줄고 유닛이 늘어난다', async ({ page }) => {
   await startNewGame(page, 7);
   const state = await getState(page);
-  const capital = state.tiles.find((t) => t.building === 'capital' && t.owner === 'player')!;
+  const capital = state.tiles.find((t) => t.building === 'capital' && t.owner === 'azure')!;
   await tapHex(page, capital.q, capital.r);
   await expect(page.locator('.sheet')).toHaveClass(/show/);
-  const goldBefore = state.factions.player.gold;
+  const goldBefore = state.factions.azure.gold;
   await page.locator('.prod-card[data-type="infantry"]').click();
   await page.waitForFunction(
     ([g]) => {
       const s = window.__tc?.state();
-      return s !== null && s !== undefined && s.factions.player.gold < g;
+      return s !== null && s !== undefined && s.factions.azure.gold < g;
     },
     [goldBefore] as const,
   );
   const after = await getState(page);
-  expect(after.units.filter((u) => u.faction === 'player').length).toBe(3);
+  expect(after.units.filter((u) => u.faction === 'azure').length).toBe(3);
 });
 
 function hexDist(a: { q: number; r: number }, b: { q: number; r: number }): number {
@@ -135,7 +136,7 @@ test('전투: 적에게 접근해 공격하면 피해가 적용된다', async ({
     let state = await getState(page);
     if (state.over) break;
 
-    for (const u of state.units.filter((x) => x.faction === 'player')) {
+    for (const u of state.units.filter((x) => x.faction === 'azure')) {
       state = await getState(page);
       if (state.over) break;
       const live = state.units.find((x) => x.id === u.id);
@@ -161,7 +162,7 @@ test('전투: 적에게 접근해 공격하면 피해가 적용된다', async ({
       }
 
       // 가장 가까운 적 방향으로 전진
-      const enemies = state.units.filter((x) => x.faction !== 'player');
+      const enemies = state.units.filter((x) => x.faction !== 'azure');
       if (enemies.length === 0) break;
       await tapHex(page, live.q, live.r);
       await page.waitForFunction(() => window.__tc!.dests().length >= 0);

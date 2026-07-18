@@ -41,11 +41,11 @@ export function generateMap(seed: number): GeneratedMap {
     }
   }
 
-  // 수도 배치: 플레이어는 남쪽, AI 둘은 북서·북동
+  // 수도 배치: 청람은 남쪽, 진홍은 북서, 자원은 북동(세력 고유 본거지)
   const capitalSpots: Record<FactionId, Axial> = {
-    player: offsetToAxial(4, 10),
-    ai1: offsetToAxial(2, 1),
-    ai2: offsetToAxial(6, 2),
+    azure: offsetToAxial(4, 10),
+    crimson: offsetToAxial(2, 1),
+    violet: offsetToAxial(6, 2),
   };
   for (const fid of FACTION_IDS) {
     const pos = capitalSpots[fid];
@@ -81,11 +81,15 @@ export function generateMap(seed: number): GeneratedMap {
     t.owner = undefined;
   }
 
-  // 연결성 보장: 플레이어 수도에서 모든 거점까지 지상 경로 확보
-  const pois: Axial[] = [capitalSpots.ai1, capitalSpots.ai2, ...villages];
+  // 연결성 보장: 기준 수도에서 모든 거점까지 지상 경로 확보
+  const baseCap = capitalSpots[FACTION_IDS[0]];
+  const pois: Axial[] = [
+    ...FACTION_IDS.slice(1).map((f) => capitalSpots[f]),
+    ...villages,
+  ];
   for (const poi of pois) {
-    if (isReachable(tiles, capitalSpots.player, poi)) continue;
-    for (const step of hexLine(capitalSpots.player, poi)) {
+    if (isReachable(tiles, baseCap, poi)) continue;
+    for (const step of hexLine(baseCap, poi)) {
       const t = tiles.get(hexKey(step.q, step.r));
       if (t && (t.terrain === 'water' || t.terrain === 'mountain')) t.terrain = 'plains';
     }

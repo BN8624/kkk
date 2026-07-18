@@ -27,3 +27,12 @@ export function unitsOf(state: GameState, faction: FactionId): Unit[] {
 export function buildingsOf(state: GameState, faction: FactionId): Tile[] {
   return state.tiles.filter((t) => t.building && t.owner === faction);
 }
+
+/** 인간 플레이어가 조작하는 세력을 반환한다. */
+export function humanFaction(state: GameState): FactionId {
+  return state.config.humanFaction;
+}
+
+export function isHumanTurn(state: GameState): boolean {
+  return state.controllers[state.current] === 'human';
+}

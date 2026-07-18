@@ -6,7 +6,7 @@
  *
  * 예시:
  *   'terrain.plains': './art/plains.png',
- *   'unit.infantry.player': './art/knight-blue.svg',
+ *   'unit.infantry.azure': './art/knight-blue.svg',
  *
  * 등록된 ID는 게임 로직·렌더러 수정 없이 해당 이미지로 대체된다.
  */

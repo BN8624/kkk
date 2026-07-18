@@ -18,16 +18,16 @@ export interface HudHandlers {
 }
 
 const FACTION_CSS: Record<FactionId, string> = {
-  player: '#31558f',
-  ai1: '#93313c',
-  ai2: '#5f3d75',
+  azure: '#31558f',
+  crimson: '#93313c',
+  violet: '#5f3d75',
 };
 
 const EMBLEM_SVG: Record<FactionId, string> = {
-  player:
+  azure:
     '<svg viewBox="0 0 20 20"><rect x="8.4" y="3" width="3.2" height="14" fill="#f2ead8"/><rect x="3" y="8.4" width="14" height="3.2" fill="#f2ead8"/></svg>',
-  ai1: '<svg viewBox="0 0 20 20"><path d="M3 15 10 4l7 11h-3.4L10 9.2 6.4 15Z" fill="#f2ead8"/></svg>',
-  ai2: '<svg viewBox="0 0 20 20"><path d="M10 2.5 12 7.6l5.5.3-4.3 3.4 1.5 5.3L10 13.4l-4.7 3.2 1.5-5.3-4.3-3.4 5.5-.3Z" fill="#f2ead8"/></svg>',
+  crimson: '<svg viewBox="0 0 20 20"><path d="M3 15 10 4l7 11h-3.4L10 9.2 6.4 15Z" fill="#f2ead8"/></svg>',
+  violet: '<svg viewBox="0 0 20 20"><path d="M10 2.5 12 7.6l5.5.3-4.3 3.4 1.5 5.3L10 13.4l-4.7 3.2 1.5-5.3-4.3-3.4 5.5-.3Z" fill="#f2ead8"/></svg>',
 };
 
 const GEAR_SVG =
@@ -199,6 +199,22 @@ export class Hud {
   transition: opacity .25s; pointer-events: none; white-space: nowrap;
 }
 .toast.show { opacity: 1; }
+.fac-cards { display: flex; gap: 10px; width: min(430px, 92vw); }
+.fac-card {
+  flex: 1; border: 2px solid rgba(242,234,216,.25); border-radius: 14px;
+  background: rgba(242,234,216,.05); color: #d8deeb; padding: 12px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px;
+}
+.fac-card .crest { width: 40px; height: 40px; border-radius: 10px; display:flex; align-items:center; justify-content:center; }
+.fac-card .crest svg { width: 26px; height: 26px; }
+.fac-card b { font-size: 15px; color: #f2ead8; }
+.fac-card.selected { border-color: #c9a227; background: rgba(201,162,39,.14); }
+.fac-desc {
+  width: min(430px, 92vw); min-height: 66px; background: rgba(242,234,216,.06);
+  border: 1px solid rgba(201,162,39,.5); border-radius: 12px; padding: 10px 14px;
+  color: #c6cede; font-size: 13.5px; line-height: 1.55;
+}
+.fac-desc b { color: #f2ead8; }
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }
@@ -244,7 +260,7 @@ export class Hud {
   // ---------------- 상단 바 ----------------
 
   updateTop(state: GameState): void {
-    const scores = (['player', 'ai1', 'ai2'] as FactionId[])
+    const scores = state.order
       .map((f) => {
         const dead = state.factions[f].eliminated;
         return `<span class="score-chip" style="opacity:${dead ? 0.4 : 1}">
@@ -257,7 +273,7 @@ export class Hud {
       <span class="hud-chip">${state.turn > state.maxTurns ? state.maxTurns : state.turn}/${state.maxTurns}턴</span>
       <span class="hud-scores">${scores}</span>
       <span style="display:flex;gap:7px;align-items:center;">
-        <span class="hud-chip">${COIN_SVG}${state.factions.player.gold}</span>
+        <span class="hud-chip">${COIN_SVG}${state.factions[state.config.humanFaction].gold}</span>
         <button class="icon-btn" id="hud-gear" aria-label="설정">${GEAR_SVG}</button>
       </span>`;
     this.topBar.querySelector('#hud-gear')!.addEventListener('click', () => this.handlers.onPause());
@@ -346,6 +362,47 @@ export class Hud {
     this.overlay.classList.add('show');
   }
 
+  /** 세력 선택 화면. 선택 후 시작 버튼으로 확정한다. */
+  showFactionSelect(
+    describe: (f: FactionId) => string,
+    onStart: (faction: FactionId) => void,
+    onBack: () => void,
+  ): void {
+    let selected: FactionId = 'azure';
+    this.overlay.innerHTML = `
+      <h1 style="font-size:24px;">왕국 선택</h1>
+      <div class="fac-cards">
+        ${(['azure', 'crimson', 'violet'] as FactionId[])
+          .map(
+            (f) => `<button class="fac-card${f === selected ? ' selected' : ''}" data-f="${f}">
+              <span class="crest" style="background:${FACTION_CSS[f]}">${EMBLEM_SVG[f]}</span>
+              <b>${FACTION_NAMES[f]}</b>
+            </button>`,
+          )
+          .join('')}
+      </div>
+      <div class="fac-desc" id="fac-desc"></div>
+      <button class="big-btn" id="btn-start">이 왕국으로 시작</button>
+      <button class="sub-btn" id="btn-back">뒤로</button>`;
+    const descEl = this.overlay.querySelector('#fac-desc')!;
+    const render = () => {
+      descEl.innerHTML = describe(selected);
+      for (const card of this.overlay.querySelectorAll<HTMLButtonElement>('.fac-card')) {
+        card.classList.toggle('selected', card.dataset.f === selected);
+      }
+    };
+    render();
+    for (const card of this.overlay.querySelectorAll<HTMLButtonElement>('.fac-card')) {
+      card.addEventListener('click', () => {
+        selected = card.dataset.f as FactionId;
+        render();
+      });
+    }
+    this.overlay.querySelector('#btn-start')!.addEventListener('click', () => onStart(selected));
+    this.overlay.querySelector('#btn-back')!.addEventListener('click', onBack);
+    this.overlay.classList.add('show');
+  }
+
   showPause(soundOn: boolean): void {
     this.overlay.innerHTML = `
       <h1 style="font-size:26px;">일시정지</h1>
@@ -368,19 +425,22 @@ export class Hud {
   }
 
   showResult(state: GameState): void {
-    const won = state.winner === 'player';
+    const me = state.config.humanFaction;
+    const won = state.winner === me;
     const draw = state.winner === 'draw';
     const word = draw ? '무승부' : won ? '승리' : '패배';
     const cls = won ? 'win' : 'lose';
+    const stats = state.stats[me];
     this.overlay.innerHTML = `
       ${won ? `<div class="crown">${CROWN_SVG}</div>` : ''}
       <h1 class="result-word ${cls}">${word}</h1>
+      <p class="subtitle">${FACTION_NAMES[me]}</p>
       <div class="result-table">
         <div><span>총 턴</span><b>${Math.min(state.turn, state.maxTurns)}턴</b></div>
-        <div><span>점령한 거점</span><b>${state.stats.captured}곳</b></div>
-        <div><span>처치한 적</span><b>${state.stats.kills}기</b></div>
-        <div><span>생산한 유닛</span><b>${state.stats.produced}기</b></div>
-        <div><span>최종 지배 점수</span><b>${factionScore(state, 'player')}점</b></div>
+        <div><span>점령한 거점</span><b>${stats.captured}곳</b></div>
+        <div><span>처치한 적</span><b>${stats.kills}기</b></div>
+        <div><span>생산한 유닛</span><b>${stats.produced}기</b></div>
+        <div><span>최종 지배 점수</span><b>${factionScore(state, me)}점</b></div>
       </div>
       <button class="big-btn" id="btn-again">다시 하기</button>
       <button class="sub-btn" id="btn-title">타이틀로</button>`;

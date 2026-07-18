@@ -38,15 +38,15 @@ describe('map generation', () => {
     }
   });
 
-  it('플레이어 수도에서 모든 거점까지 지상 경로가 존재한다', () => {
+  it('기준 수도에서 모든 거점까지 지상 경로가 존재한다', () => {
     for (const seed of [1, 7, 42, 999, 20260719]) {
       const { tiles, capitals } = generateMap(seed);
       const land = new Map(
         tiles.filter((t) => t.terrain !== 'water').map((t) => [hexKey(t.q, t.r), t]),
       );
       const visited = new Set<string>();
-      const queue = [capitals.player];
-      visited.add(hexKey(capitals.player.q, capitals.player.r));
+      const queue = [capitals.azure];
+      visited.add(hexKey(capitals.azure.q, capitals.azure.r));
       while (queue.length > 0) {
         const cur = queue.shift()!;
         for (const d of [

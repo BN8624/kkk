@@ -1,5 +1,5 @@
 // 한 줄 목적: 이동·전투·점령·생산·턴 진행·승패 판정 등 게임 규칙 엔진을 구현한다
-import { buildingsOf, tileAt, unitAt, unitById, unitsOf } from './board';
+import { buildingsOf, humanFaction, tileAt, unitAt, unitById, unitsOf } from './board';
 import {
   BUILDING_DEF_BONUS,
   BUILDING_INCOME,
@@ -14,25 +14,52 @@ import {
 import { hexDistance, hexKey, neighbors } from './hex';
 import { generateMap } from './map';
 import { movementRange, reconstructPath } from './pathfind';
-import type { Axial, FactionId, GameState, Tile, Unit, UnitTypeId } from './types';
+import type {
+  Axial,
+  FactionId,
+  GameConfig,
+  GameState,
+  Tile,
+  Unit,
+  UnitTypeId,
+} from './types';
 
-export function newGame(seed: number, maxTurns: number = DEFAULT_MAX_TURNS): GameState {
+export const DEFAULT_CONFIG: GameConfig = {
+  mode: 'quick',
+  scenario: 'three-crowns',
+  difficulty: 'normal',
+  humanFaction: 'azure',
+};
+
+export function newGame(
+  seed: number,
+  config: Partial<GameConfig> = {},
+  maxTurns: number = DEFAULT_MAX_TURNS,
+): GameState {
+  const cfg: GameConfig = { ...DEFAULT_CONFIG, ...config };
   const { tiles, capitals } = generateMap(seed);
+  const controllers = {} as GameState['controllers'];
+  const factions = {} as GameState['factions'];
+  const stats = {} as GameState['stats'];
+  for (const fid of FACTION_IDS) {
+    controllers[fid] = fid === cfg.humanFaction ? 'human' : 'ai';
+    factions[fid] = { id: fid, gold: START_GOLD, eliminated: false };
+    stats[fid] = { kills: 0, produced: 0, captured: 0 };
+  }
   const state: GameState = {
     seed,
+    config: cfg,
     turn: 1,
     maxTurns,
-    current: 'player',
+    order: [...FACTION_IDS],
+    current: FACTION_IDS[0],
+    controllers,
     tiles,
     units: [],
-    factions: {
-      player: { id: 'player', gold: START_GOLD, eliminated: false },
-      ai1: { id: 'ai1', gold: START_GOLD, eliminated: false },
-      ai2: { id: 'ai2', gold: START_GOLD, eliminated: false },
-    },
+    factions,
     nextUnitId: 1,
     over: false,
-    stats: { kills: 0, produced: 0, captured: 0 },
+    stats,
   };
 
   // 시작 유닛: 각 세력 수도 인접에 보병·궁병 1기씩
@@ -105,7 +132,7 @@ export function moveUnit(state: GameState, unitId: number, dest: Axial): MoveRes
   if (tile.building && tile.owner !== unit.faction) {
     tile.owner = unit.faction;
     captured = tile;
-    if (unit.faction === 'player') state.stats.captured++;
+    state.stats[unit.faction].captured++;
     evaluateVictory(state);
   }
   return { ok: true, path, captured };
@@ -152,7 +179,7 @@ export function attack(state: GameState, attackerId: number, defenderId: number)
   if (defender.hp <= 0) {
     defenderDied = true;
     removeUnit(state, defender.id);
-    if (attacker.faction === 'player') state.stats.kills++;
+    state.stats[attacker.faction].kills++;
   } else if (hexDistance(attacker, defender) <= UNIT_STATS[defender.type].range) {
     const atkTile = tileAt(state, attacker.q, attacker.r)!;
     counterDamage = computeDamage(defender, attacker, atkTile);
@@ -160,7 +187,7 @@ export function attack(state: GameState, attackerId: number, defenderId: number)
     if (attacker.hp <= 0) {
       attackerDied = true;
       removeUnit(state, attacker.id);
-      if (defender.faction === 'player') state.stats.kills++;
+      state.stats[defender.faction].kills++;
     }
   }
   evaluateVictory(state);
@@ -197,7 +224,7 @@ export function produceUnit(
   const unit = spawnUnit(state, faction, type, at);
   unit.moved = true;
   unit.attacked = true; // 생산 턴에는 행동 불가
-  if (faction === 'player') state.stats.produced++;
+  state.stats[faction].produced++;
   return { ok: true, unit };
 }
 
@@ -205,7 +232,12 @@ export function produceUnit(
 export function factionScore(state: GameState, faction: FactionId): number {
   let score = 0;
   for (const t of buildingsOf(state, faction)) {
-    score += t.building === 'capital' ? SCORE_WEIGHTS.capital : SCORE_WEIGHTS.village;
+    score +=
+      t.building === 'capital'
+        ? SCORE_WEIGHTS.capital
+        : t.building === 'crown'
+          ? SCORE_WEIGHTS.crown
+          : SCORE_WEIGHTS.village;
   }
   score += unitsOf(state, faction).length * SCORE_WEIGHTS.unit;
   return score;
@@ -215,28 +247,49 @@ function capitalsOwned(state: GameState, faction: FactionId): number {
   return state.tiles.filter((t) => t.building === 'capital' && t.owner === faction).length;
 }
 
+function totalCapitals(state: GameState): number {
+  return state.tiles.filter((t) => t.building === 'capital').length;
+}
+
+/** 점수 순으로 정렬해 승자를 정한다. 동점에 인간 세력이 끼면 무승부. */
+function scoreWinner(state: GameState, candidates: FactionId[]): FactionId | 'draw' {
+  const scores = candidates.map((f) => ({ f, s: factionScore(state, f) }));
+  scores.sort((a, b) => b.s - a.s || state.order.indexOf(a.f) - state.order.indexOf(b.f));
+  const top = scores.filter((x) => x.s === scores[0].s);
+  if (top.length > 1 && top.some((x) => x.f === humanFaction(state))) return 'draw';
+  return top[0].f;
+}
+
 /** 승패를 판정한다. 상태의 over/winner를 갱신한다. */
 export function evaluateVictory(state: GameState): void {
   if (state.over) return;
   // 세력 소멸 판정: 수도가 없고 유닛도 없으면 탈락
-  for (const fid of FACTION_IDS) {
+  for (const fid of state.order) {
     const fs = state.factions[fid];
     if (!fs.eliminated && capitalsOwned(state, fid) === 0 && unitsOf(state, fid).length === 0) {
       fs.eliminated = true;
     }
   }
-  const playerOut = state.factions.player.eliminated;
-  const aiOut = state.factions.ai1.eliminated && state.factions.ai2.eliminated;
-  // 플레이어가 모든 수도를 점령하면 즉시 승리
-  if (capitalsOwned(state, 'player') === 3 || aiOut) {
+  // 한 세력이 모든 수도를 점령하면 즉시 승리
+  const total = totalCapitals(state);
+  for (const fid of state.order) {
+    if (total > 0 && capitalsOwned(state, fid) === total) {
+      state.over = true;
+      state.winner = fid;
+      return;
+    }
+  }
+  const alive = state.order.filter((f) => !state.factions[f].eliminated);
+  if (alive.length === 1) {
     state.over = true;
-    state.winner = 'player';
+    state.winner = alive[0];
     return;
   }
-  if (playerOut) {
+  // 인간 세력이 탈락하면 게임 종료: 남은 세력 중 최고 점수가 승자
+  if (state.factions[humanFaction(state)].eliminated) {
     state.over = true;
-    state.winner = factionScore(state, 'ai1') >= factionScore(state, 'ai2') ? 'ai1' : 'ai2';
-    return;
+    const winner = scoreWinner(state, alive);
+    state.winner = winner === 'draw' ? alive[0] : winner;
   }
 }
 
@@ -244,30 +297,20 @@ export function evaluateVictory(state: GameState): void {
 export function evaluateTurnLimit(state: GameState): void {
   if (state.over) return;
   if (state.turn <= state.maxTurns) return;
-  const scores = FACTION_IDS.map((f) => ({ f, s: factionScore(state, f) }));
-  scores.sort((a, b) => b.s - a.s);
   state.over = true;
-  if (scores[0].s === scores[1].s && scores[0].f !== 'player' && scores[1].f !== 'player') {
-    state.winner = scores[0].f;
-  } else if (scores[0].s === scores[1].s) {
-    // 동점에 플레이어가 포함되면 무승부 대신 플레이어 패배 방지: 무승부 처리
-    state.winner = scores[0].f === 'player' || scores[1].f === 'player' ? 'draw' : scores[0].f;
-  } else {
-    state.winner = scores[0].f;
-  }
+  state.winner = scoreWinner(state, state.order);
 }
 
 /** 세력 하나의 페이즈를 마치고 다음 세력 또는 다음 턴으로 넘어간다. */
 export function advancePhase(state: GameState): void {
   if (state.over) return;
-  const order: FactionId[] = ['player', 'ai1', 'ai2'];
-  const idx = order.indexOf(state.current);
-  if (idx < order.length - 1) {
-    state.current = order[idx + 1];
+  const idx = state.order.indexOf(state.current);
+  if (idx < state.order.length - 1) {
+    state.current = state.order[idx + 1];
     return;
   }
   // 턴 종료: 자원 생산·유닛 행동 초기화
-  for (const fid of FACTION_IDS) {
+  for (const fid of state.order) {
     const fs = state.factions[fid];
     if (fs.eliminated) continue;
     for (const t of buildingsOf(state, fid)) {
@@ -279,6 +322,6 @@ export function advancePhase(state: GameState): void {
     u.attacked = false;
   }
   state.turn++;
-  state.current = 'player';
+  state.current = state.order[0];
   evaluateTurnLimit(state);
 }

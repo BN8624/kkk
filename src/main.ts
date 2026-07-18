@@ -1,7 +1,7 @@
 // 한 줄 목적: 게임 전체 흐름(타이틀→플레이→AI 턴→승패)과 입력·저장·튜토리얼을 조율하는 진입점
 import Phaser from 'phaser';
 import { runAiTurn, type AiAction } from './core/ai';
-import { tileAt, unitAt, unitById } from './core/board';
+import { humanFaction, isHumanTurn, tileAt, unitAt, unitById } from './core/board';
 import { BUILDING_NAMES, UNIT_NAMES, UNIT_STATS } from './core/data';
 import {
   advancePhase,
@@ -24,6 +24,18 @@ import type { Axial, FactionId, GameState, Tile, UnitTypeId } from './core/types
 import { BoardScene } from './render/BoardScene';
 import { setSoundEnabled, sfx } from './render/sound';
 import { Hud } from './ui/hud';
+
+const FACTION_TOKEN_DESC: Record<FactionId, string> = {
+  azure: '남색',
+  crimson: '진홍색',
+  violet: '보라색',
+};
+
+const FACTION_INTRO: Record<FactionId, string> = {
+  azure: '<b>수비와 규율.</b> 균형 잡힌 부대로 견고하게 영토를 넓힙니다.',
+  crimson: '<b>기동과 공격.</b> 빠른 진격으로 적의 거점을 노립니다.',
+  violet: '<b>사격과 경제.</b> 원거리 화력과 수입으로 힘을 쌓습니다.',
+};
 
 class App {
   private hud: Hud;
@@ -93,6 +105,7 @@ class App {
       lastTap: () => this.lastTap,
       game: () => this.game,
       dests: () => this.moveDests,
+      human: () => (this.state ? humanFaction(this.state) : null),
       targets: (id: number) => {
         const u = this.state ? unitById(this.state, id) : null;
         return u && this.state
@@ -102,6 +115,10 @@ class App {
     };
   }
 
+  private human(): FactionId {
+    return humanFaction(this.state!);
+  }
+
   // ---------------- 화면 전환 ----------------
 
   private toTitle(): void {
@@ -109,11 +126,17 @@ class App {
   }
 
   private startNewGame(): void {
-    const param = new URLSearchParams(location.search).get('seed');
-    const seed = param ? Number(param) >>> 0 : Date.now() >>> 0;
-    const state = newGame(seed);
-    this.launch(state);
-    if (!this.settings.tutorialDone) this.startTutorial();
+    this.hud.showFactionSelect(
+      (f) => FACTION_INTRO[f],
+      (faction) => {
+        const param = new URLSearchParams(location.search).get('seed');
+        const seed = param ? Number(param) >>> 0 : Date.now() >>> 0;
+        const state = newGame(seed, { humanFaction: faction });
+        this.launch(state);
+        if (!this.settings.tutorialDone) this.startTutorial();
+      },
+      () => this.toTitle(),
+    );
   }
 
   private continueGame(): void {
@@ -153,6 +176,10 @@ class App {
       this.scene!.clearHighlights();
       this.scene!.showSelection(null);
     }
+    // 저장 시점이 AI 차례였다면 남은 AI 턴을 이어서 진행한다
+    if (!state.over && !isHumanTurn(state)) {
+      void this.runAiPhases();
+    }
   }
 
   // ---------------- 튜토리얼 ----------------
@@ -164,9 +191,10 @@ class App {
 
   private showTutorial(): void {
     const total = 5;
+    const color = FACTION_TOKEN_DESC[this.state ? this.human() : 'azure'];
     switch (this.tutorialStep) {
       case 1:
-        this.hud.showTutorialStep(1, total, '당신의 유닛(남색 방패 토큰)을 탭하세요.', null);
+        this.hud.showTutorialStep(1, total, `당신의 유닛(${color} 방패 토큰)을 탭하세요.`, null);
         break;
       case 2:
         this.hud.showTutorialStep(2, total, '금색으로 강조된 타일을 탭해 이동하세요.', null);
@@ -215,7 +243,7 @@ class App {
   private onTileTap(q: number, r: number): void {
     this.lastTap = { q, r };
     const state = this.state;
-    if (!state || this.busy || state.over || state.current !== 'player') return;
+    if (!state || this.busy || state.over || !isHumanTurn(state)) return;
     if (this.productionTile) {
       this.closeProduction();
       return;
@@ -239,12 +267,12 @@ class App {
       return;
     }
     // 자기 유닛 선택
-    if (tappedUnit && tappedUnit.faction === 'player') {
+    if (tappedUnit && tappedUnit.faction === this.human()) {
       this.select(tappedUnit.id);
       return;
     }
     // 자기 거점(빈 타일) → 생산
-    if (!tappedUnit && tile.building && tile.owner === 'player') {
+    if (!tappedUnit && tile.building && tile.owner === this.human()) {
       this.openProduction(tile);
       return;
     }
@@ -375,10 +403,11 @@ class App {
     this.deselect();
     this.productionTile = tile;
     sfx.select();
+    const gold = state.factions[this.human()].gold;
     this.hud.showProduction(
       BUILDING_NAMES[tile.building!],
-      state.factions.player.gold,
-      (t) => state.factions.player.gold >= UNIT_STATS[t].cost,
+      gold,
+      (t) => gold >= UNIT_STATS[t].cost,
     );
   }
 
@@ -391,7 +420,7 @@ class App {
     const state = this.state!;
     const tile = this.productionTile;
     if (!tile || this.busy) return;
-    const result = produceUnit(state, 'player', tile, type);
+    const result = produceUnit(state, this.human(), tile, type);
     if (!result.ok) {
       this.hud.toast(
         result.reason === 'no-gold'
@@ -414,20 +443,25 @@ class App {
 
   private async endTurn(): Promise<void> {
     const state = this.state;
-    if (!state || this.busy || state.over || state.current !== 'player') return;
-    this.busy = true;
+    if (!state || this.busy || state.over || !isHumanTurn(state)) return;
     this.deselect();
     this.closeProduction();
-    this.hud.setEndTurnEnabled(false);
     if (this.tutorialStep === 5) this.advanceTutorial(6);
+    advancePhase(state); // 인간 페이즈 종료 → 다음 세력
+    await this.runAiPhases();
+  }
 
-    advancePhase(state); // -> ai1
-    for (const fid of ['ai1', 'ai2'] as FactionId[]) {
-      if (state.over) break;
+  /** 현재 차례부터 인간 차례가 될 때까지 AI 페이즈를 연속 실행한다. */
+  private async runAiPhases(): Promise<void> {
+    const state = this.state!;
+    this.busy = true;
+    this.hud.setEndTurnEnabled(false);
+    while (!state.over && !isHumanTurn(state)) {
+      const fid = state.current;
       this.hud.setAiThinking(fid);
       const log = runAiTurn(state, fid);
       await this.playAiLog(log);
-      advancePhase(state); // ai1 -> ai2, ai2 -> 다음 턴(수입·초기화)
+      advancePhase(state);
       this.hud.updateTop(state);
     }
     this.hud.setAiThinking(null);
@@ -443,9 +477,10 @@ class App {
     saveGame(state);
     sfx.turn();
     // 카메라를 플레이어 진영으로 되돌린다
+    const me = this.human();
     const home =
-      state.tiles.find((t) => t.building === 'capital' && t.owner === 'player') ??
-      state.units.find((u) => u.faction === 'player');
+      state.tiles.find((t) => t.building === 'capital' && t.owner === me) ??
+      state.units.find((u) => u.faction === me);
     if (home) this.scene?.panTo({ q: home.q, r: home.r });
     this.hud.toast(`${state.turn}턴 — 당신의 차례입니다`);
     this.busy = false;
@@ -501,7 +536,7 @@ class App {
     clearSave();
     this.deselect();
     this.hud.hideTutorial();
-    if (state.winner === 'player') sfx.win();
+    if (state.winner === this.human()) sfx.win();
     else sfx.lose();
     window.setTimeout(() => this.hud.showResult(state), 700);
   }

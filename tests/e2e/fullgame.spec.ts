@@ -11,6 +11,7 @@ test('한 판이 제한 턴 안에 끝나고 결과 화면이 표시된다', asy
   });
   await page.goto('/?seed=20260719');
   await page.getByRole('button', { name: '새 게임' }).click();
+  await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
   await page.waitForFunction(() => window.__tc?.state() !== null);
 
   // 플레이어는 매 턴 수도에서 생산만 시도하고 턴을 종료한다(수비 위주 소극 플레이)

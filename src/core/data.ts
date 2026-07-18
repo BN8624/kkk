@@ -17,16 +17,19 @@ export const TERRAIN_RULES: Record<TerrainId, TerrainRule> = {
 export const BUILDING_DEF_BONUS: Record<BuildingId, number> = {
   capital: 2,
   village: 1,
+  crown: 2,
 };
 
 export const BUILDING_INCOME: Record<BuildingId, number> = {
   capital: 15,
   village: 10,
+  crown: 10,
 };
 
 export const SCORE_WEIGHTS = {
   capital: 30,
   village: 10,
+  crown: 20,
   unit: 2,
 };
 
@@ -34,12 +37,12 @@ export const START_GOLD = 40;
 export const DEFAULT_MAX_TURNS = 12;
 export const MAX_UNITS_PER_FACTION = 10;
 
-export const FACTION_IDS: FactionId[] = ['player', 'ai1', 'ai2'];
+export const FACTION_IDS: FactionId[] = ['azure', 'crimson', 'violet'];
 
 export const FACTION_NAMES: Record<FactionId, string> = {
-  player: '청람 왕국',
-  ai1: '진홍 공국',
-  ai2: '자원 후국',
+  azure: '청람 왕국',
+  crimson: '진홍 공국',
+  violet: '자원 후국',
 };
 
 export const UNIT_NAMES: Record<UnitTypeId, string> = {
@@ -58,4 +61,5 @@ export const TERRAIN_NAMES: Record<TerrainId, string> = {
 export const BUILDING_NAMES: Record<BuildingId, string> = {
   capital: '수도',
   village: '마을',
+  crown: '왕관 요새',
 };

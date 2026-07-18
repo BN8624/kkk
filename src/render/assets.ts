@@ -18,9 +18,9 @@ export const HEX_SIZE = 44;
 const TEX_SCALE = 2;
 
 export const FACTION_COLORS: Record<FactionId, { main: string; dark: string; light: string }> = {
-  player: { main: '#31558f', dark: '#1d345c', light: '#5b7fb5' },
-  ai1: { main: '#93313c', dark: '#5f1e26', light: '#b95c66' },
-  ai2: { main: '#5f3d75', dark: '#3d264c', light: '#87639d' },
+  azure: { main: '#31558f', dark: '#1d345c', light: '#5b7fb5' },
+  crimson: { main: '#93313c', dark: '#5f1e26', light: '#b95c66' },
+  violet: { main: '#5f3d75', dark: '#3d264c', light: '#87639d' },
 };
 
 export const NEUTRAL_COLOR = { main: '#7a7468', dark: '#4f4b43', light: '#a29c8e' };
@@ -31,7 +31,7 @@ const GOLD = '#c9a227';
 export function allAssetIds(): AssetId[] {
   const ids: AssetId[] = [];
   const terrains: TerrainId[] = ['plains', 'forest', 'mountain', 'water'];
-  const factions: FactionId[] = ['player', 'ai1', 'ai2'];
+  const factions: FactionId[] = ['azure', 'crimson', 'violet'];
   const units: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
   for (const t of terrains) ids.push(`terrain.${t}`);
   for (const f of factions) ids.push(`building.capital.${f}`);
@@ -352,9 +352,9 @@ function generateCapital(owner: FactionId): HTMLCanvasElement {
 // ---------------- 유닛 토큰 ----------------
 
 export const FACTION_EMBLEMS: Record<FactionId, 'cross' | 'chevron' | 'star'> = {
-  player: 'cross',
-  ai1: 'chevron',
-  ai2: 'star',
+  azure: 'cross',
+  crimson: 'chevron',
+  violet: 'star',
 };
 
 function drawEmblem(
