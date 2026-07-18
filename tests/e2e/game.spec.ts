@@ -147,7 +147,9 @@ test('전투: 적에게 접근해 공격하면 피해가 적용된다', async ({
         const target = targets[0];
         const before = state.units.find((x) => x.id === target.id)!;
         await tapHex(page, live.q, live.r);
-        await tapHex(page, target.q, target.r);
+        await tapHex(page, target.q, target.r); // 전투 예측 표시
+        await expect(page.locator('#fc-attack')).toBeVisible();
+        await tapHex(page, target.q, target.r); // 재탭으로 공격 확정
         await page.waitForFunction(
           ([tid, hp]) => {
             const s = window.__tc?.state();
@@ -188,7 +190,9 @@ test('전투: 적에게 접근해 공격하면 피해가 적용된다', async ({
         const cur = (await getState(page)).units.find((x) => x.id === target.id)!;
         const pos = (await getState(page)).units.find((x) => x.id === u.id)!;
         await tapHex(page, pos.q, pos.r);
-        await tapHex(page, target.q, target.r);
+        await tapHex(page, target.q, target.r); // 전투 예측 표시
+        await expect(page.locator('#fc-attack')).toBeVisible();
+        await tapHex(page, target.q, target.r); // 재탭으로 공격 확정
         await page.waitForFunction(
           ([tid, hp]) => {
             const s = window.__tc?.state();

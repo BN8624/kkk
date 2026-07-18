@@ -10,6 +10,7 @@ import {
   advancePhase,
   attack,
   attackTargets,
+  forecastAttack,
   moveUnit,
   newGame,
   produceUnit,
@@ -25,7 +26,7 @@ import {
   saveSettings,
   type Settings,
 } from './core/save';
-import type { Axial, FactionId, GameState, Tile, UnitTypeId } from './core/types';
+import type { Axial, FactionId, GameState, Tile, Unit, UnitTypeId } from './core/types';
 import { BoardScene } from './render/BoardScene';
 import { setSoundEnabled, sfx } from './render/sound';
 import { Hud } from './ui/hud';
@@ -35,6 +36,10 @@ const FACTION_TOKEN_DESC: Record<FactionId, string> = {
   crimson: '진홍색',
   violet: '보라색',
 };
+
+function aiSpeedLabel(speed: number): string {
+  return speed === 2 ? '2배속' : speed === 0 ? '건너뛰기' : '기본';
+}
 
 function describeFaction(f: FactionId): string {
   const d = DOCTRINES[f];
@@ -61,6 +66,7 @@ class App {
   private tutorialStep = 0; // 0 = 비활성
   private lastTap: { q: number; r: number } | null = null;
   private lastSetup: import('./ui/hud').GameSetup | null = null;
+  private pendingAttackId: number | null = null;
 
   constructor() {
     this.settings = loadSettings();
@@ -71,13 +77,18 @@ class App {
       onZoom: (f) => this.scene?.zoomBy(f),
       onProduce: (t) => this.produce(t),
       onCloseProduction: () => this.closeProduction(),
-      onPause: () => this.hud.showPause(this.settings.soundOn),
+      onPause: () => this.hud.showPause(this.settings.soundOn, aiSpeedLabel(this.settings.aiSpeed)),
       onResume: () => this.hud.hideOverlay(),
       onToggleSound: () => {
         this.settings.soundOn = !this.settings.soundOn;
         setSoundEnabled(this.settings.soundOn);
         saveSettings(this.settings);
         return this.settings.soundOn;
+      },
+      onCycleAiSpeed: () => {
+        this.settings.aiSpeed = this.settings.aiSpeed === 1 ? 2 : this.settings.aiSpeed === 2 ? 0 : 1;
+        saveSettings(this.settings);
+        return aiSpeedLabel(this.settings.aiSpeed);
       },
       onNewGame: () => this.startNewGame(),
       onContinue: () => this.continueGame(),
@@ -295,7 +306,7 @@ class App {
         this.hud.showTutorialStep(
           3,
           total,
-          '사거리 안의 적은 붉게 표시됩니다. 적 토큰을 탭하면 공격합니다.',
+          '사거리 안의 적은 붉게 표시됩니다. 적 토큰을 탭하면 전투 예측이 뜨고, 공격 버튼이나 한 번 더 탭하면 공격합니다.',
           '알겠습니다',
           () => this.advanceTutorial(4),
         );
@@ -348,9 +359,13 @@ class App {
     const tappedUnit = unitAt(state, q, r);
     const selected = this.selectedUnitId ? unitById(state, this.selectedUnitId) : null;
 
-    // 선택된 유닛의 공격
+    // 선택된 유닛의 공격: 첫 탭은 전투 예측, 같은 대상 재탭 또는 공격 버튼으로 확정
     if (selected && tappedUnit && this.attackIds.has(tappedUnit.id)) {
-      void this.doAttack(selected.id, tappedUnit.id);
+      if (this.pendingAttackId === tappedUnit.id) {
+        void this.doAttack(selected.id, tappedUnit.id);
+        return;
+      }
+      this.showForecast(selected, tappedUnit);
       return;
     }
     // 선택된 유닛의 이동
@@ -408,11 +423,33 @@ class App {
 
   private deselect(): void {
     this.selectedUnitId = null;
+    this.pendingAttackId = null;
     this.moveDests = [];
     this.attackIds.clear();
     this.scene?.clearHighlights();
     this.scene?.showSelection(null);
     this.hud.showUnitPanel(null, null, '');
+  }
+
+  /** 전투 예측 패널 표시(실제 엔진과 동일한 forecastAttack 사용) */
+  private showForecast(attacker: Unit, defender: Unit): void {
+    const state = this.state!;
+    const fc = forecastAttack(state, attacker, defender);
+    this.pendingAttackId = defender.id;
+    const notes: string[] = [];
+    if (fc.damage.atkBonus > 0) notes.push(`능력·수정자 공격 +${fc.damage.atkBonus}`);
+    const defTotal = fc.damage.terrainDef + fc.damage.doctrineDef;
+    if (defTotal > 0) notes.push(`상대 지형·거점 방어 +${defTotal}`);
+    this.hud.showForecast({
+      attackerName: UNIT_NAMES[attacker.type],
+      defenderName: `${FACTION_NAMES[defender.faction]} ${UNIT_NAMES[defender.type]}`,
+      damage: fc.damage.total,
+      counter: fc.counter?.total ?? null,
+      kill: fc.defenderDies,
+      die: fc.attackerDies,
+      notes,
+      onConfirm: () => void this.doAttack(attacker.id, defender.id),
+    });
   }
 
   // ---------------- 플레이어 행동 ----------------
@@ -432,7 +469,7 @@ class App {
     await this.scene?.animateMove(unitId, result.path!);
     if (result.captured) {
       sfx.capture();
-      await this.scene?.animateCapture(dest);
+      await this.scene?.animateCapture(dest, result.captured.building !== 'village');
       const bonus = result.bonusGold ? ` (+${result.bonusGold}금)` : '';
       this.hud.toast(`${BUILDING_NAMES[result.captured.building!]} 점령!${bonus}`);
     }
@@ -471,13 +508,15 @@ class App {
       return;
     }
     sfx.attack();
-    await this.scene?.animateAttack(
+    await this.scene?.animateAttack({
       attackerId,
+      attackerType: attacker.type,
+      defenderId,
       defenderPos,
-      result.damage!,
-      result.counterDamage,
+      damage: result.damage!,
+      counterDamage: result.counterDamage,
       attackerPos,
-    );
+    });
     if (result.defenderDied || result.attackerDied) sfx.hit();
     if (result.defenderDied) this.hud.toast('적 유닛 처치!');
     this.hud.updateTop(state);
@@ -547,6 +586,7 @@ class App {
     const state = this.state!;
     this.busy = true;
     this.hud.setEndTurnEnabled(false);
+    this.scene?.setSpeed(this.settings.aiSpeed === 2 ? 2 : 1);
     while (!state.over && !isHumanTurn(state)) {
       const fid = state.current;
       this.hud.setAiThinking(fid);
@@ -556,6 +596,7 @@ class App {
       this.hud.updateTop(state);
     }
     this.hud.setAiThinking(null);
+    this.scene?.setSpeed(1);
     this.scene?.refresh();
     this.hud.updateTop(state);
 
@@ -580,6 +621,12 @@ class App {
 
   private async playAiLog(log: AiAction[]): Promise<void> {
     if (!this.scene) return;
+    // 건너뛰기: 연출 없이 결과만 반영
+    if (this.settings.aiSpeed === 0) {
+      this.scene.refresh();
+      await delay(120);
+      return;
+    }
     for (const action of log) {
       switch (action.kind) {
         case 'move': {
@@ -595,23 +642,27 @@ class App {
           // 사망한 유닛 좌표는 로그 시점 상태로 추정 불가하므로 생존 좌표만 사용
           const defenderPos = target ? { q: target.q, r: target.r } : null;
           if (defenderPos) {
-            await this.scene.animateAttack(
-              action.unitId,
+            await this.scene.animateAttack({
+              attackerId: action.unitId,
+              attackerType: action.attackerType,
+              defenderId: action.targetId,
               defenderPos,
-              action.damage,
-              action.counterDamage,
-              attacker ? { q: attacker.q, r: attacker.r } : undefined,
-            );
+              damage: action.damage,
+              counterDamage: action.counterDamage,
+              attackerPos: attacker ? { q: attacker.q, r: attacker.r } : undefined,
+            });
           } else {
             this.scene.refresh();
             await delay(200);
           }
           break;
         }
-        case 'capture':
+        case 'capture': {
           sfx.capture();
-          await this.scene.animateCapture(action.at);
+          const t = tileAt(this.state!, action.at.q, action.at.r);
+          await this.scene.animateCapture(action.at, t?.building !== 'village');
           break;
+        }
         case 'produce':
           await this.scene.animateSpawn(action.unitId);
           break;

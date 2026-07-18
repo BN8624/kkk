@@ -32,6 +32,7 @@ export interface HudHandlers {
   onPause: () => void;
   onResume: () => void;
   onToggleSound: () => boolean; // 새 상태 반환
+  onCycleAiSpeed: () => string; // 새 속도 라벨 반환
   onNewGame: () => void;
   onContinue: () => void;
   onDaily: () => void;
@@ -355,6 +356,41 @@ export class Hud {
     this.bottomPanel.classList.add('show');
   }
 
+  /** 전투 예측 패널: 실제 엔진 계산 결과를 그대로 보여준다. */
+  showForecast(o: {
+    attackerName: string;
+    defenderName: string;
+    damage: number;
+    counter: number | null;
+    kill: boolean;
+    die: boolean;
+    notes: string[];
+    onConfirm: () => void;
+  }): void {
+    const counterLine = o.kill
+      ? '<span style="color:#4f7a3a">반격 없음(처치)</span>'
+      : o.counter !== null
+        ? `반격 예상 <b style="color:#8a4a1f">-${o.counter}</b>${o.die ? ' <b style="color:#a33636">(아군 전멸!)</b>' : ''}`
+        : '<span style="color:#4f7a3a">반격 없음</span>';
+    this.bottomPanel.innerHTML = `
+      <h3>⚔ ${o.attackerName} → ${o.defenderName}</h3>
+      <div class="stats">
+        <span>예상 피해 <b style="color:#a33636">-${o.damage}</b>${o.kill ? ' <b style="color:#a33636">(처치!)</b>' : ''}</span>
+        <span>${counterLine}</span>
+      </div>
+      ${o.notes.length > 0 ? `<div class="stats">${o.notes.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="fc-attack" style="flex:1;height:42px;border-radius:10px;border:1.5px solid #8a6d14;background:#c9a227;font-weight:bold;font-size:15px;color:#2b2416;">공격</button>
+        <button id="fc-cancel" style="flex:1;height:42px;border-radius:10px;border:1.5px solid #8a6d14;background:#e5dbc2;font-size:15px;color:#2b2416;">취소</button>
+      </div>
+      <div class="hint">공격하면 이 유닛의 이번 턴 행동이 끝납니다</div>`;
+    this.bottomPanel.querySelector('#fc-attack')!.addEventListener('click', o.onConfirm);
+    this.bottomPanel
+      .querySelector('#fc-cancel')!
+      .addEventListener('click', () => this.showUnitPanel(null, null, ''));
+    this.bottomPanel.classList.add('show');
+  }
+
   // ---------------- 생산 시트 ----------------
 
   showProduction(
@@ -532,11 +568,12 @@ export class Hud {
     this.overlay.classList.add('show');
   }
 
-  showPause(soundOn: boolean): void {
+  showPause(soundOn: boolean, aiSpeedLabel: string): void {
     this.overlay.innerHTML = `
       <h1 style="font-size:26px;">일시정지</h1>
       <button class="big-btn" id="btn-resume">계속하기</button>
       <button class="sub-btn" id="btn-sound">사운드: ${soundOn ? '켜짐' : '꺼짐'}</button>
+      <button class="sub-btn" id="btn-ai-speed">AI 속도: ${aiSpeedLabel}</button>
       <button class="sub-btn" id="btn-tutorial">튜토리얼 다시 보기</button>
       <button class="sub-btn" id="btn-restart">새 게임 (저장 초기화)</button>
       <button class="sub-btn" id="btn-title">타이틀로</button>`;
@@ -544,6 +581,10 @@ export class Hud {
     this.overlay.querySelector('#btn-sound')!.addEventListener('click', (e) => {
       const on = this.handlers.onToggleSound();
       (e.currentTarget as HTMLElement).textContent = `사운드: ${on ? '켜짐' : '꺼짐'}`;
+    });
+    this.overlay.querySelector('#btn-ai-speed')!.addEventListener('click', (e) => {
+      const label = this.handlers.onCycleAiSpeed();
+      (e.currentTarget as HTMLElement).textContent = `AI 속도: ${label}`;
     });
     this.overlay
       .querySelector('#btn-tutorial')!

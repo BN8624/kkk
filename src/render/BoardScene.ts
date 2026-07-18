@@ -193,6 +193,12 @@ export class BoardScene extends Phaser.Scene {
 
   // ---------------- 연출 ----------------
 
+  /** AI 턴 재생 속도(트윈·타이머 배속) */
+  setSpeed(factor: number): void {
+    this.tweens.timeScale = factor;
+    this.time.timeScale = factor;
+  }
+
   animateMove(unitId: number, path: Axial[]): Promise<void> {
     return new Promise((resolve) => {
       const view = this.unitViews.get(unitId);
@@ -201,6 +207,9 @@ export class BoardScene extends Phaser.Scene {
         resolve();
         return;
       }
+      // 병과별 이동 속도: 기병은 빠르고 궁병은 느리다
+      const unit = this.state.units.find((u) => u.id === unitId);
+      const stepMs = unit?.type === 'cavalry' ? 80 : unit?.type === 'archer' ? 125 : 105;
       const points = path.map((p) => this.pos(p));
       let i = 1;
       const step = () => {
@@ -215,7 +224,7 @@ export class BoardScene extends Phaser.Scene {
           targets: view.container,
           x: target.x,
           y: target.y + UNIT_Y_OFFSET,
-          duration: 110,
+          duration: stepMs,
           ease: 'Sine.easeInOut',
           onComplete: step,
         });
@@ -224,48 +233,100 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
-  animateAttack(
-    attackerId: number,
-    defenderPos: Axial,
-    damage: number,
-    counterDamage?: number,
-    attackerPos?: Axial,
-  ): Promise<void> {
+  animateAttack(o: {
+    attackerId: number;
+    attackerType: 'infantry' | 'archer' | 'cavalry';
+    defenderId: number;
+    defenderPos: Axial;
+    damage: number;
+    counterDamage?: number;
+    attackerPos?: Axial;
+  }): Promise<void> {
     return new Promise((resolve) => {
-      const view = this.unitViews.get(attackerId);
-      const target = this.pos(defenderPos);
+      const view = this.unitViews.get(o.attackerId);
+      const target = this.pos(o.defenderPos);
       if (!view) {
         this.refresh();
         resolve();
         return;
       }
-      const ox = view.container.x;
-      const oy = view.container.y;
-      const dx = (target.x - ox) * 0.3;
-      const dy = (target.y + UNIT_Y_OFFSET - oy) * 0.3;
-      this.tweens.add({
-        targets: view.container,
-        x: ox + dx,
-        y: oy + dy,
-        duration: 100,
-        yoyo: true,
-        ease: 'Sine.easeIn',
-        onComplete: () => {
-          this.floatText(target.x, target.y - 26, `-${damage}`, '#ffd9d9');
-          this.cameras.main.shake(90, 0.004);
-          if (counterDamage && attackerPos) {
-            const ap = this.pos(attackerPos);
-            this.time.delayedCall(220, () => {
-              this.floatText(ap.x, ap.y - 26, `-${counterDamage}`, '#ffeebb');
-              this.refresh();
-              resolve();
-            });
-          } else {
-            this.refresh();
-            resolve();
-          }
-        },
-      });
+      // 전투 종료 처리: 사망 유닛 페이드 후 화면 동기화
+      const finish = () => {
+        const deadIds = [o.attackerId, o.defenderId].filter(
+          (id) => !this.state.units.some((u) => u.id === id) && this.unitViews.has(id),
+        );
+        for (const id of deadIds) {
+          const v = this.unitViews.get(id)!;
+          this.tweens.add({ targets: v.container, alpha: 0, scale: 0.5, duration: 200 });
+        }
+        this.time.delayedCall(deadIds.length > 0 ? 220 : 0, () => {
+          this.refresh();
+          resolve();
+        });
+      };
+      const impact = () => {
+        this.floatText(target.x, target.y - 26, `-${o.damage}`, '#ffd9d9');
+        this.cameras.main.shake(o.attackerType === 'cavalry' ? 140 : 90, o.attackerType === 'cavalry' ? 0.006 : 0.004);
+        this.hitShake(o.defenderId);
+        if (o.counterDamage && o.attackerPos) {
+          const ap = this.pos(o.attackerPos);
+          this.time.delayedCall(220, () => {
+            this.floatText(ap.x, ap.y - 26, `-${o.counterDamage}`, '#ffeebb');
+            this.hitShake(o.attackerId);
+            finish();
+          });
+        } else {
+          finish();
+        }
+      };
+
+      if (o.attackerType === 'archer') {
+        // 궁병: 돌진 대신 투사체 연출
+        const proj = this.add.circle(view.container.x, view.container.y - 10, 3.5, 0xf2ead8);
+        proj.setDepth(9);
+        this.tweens.add({
+          targets: proj,
+          x: target.x,
+          y: target.y + UNIT_Y_OFFSET,
+          duration: 220,
+          ease: 'Sine.easeIn',
+          onComplete: () => {
+            proj.destroy();
+            impact();
+          },
+        });
+      } else {
+        // 보병·기병: 돌진(기병은 더 깊고 빠르게)
+        const ox = view.container.x;
+        const oy = view.container.y;
+        const depth = o.attackerType === 'cavalry' ? 0.5 : 0.3;
+        const dx = (target.x - ox) * depth;
+        const dy = (target.y + UNIT_Y_OFFSET - oy) * depth;
+        this.tweens.add({
+          targets: view.container,
+          x: ox + dx,
+          y: oy + dy,
+          duration: o.attackerType === 'cavalry' ? 85 : 100,
+          yoyo: true,
+          ease: 'Sine.easeIn',
+          onComplete: impact,
+        });
+      }
+    });
+  }
+
+  /** 피격 흔들림 */
+  private hitShake(unitId: number): void {
+    const view = this.unitViews.get(unitId);
+    if (!view) return;
+    const x = view.container.x;
+    this.tweens.add({
+      targets: view.container,
+      x: x + 4,
+      duration: 40,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => view.container.setX(x),
     });
   }
 
@@ -288,23 +349,28 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
-  animateCapture(at: Axial): Promise<void> {
+  animateCapture(at: Axial, major = false): Promise<void> {
     return new Promise((resolve) => {
       this.refresh();
       const { x, y } = this.pos(at);
-      const ring = this.add.image(x, y, textureKey('ui.ring.select'));
-      ring.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
-      ring.setDepth(5);
-      this.tweens.add({
-        targets: ring,
-        scale: ring.scale * 1.6,
-        alpha: 0,
-        duration: 450,
-        onComplete: () => {
-          ring.destroy();
-          resolve();
-        },
-      });
+      const rings = major ? 2 : 1;
+      if (major) this.cameras.main.shake(160, 0.005);
+      for (let i = 0; i < rings; i++) {
+        const ring = this.add.image(x, y, textureKey('ui.ring.select'));
+        ring.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
+        ring.setDepth(5);
+        this.tweens.add({
+          targets: ring,
+          scale: ring.scale * (1.6 + i * 0.5),
+          alpha: 0,
+          duration: 450 + i * 150,
+          delay: i * 120,
+          onComplete: () => {
+            ring.destroy();
+            if (i === rings - 1) resolve();
+          },
+        });
+      }
     });
   }
 

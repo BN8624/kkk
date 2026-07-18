@@ -16,7 +16,14 @@ import type {
 
 export type AiAction =
   | { kind: 'move'; unitId: number; path: Axial[] }
-  | { kind: 'attack'; unitId: number; targetId: number; damage: number; counterDamage?: number }
+  | {
+      kind: 'attack';
+      unitId: number;
+      targetId: number;
+      damage: number;
+      counterDamage?: number;
+      attackerType: UnitTypeId;
+    }
   | { kind: 'capture'; unitId: number; at: Axial }
   | { kind: 'produce'; unitId: number; at: Axial; type: UnitTypeId };
 
@@ -297,6 +304,7 @@ function tryAttack(
       targetId: best.target.id,
       damage: atkResult.damage!,
       counterDamage: atkResult.counterDamage,
+      attackerType: unit.type,
     });
     return true;
   }
