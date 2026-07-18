@@ -5,6 +5,7 @@ interface TcState {
   turn: number;
   current: string;
   over: boolean;
+  winner?: string;
   units: { id: number; faction: string; q: number; r: number; hp: number; moved: boolean; attacked: boolean }[];
   tiles: { q: number; r: number; terrain: string; building?: string; owner?: string }[];
   factions: Record<string, { gold: number }>;
