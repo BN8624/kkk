@@ -318,12 +318,16 @@ export class Hud {
 
   // ---------------- 생산 시트 ----------------
 
-  showProduction(buildingName: string, gold: number, canAfford: (t: UnitTypeId) => boolean): void {
+  showProduction(
+    buildingName: string,
+    gold: number,
+    costFor: (t: UnitTypeId) => number,
+  ): void {
     const card = (type: UnitTypeId) => {
       const s = UNIT_STATS[type];
-      return `<button class="prod-card" data-type="${type}" ${canAfford(type) ? '' : 'disabled'}>
+      return `<button class="prod-card" data-type="${type}" ${gold >= costFor(type) ? '' : 'disabled'}>
         <b>${UNIT_NAMES[type]}</b>
-        <span class="cost">${COIN_SVG}${s.cost}</span>
+        <span class="cost">${COIN_SVG}${costFor(type)}</span>
         <span class="mini">공격 ${s.atk} · 방어 ${s.def}<br>이동 ${s.move} · 사거리 ${s.range}</span>
       </button>`;
     };

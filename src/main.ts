@@ -2,7 +2,8 @@
 import Phaser from 'phaser';
 import { runAiTurn, type AiAction } from './core/ai';
 import { humanFaction, isHumanTurn, tileAt, unitAt, unitById } from './core/board';
-import { BUILDING_NAMES, UNIT_NAMES, UNIT_STATS } from './core/data';
+import { BUILDING_NAMES, UNIT_NAMES } from './core/data';
+import { DOCTRINES } from './core/doctrines';
 import {
   advancePhase,
   attack,
@@ -10,6 +11,7 @@ import {
   moveUnit,
   newGame,
   produceUnit,
+  unitCost,
 } from './core/game';
 import { reachableDestinations } from './core/pathfind';
 import {
@@ -31,11 +33,15 @@ const FACTION_TOKEN_DESC: Record<FactionId, string> = {
   violet: '보라색',
 };
 
-const FACTION_INTRO: Record<FactionId, string> = {
-  azure: '<b>수비와 규율.</b> 균형 잡힌 부대로 견고하게 영토를 넓힙니다.',
-  crimson: '<b>기동과 공격.</b> 빠른 진격으로 적의 거점을 노립니다.',
-  violet: '<b>사격과 경제.</b> 원거리 화력과 수입으로 힘을 쌓습니다.',
-};
+function describeFaction(f: FactionId): string {
+  const d = DOCTRINES[f];
+  return (
+    `<b>${d.title}</b> — ${d.style}<br>` +
+    `⚔ <b>${d.abilityName}</b> · ${d.abilityDesc}<br>` +
+    `✦ ${d.bonusDesc} · ${d.startDesc}<br>` +
+    `<span style="opacity:.75">${d.recommended}</span>`
+  );
+}
 
 class App {
   private hud: Hud;
@@ -127,7 +133,7 @@ class App {
 
   private startNewGame(): void {
     this.hud.showFactionSelect(
-      (f) => FACTION_INTRO[f],
+      (f) => describeFaction(f),
       (faction) => {
         const param = new URLSearchParams(location.search).get('seed');
         const seed = param ? Number(param) >>> 0 : Date.now() >>> 0;
@@ -341,9 +347,8 @@ class App {
     if (result.captured) {
       sfx.capture();
       await this.scene?.animateCapture(dest);
-      this.hud.toast(
-        `${BUILDING_NAMES[result.captured.building!]} 점령!`,
-      );
+      const bonus = result.bonusGold ? ` (+${result.bonusGold}금)` : '';
+      this.hud.toast(`${BUILDING_NAMES[result.captured.building!]} 점령!${bonus}`);
     }
     this.hud.updateTop(state);
     saveGame(state);
@@ -407,7 +412,7 @@ class App {
     this.hud.showProduction(
       BUILDING_NAMES[tile.building!],
       gold,
-      (t) => gold >= UNIT_STATS[t].cost,
+      (t) => unitCost(this.human(), t),
     );
   }
 

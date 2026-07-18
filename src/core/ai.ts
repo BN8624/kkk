@@ -1,7 +1,7 @@
 // 한 줄 목적: 우선순위 기반 AI 세력 턴(공격·점령·전진·생산)을 유한 시간 안에 수행한다
 import { tileAt, unitAt, unitById, unitsOf } from './board';
 import { MAX_UNITS_PER_FACTION, UNIT_STATS } from './data';
-import { attack, computeDamage, moveUnit, produceUnit } from './game';
+import { attack, damageBreakdown, moveUnit, produceUnit, unitCost } from './game';
 import { hexDistance, hexKey } from './hex';
 import { movementRange, reconstructPath } from './pathfind';
 import type { Axial, FactionId, GameState, Unit, UnitTypeId } from './types';
@@ -64,8 +64,10 @@ function tryAttack(state: GameState, unit: Unit, log: AiAction[]): boolean {
   for (const pos of positions) {
     for (const enemy of enemies) {
       if (hexDistance(pos, enemy) > range) continue;
-      const tile = tileAt(state, enemy.q, enemy.r)!;
-      const dmg = computeDamage(unit, enemy, tile);
+      const dmg = damageBreakdown(state, unit, enemy, {
+        attackerPos: { q: pos.q, r: pos.r },
+        attackerMoved: pos.key ? true : unit.moved,
+      }).total;
       let score = dmg;
       if (dmg >= enemy.hp) score += 20; // 처치 가능하면 최우선
       score += (UNIT_STATS[enemy.type].hp - enemy.hp) * 0.3; // 약한 적 선호
@@ -164,9 +166,9 @@ function produceUnits(state: GameState, faction: FactionId, log: AiAction[]): vo
     // 여유 자금이 많으면 기병, 아니면 보병·궁병 균형
     const count = unitsOf(state, faction).length;
     let type: UnitTypeId = order[count % 2 === 0 ? 0 : 1];
-    if (fs.gold >= UNIT_STATS.cavalry.cost + 30) type = 'cavalry';
-    if (fs.gold < UNIT_STATS[type].cost) type = 'infantry';
-    if (fs.gold < UNIT_STATS[type].cost) break;
+    if (fs.gold >= unitCost(faction, 'cavalry') + 30) type = 'cavalry';
+    if (fs.gold < unitCost(faction, type)) type = 'infantry';
+    if (fs.gold < unitCost(faction, type)) break;
     const result = produceUnit(state, faction, spot, type);
     if (result.ok && result.unit) {
       log.push({ kind: 'produce', unitId: result.unit.id, at: { q: spot.q, r: spot.r }, type });

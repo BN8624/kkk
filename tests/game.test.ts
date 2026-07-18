@@ -6,13 +6,14 @@ import {
   advancePhase,
   attack,
   attackTargets,
-  computeDamage,
+  damageBreakdown,
   evaluateTurnLimit,
   evaluateVictory,
   factionScore,
   moveUnit,
   newGame,
   produceUnit,
+  unitCost,
 } from '../src/core/game';
 import { movementRange, reachableDestinations } from '../src/core/pathfind';
 import { addUnit, makeState } from './helpers';
@@ -69,9 +70,9 @@ describe('전투', () => {
     const a = addUnit(state, { faction: 'azure', q: 0, r: 0 });
     const d = addUnit(state, { faction: 'crimson', q: 1, r: 0 });
     const tile = tileAt(state, 1, 0)!;
-    expect(computeDamage(a, d, tile)).toBe(5 - 2); // 보병 대 보병 평원
+    expect(damageBreakdown(state, a, d).total).toBe(5 - 2); // 보병 대 보병 평원
     tile.terrain = 'mountain';
-    expect(computeDamage(a, d, tile)).toBe(1); // 5 - 2 - 2 = 1
+    expect(damageBreakdown(state, a, d).total).toBe(1); // 5 - 2 - 2 = 1
   });
 
   it('공격하면 반격을 받고 체력이 감소한다', () => {
@@ -209,7 +210,7 @@ describe('생산과 자원', () => {
     t.owner = 'azure';
     const result = produceUnit(state, 'azure', { q: 0, r: 0 }, 'infantry');
     expect(result.ok).toBe(true);
-    expect(state.factions.azure.gold).toBe(100 - UNIT_STATS.infantry.cost);
+    expect(state.factions.azure.gold).toBe(100 - unitCost('azure', 'infantry'));
     expect(unitAt(state, 0, 0)).toBeDefined();
     expect(result.unit!.moved).toBe(true);
     expect(state.stats.azure.produced).toBe(1);
