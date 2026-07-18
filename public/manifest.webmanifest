@@ -1,0 +1,10 @@
+{
+  "name": "세 왕관의 섬",
+  "short_name": "세 왕관의 섬",
+  "display": "fullscreen",
+  "orientation": "any",
+  "start_url": ".",
+  "background_color": "#1d2a44",
+  "theme_color": "#1d2a44",
+  "icons": []
+}
