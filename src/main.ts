@@ -279,8 +279,13 @@ class App {
       this.scene!.clearHighlights();
       this.scene!.showSelection(null);
     }
+    // 끝난 게임이 저장돼 있던 극단적 경우: 즉시 결과 처리
+    if (state.over) {
+      this.finishGame();
+      return;
+    }
     // 저장 시점이 AI 차례였다면 남은 AI 턴을 이어서 진행한다
-    if (!state.over && !isHumanTurn(state)) {
+    if (!isHumanTurn(state)) {
       void this.runAiPhases();
     }
   }
@@ -590,9 +595,12 @@ class App {
     while (!state.over && !isHumanTurn(state)) {
       const fid = state.current;
       this.hud.setAiThinking(fid);
+      // 행동·페이즈 전환을 동기적으로 확정한 뒤(페이즈 경계) 저장하고, 연출은 그 후 재생한다.
+      // 연출 중 이탈해도 저장본은 항상 "다음 세력이 아직 행동하지 않은" 경계 상태라 중복 실행이 없다.
       const log = runAiTurn(state, fid);
-      await this.playAiLog(log);
       advancePhase(state);
+      if (!state.over) saveGame(state);
+      await this.playAiLog(log);
       this.hud.updateTop(state);
     }
     this.hud.setAiThinking(null);
