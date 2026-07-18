@@ -442,6 +442,11 @@ class App {
     }
     saveGame(state);
     sfx.turn();
+    // 카메라를 플레이어 진영으로 되돌린다
+    const home =
+      state.tiles.find((t) => t.building === 'capital' && t.owner === 'player') ??
+      state.units.find((u) => u.faction === 'player');
+    if (home) this.scene?.panTo({ q: home.q, r: home.r });
     this.hud.toast(`${state.turn}턴 — 당신의 차례입니다`);
     this.busy = false;
     this.hud.setEndTurnEnabled(true);
