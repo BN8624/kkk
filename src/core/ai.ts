@@ -1,7 +1,7 @@
 // 한 줄 목적: 우선순위 기반 AI 세력 턴(공격·점령·전진·생산)을 유한 시간 안에 수행한다
 import { tileAt, unitAt, unitById, unitsOf } from './board';
 import { MAX_UNITS_PER_FACTION, UNIT_STATS } from './data';
-import { attack, attackTargets, computeDamage, moveUnit, produceUnit } from './game';
+import { attack, computeDamage, moveUnit, produceUnit } from './game';
 import { hexDistance, hexKey } from './hex';
 import { movementRange, reconstructPath } from './pathfind';
 import type { Axial, FactionId, GameState, Unit, UnitTypeId } from './types';
