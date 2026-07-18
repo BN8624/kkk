@@ -34,6 +34,8 @@ export interface HudHandlers {
   onToggleSound: () => boolean; // 새 상태 반환
   onNewGame: () => void;
   onContinue: () => void;
+  onDaily: () => void;
+  onShowRecords: () => void;
   onToTitle: () => void;
   onReplayTutorial: () => void;
 }
@@ -389,17 +391,64 @@ export class Hud {
 
   // ---------------- 오버레이 화면 ----------------
 
-  showTitle(hasSave: boolean): void {
+  showTitle(hasSave: boolean, saveSummary?: string): void {
     this.overlay.innerHTML = `
       <div class="crown">${CROWN_SVG}</div>
       <h1>세 왕관의 섬</h1>
-      <p class="subtitle">하나의 섬, 세 개의 왕관.<br>12턴 안에 가장 강한 왕국을 세우십시오.</p>
-      ${hasSave ? '<button class="big-btn" id="btn-continue">이어하기</button>' : ''}
-      <button class="${hasSave ? 'sub-btn' : 'big-btn'}" id="btn-new">새 게임</button>`;
+      <p class="subtitle">하나의 섬, 세 개의 왕관.<br>가장 강한 왕국을 세우십시오.</p>
+      ${
+        hasSave
+          ? `<button class="big-btn" id="btn-continue">이어하기</button>
+             ${saveSummary ? `<p class="subtitle" style="margin-top:-8px;font-size:12.5px;">${saveSummary}</p>` : ''}`
+          : ''
+      }
+      <button class="${hasSave ? 'sub-btn' : 'big-btn'}" id="btn-new">새 게임</button>
+      <button class="sub-btn" id="btn-daily">일일 도전</button>
+      <button class="sub-btn" id="btn-records">기록</button>`;
     this.overlay.querySelector('#btn-new')!.addEventListener('click', () => this.handlers.onNewGame());
     this.overlay
       .querySelector('#btn-continue')
       ?.addEventListener('click', () => this.handlers.onContinue());
+    this.overlay.querySelector('#btn-daily')!.addEventListener('click', () => this.handlers.onDaily());
+    this.overlay
+      .querySelector('#btn-records')!
+      .addEventListener('click', () => this.handlers.onShowRecords());
+    this.overlay.classList.add('show');
+  }
+
+  /** 일일 도전 안내 화면 */
+  showDaily(opts: {
+    title: string;
+    lines: { label: string; value: string }[];
+    note: string;
+    startLabel: string;
+    onStart: () => void;
+    onBack: () => void;
+  }): void {
+    this.overlay.innerHTML = `
+      <h1 style="font-size:24px;">일일 도전</h1>
+      <p class="subtitle">${opts.title}</p>
+      <div class="result-table">
+        ${opts.lines.map((l) => `<div><span>${l.label}</span><b>${l.value}</b></div>`).join('')}
+      </div>
+      <p class="subtitle" style="font-size:12.5px;">${opts.note}</p>
+      <button class="big-btn" id="btn-daily-start">${opts.startLabel}</button>
+      <button class="sub-btn" id="btn-back">뒤로</button>`;
+    this.overlay.querySelector('#btn-daily-start')!.addEventListener('click', opts.onStart);
+    this.overlay.querySelector('#btn-back')!.addEventListener('click', opts.onBack);
+    this.overlay.classList.add('show');
+  }
+
+  /** 로컬 기록 화면 */
+  showRecords(lines: { label: string; value: string }[], onBack: () => void): void {
+    this.overlay.innerHTML = `
+      <h1 style="font-size:24px;">기록</h1>
+      <p class="subtitle" style="font-size:12.5px;">이 브라우저에만 저장되는 로컬 기록입니다</p>
+      <div class="result-table">
+        ${lines.map((l) => `<div><span>${l.label}</span><b>${l.value}</b></div>`).join('')}
+      </div>
+      <button class="sub-btn" id="btn-back">뒤로</button>`;
+    this.overlay.querySelector('#btn-back')!.addEventListener('click', onBack);
     this.overlay.classList.add('show');
   }
 
@@ -504,27 +553,58 @@ export class Hud {
     this.overlay.classList.add('show');
   }
 
-  showResult(state: GameState): void {
+  showResult(
+    state: GameState,
+    opts: {
+      scenarioName: string;
+      difficultyName: string;
+      modifierName?: string;
+      prevBest: number | null;
+      isNewBest: boolean;
+      onShare: () => void;
+      onReplay: () => void;
+      onChangeSetup: () => void;
+      onDaily: () => void;
+    },
+  ): void {
     const me = state.config.humanFaction;
     const won = state.winner === me;
     const draw = state.winner === 'draw';
     const word = draw ? '무승부' : won ? '승리' : '패배';
     const cls = won ? 'win' : 'lose';
     const stats = state.stats[me];
+    const score = factionScore(state, me);
+    const bestLine = opts.isNewBest
+      ? `<div><span>시나리오 최고 기록</span><b style="color:#e8c95a">신기록!</b></div>`
+      : opts.prevBest !== null
+        ? `<div><span>시나리오 최고 기록</span><b>${opts.prevBest}점</b></div>`
+        : '';
     this.overlay.innerHTML = `
       ${won ? `<div class="crown">${CROWN_SVG}</div>` : ''}
       <h1 class="result-word ${cls}">${word}</h1>
-      <p class="subtitle">${FACTION_NAMES[me]}</p>
+      <p class="subtitle">${FACTION_NAMES[me]} · ${opts.scenarioName} · ${opts.difficultyName}${
+        state.config.mode === 'daily' ? ' · 일일 도전' : ''
+      }${opts.modifierName ? `<br>수정자: ${opts.modifierName}` : ''}</p>
       <div class="result-table">
         <div><span>총 턴</span><b>${Math.min(state.turn, state.maxTurns)}턴</b></div>
+        <div><span>최종 지배 점수</span><b>${score}점</b></div>
+        ${bestLine}
         <div><span>점령한 거점</span><b>${stats.captured}곳</b></div>
         <div><span>처치한 적</span><b>${stats.kills}기</b></div>
         <div><span>생산한 유닛</span><b>${stats.produced}기</b></div>
-        <div><span>최종 지배 점수</span><b>${factionScore(state, me)}점</b></div>
+        <div><span>시드</span><b>${state.seed}</b></div>
       </div>
-      <button class="big-btn" id="btn-again">다시 하기</button>
+      <button class="big-btn" id="btn-again">같은 설정으로 다시</button>
+      <div style="display:flex; gap:8px; width:min(300px,82vw);">
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-share">공유</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-setup">다른 왕국</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-daily">일일 도전</button>
+      </div>
       <button class="sub-btn" id="btn-title">타이틀로</button>`;
-    this.overlay.querySelector('#btn-again')!.addEventListener('click', () => this.handlers.onNewGame());
+    this.overlay.querySelector('#btn-again')!.addEventListener('click', opts.onReplay);
+    this.overlay.querySelector('#btn-share')!.addEventListener('click', opts.onShare);
+    this.overlay.querySelector('#btn-setup')!.addEventListener('click', opts.onChangeSetup);
+    this.overlay.querySelector('#btn-daily')!.addEventListener('click', opts.onDaily);
     this.overlay.querySelector('#btn-title')!.addEventListener('click', () => this.handlers.onToTitle());
     this.overlay.classList.add('show');
   }

@@ -45,14 +45,17 @@ export function newGame(
 ): GameState {
   const cfg: GameConfig = { ...DEFAULT_CONFIG, ...config };
   const scenario = SCENARIOS[cfg.scenario];
-  const maxTurns = maxTurnsOverride ?? scenario.maxTurns ?? DEFAULT_MAX_TURNS;
+  let maxTurns = maxTurnsOverride ?? scenario.maxTurns ?? DEFAULT_MAX_TURNS;
+  if (cfg.modifier === 'short-war') maxTurns = Math.max(6, maxTurns - 2);
   const { tiles, capitals } = generateScenarioMap(cfg.scenario, seed);
   const controllers = {} as GameState['controllers'];
   const factions = {} as GameState['factions'];
   const stats = {} as GameState['stats'];
   for (const fid of FACTION_IDS) {
     controllers[fid] = fid === cfg.humanFaction ? 'human' : 'ai';
-    factions[fid] = { id: fid, gold: DOCTRINES[fid].startGold, eliminated: false };
+    let gold = DOCTRINES[fid].startGold;
+    if (cfg.modifier === 'poor-start') gold = Math.max(0, gold - 15);
+    factions[fid] = { id: fid, gold, eliminated: false };
     stats[fid] = { kills: 0, produced: 0, captured: 0 };
   }
   const state: GameState = {
@@ -141,9 +144,11 @@ export function doctrineAtkBonus(
   return 0;
 }
 
-/** 세력 교리를 반영한 병과 생산 비용. */
-export function unitCost(faction: FactionId, type: UnitTypeId): number {
-  return UNIT_STATS[type].cost + (DOCTRINES[faction].unitCostDelta[type] ?? 0);
+/** 세력 교리·일일 수정자를 반영한 병과 생산 비용. */
+export function unitCost(faction: FactionId, type: UnitTypeId, modifier?: string): number {
+  let cost = UNIT_STATS[type].cost + (DOCTRINES[faction].unitCostDelta[type] ?? 0);
+  if (modifier === 'costly-cavalry' && type === 'cavalry') cost += 15;
+  return cost;
 }
 
 export interface DamageBreakdown {
@@ -179,7 +184,9 @@ export function damageBreakdown(
   const defTile = tileAt(state, defPos.q, defPos.r)!;
   const moved = opts.attackerMoved ?? attacker.moved;
   const base = UNIT_STATS[attacker.type].atk;
-  const atkBonus = doctrineAtkBonus(attacker, atkTile, moved, opts.counter ?? false);
+  let atkBonus = doctrineAtkBonus(attacker, atkTile, moved, opts.counter ?? false);
+  // 일일 수정자: 날카로운 화살(모든 궁병 공격 +1, 반격 포함)
+  if (state.config.modifier === 'sharp-arrows' && attacker.type === 'archer') atkBonus += 1;
   const defense = UNIT_STATS[defender.type].def;
   const terrainDef = terrainDefBonus(defTile);
   const doctrineDef = doctrineDefBonus(defender, defTile);
@@ -330,7 +337,7 @@ export function produceUnit(
   if (!tile || !tile.building || tile.owner !== faction) return { ok: false, reason: 'not-owned' };
   if (unitAt(state, at.q, at.r)) return { ok: false, reason: 'occupied' };
   const fs = state.factions[faction];
-  const cost = unitCost(faction, type);
+  const cost = unitCost(faction, type, state.config.modifier);
   if (fs.gold < cost) return { ok: false, reason: 'no-gold' };
   if (unitsOf(state, faction).length >= MAX_UNITS_PER_FACTION)
     return { ok: false, reason: 'unit-cap' };
@@ -429,7 +436,10 @@ export function advancePhase(state: GameState): void {
     if (fs.eliminated) continue;
     for (const t of buildingsOf(state, fid)) {
       fs.gold += BUILDING_INCOME[t.building!];
-      if (t.building === 'village') fs.gold += DOCTRINES[fid].villageIncomeBonus;
+      if (t.building === 'village') {
+        fs.gold += DOCTRINES[fid].villageIncomeBonus;
+        if (state.config.modifier === 'rich-villages') fs.gold += 5;
+      }
     }
   }
   for (const u of state.units) {

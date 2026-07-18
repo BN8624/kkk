@@ -440,7 +440,10 @@ function pickProductionType(
     const enemyArc = an.enemies.filter((e) => e.type === 'archer').length;
     // 적 기병 비중이 크면 방어 보병, 적 궁병 비중이 크면 접근 기병
     if (enemyCav / an.enemies.length >= 0.4) return 'infantry';
-    if (enemyArc / an.enemies.length >= 0.5 && fs.gold >= unitCost(faction, 'cavalry'))
+    if (
+      enemyArc / an.enemies.length >= 0.5 &&
+      fs.gold >= unitCost(faction, 'cavalry', state.config.modifier)
+    )
       return 'cavalry';
   }
 
@@ -452,7 +455,8 @@ function pickProductionType(
   const targetArc = Math.ceil((count + 1) * 0.3);
   if (inf < targetInf) return 'infantry';
   if (arc < targetArc) return 'archer';
-  if (fs.gold >= unitCost(faction, 'cavalry') + 20 && cav <= arc) return 'cavalry';
+  if (fs.gold >= unitCost(faction, 'cavalry', state.config.modifier) + 20 && cav <= arc)
+    return 'cavalry';
   return 'infantry';
 }
 
@@ -479,8 +483,8 @@ function produceUnits(
       if (adjacentEnemy) continue;
     }
     let type = pickProductionType(state, faction, an, profile);
-    if (fs.gold < unitCost(faction, type)) type = 'infantry';
-    if (fs.gold < unitCost(faction, type)) break;
+    if (fs.gold < unitCost(faction, type, state.config.modifier)) type = 'infantry';
+    if (fs.gold < unitCost(faction, type, state.config.modifier)) break;
     const result = produceUnit(state, faction, spot, type);
     if (result.ok && result.unit) {
       log.push({ kind: 'produce', unitId: result.unit.id, at: { q: spot.q, r: spot.r }, type });

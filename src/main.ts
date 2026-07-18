@@ -2,8 +2,10 @@
 import Phaser from 'phaser';
 import { runAiTurn, type AiAction } from './core/ai';
 import { humanFaction, isHumanTurn, tileAt, unitAt, unitById } from './core/board';
-import { BUILDING_NAMES, UNIT_NAMES } from './core/data';
+import { BUILDING_NAMES, DIFFICULTY_NAMES, FACTION_NAMES, UNIT_NAMES } from './core/data';
+import { dailyChallenge, MODIFIERS, shareText, todayKey, type ModifierId } from './core/daily';
 import { DOCTRINES } from './core/doctrines';
+import { loadRecords, recordGame, saveRecords, type RecordOutcome } from './core/records';
 import {
   advancePhase,
   attack,
@@ -79,6 +81,8 @@ class App {
       },
       onNewGame: () => this.startNewGame(),
       onContinue: () => this.continueGame(),
+      onDaily: () => this.showDaily(),
+      onShowRecords: () => this.showRecords(),
       onToTitle: () => this.toTitle(),
       onReplayTutorial: () => {
         this.hud.hideOverlay();
@@ -130,7 +134,80 @@ class App {
   // ---------------- 화면 전환 ----------------
 
   private toTitle(): void {
-    this.hud.showTitle(loadGame() !== null);
+    const saved = loadGame();
+    const summary = saved
+      ? `${FACTION_NAMES[saved.config.humanFaction]} · ${SCENARIOS[saved.config.scenario].name} · ${
+          DIFFICULTY_NAMES[saved.config.difficulty]
+        } · ${Math.min(saved.turn, saved.maxTurns)}턴${saved.config.mode === 'daily' ? ' · 일일 도전' : ''}`
+      : undefined;
+    this.hud.showTitle(saved !== null, summary);
+  }
+
+  private showDaily(): void {
+    const ch = dailyChallenge(todayKey());
+    const records = loadRecords();
+    const today = records.daily?.dateKey === ch.dateKey ? records.daily : null;
+    const lines = [
+      { label: '시나리오', value: SCENARIOS[ch.scenario].name },
+      { label: '왕국', value: FACTION_NAMES[ch.faction] },
+      { label: '난이도', value: DIFFICULTY_NAMES[ch.difficulty] },
+      {
+        label: '수정자',
+        value: ch.modifier ? MODIFIERS[ch.modifier].name : '없음',
+      },
+      ...(ch.modifier ? [{ label: '효과', value: MODIFIERS[ch.modifier].description }] : []),
+      ...(today
+        ? [
+            { label: '오늘 최고 점수', value: `${today.bestScore}점` },
+            { label: '오늘 결과', value: today.won ? '승리' : '미승리' },
+          ]
+        : []),
+    ];
+    this.hud.showDaily({
+      title: `${ch.dateKey.slice(0, 4)}년 ${ch.dateKey.slice(4, 6)}월 ${ch.dateKey.slice(6, 8)}일 — 모두 같은 전장에서 겨룹니다`,
+      lines,
+      note: '기록은 이 브라우저에만 저장됩니다 (서버 없음)',
+      startLabel: today ? '다시 도전' : '도전 시작',
+      onStart: () => {
+        const state = newGame(ch.seed, {
+          mode: 'daily',
+          scenario: ch.scenario,
+          humanFaction: ch.faction,
+          difficulty: ch.difficulty,
+          modifier: ch.modifier,
+        });
+        this.launch(state);
+      },
+      onBack: () => this.toTitle(),
+    });
+  }
+
+  private showRecords(): void {
+    const r = loadRecords();
+    const lines = [
+      { label: '전체 플레이', value: `${r.plays}판` },
+      {
+        label: '왕국별 승리',
+        value: `${r.winsByFaction.azure} · ${r.winsByFaction.crimson} · ${r.winsByFaction.violet}`,
+      },
+      {
+        label: '난이도별 승리',
+        value: `쉬움 ${r.winsByDifficulty.easy} · 보통 ${r.winsByDifficulty.normal} · 어려움 ${r.winsByDifficulty.hard}`,
+      },
+      ...SCENARIO_IDS.map((id) => ({
+        label: `${SCENARIOS[id].name} 최고`,
+        value: r.bestScoreByScenario[id] !== undefined ? `${r.bestScoreByScenario[id]}점` : '-',
+      })),
+      { label: '최단 승리', value: r.fastestWinTurns !== null ? `${r.fastestWinTurns}턴` : '-' },
+      { label: '최다 점령', value: `${r.maxCaptured}곳` },
+      { label: '최다 처치', value: `${r.maxKills}기` },
+      {
+        label: '오늘 일일 도전',
+        value:
+          r.daily?.dateKey === todayKey() ? `${r.daily.bestScore}점 (완료)` : '미완료',
+      },
+    ];
+    this.hud.showRecords(lines, () => this.toTitle());
   }
 
   private startNewGame(): void {
@@ -552,7 +629,68 @@ class App {
     this.hud.hideTutorial();
     if (state.winner === this.human()) sfx.win();
     else sfx.lose();
-    window.setTimeout(() => this.hud.showResult(state), 700);
+
+    // 기록 반영(1회)
+    const records = loadRecords();
+    const outcome = recordGame(
+      records,
+      state,
+      state.config.mode === 'daily' ? todayKey() : undefined,
+    );
+    saveRecords(outcome.records);
+
+    window.setTimeout(() => this.showResultScreen(state, outcome), 700);
+  }
+
+  private showResultScreen(state: GameState, outcome: RecordOutcome): void {
+    const modifier = state.config.modifier as ModifierId | undefined;
+    this.hud.showResult(state, {
+      scenarioName: SCENARIOS[state.config.scenario].name,
+      difficultyName: DIFFICULTY_NAMES[state.config.difficulty],
+      modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
+      prevBest: outcome.prevBestScore,
+      isNewBest: outcome.isNewBest,
+      onShare: () => void this.shareResult(outcome),
+      onReplay: () => {
+        const seed =
+          state.config.mode === 'daily' ? state.seed : Date.now() >>> 0;
+        this.launch(newGame(seed, { ...state.config }));
+      },
+      onChangeSetup: () => this.startNewGame(),
+      onDaily: () => this.showDaily(),
+    });
+  }
+
+  private async shareResult(outcome: RecordOutcome): Promise<void> {
+    const e = outcome.entry;
+    const modifier = this.state?.config.modifier as ModifierId | undefined;
+    const text = shareText({
+      scenarioName: SCENARIOS[e.scenario].name,
+      difficultyName: DIFFICULTY_NAMES[e.difficulty],
+      factionName: FACTION_NAMES[e.faction],
+      outcome: e.outcome,
+      turns: e.turns,
+      score: e.score,
+      captured: e.captured,
+      kills: e.kills,
+      seed: e.seed,
+      daily: e.mode === 'daily',
+      modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
+    });
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+        return;
+      }
+    } catch {
+      /* 사용자가 공유 시트를 닫은 경우 등 — 클립보드로 폴백 */
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      this.hud.toast('결과를 클립보드에 복사했습니다');
+    } catch {
+      this.hud.toast('공유를 지원하지 않는 환경입니다');
+    }
   }
 }
 
