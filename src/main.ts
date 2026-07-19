@@ -3,11 +3,18 @@ import Phaser from 'phaser';
 import { runAiTurn } from './core/ai';
 import { humanFaction, isHumanTurn, tileAt, unitAt, unitById } from './core/board';
 import { findEvent, issueCommand, type GameEvent } from './core/command';
-import { BUILDING_NAMES, DIFFICULTY_NAMES, FACTION_NAMES, UNIT_NAMES } from './core/data';
+import { BUILDING_NAMES, DIFFICULTY_NAMES, FACTION_NAMES, UNIT_NAMES, UNIT_STATS } from './core/data';
 import { dailyChallenge, MODIFIERS, shareText, todayKey, type ModifierId } from './core/daily';
 import { DOCTRINES } from './core/doctrines';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from './core/records';
-import { attackTargets, factionScore, forecastAttack, newGame, unitCost } from './core/game';
+import {
+  attackTargets,
+  factionScore,
+  forecastAttack,
+  newGame,
+  newGameFromScenario,
+  unitCost,
+} from './core/game';
 import {
   buildReplayDocument,
   parseReplayDocument,
@@ -19,11 +26,12 @@ import { ReplayPlayback } from './replay/playback';
 import { EditorController, type EditorTool } from './editor/controller';
 import { cloneBuiltinDocument, emptyDocument, randomDocument } from './editor/new-doc';
 import { clone } from './editor/ops';
-import { UNIT_STATS } from './core/data';
-import { parseScenarioDocument } from './core/scenario/validate';
+import { normalizeScenario } from './core/scenario/normalize';
+import { isPlayable, parseScenarioDocument } from './core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from './core/scenario/types';
 import { EditorScene, type EditorSceneCallbacks } from './render/EditorScene';
 import { EditorPanel, showEditorHomeScreen, type EditorDraftItem } from './ui/editor';
+import { TestPlayBar } from './ui/editor/testplay';
 import { newDocId } from './storage/docstore';
 import { documentStore } from './storage/idb';
 import {
@@ -104,6 +112,9 @@ class App {
   private editorSceneStarted = false;
   private tilePickResolve: ((v: Axial | null) => void) | null = null;
   private pickBanner: HTMLElement | null = null;
+  private testPlay = false;
+  private spectate = false;
+  private testPlayBar: TestPlayBar | null = null;
 
   constructor() {
     this.settings = loadSettings();
@@ -133,7 +144,7 @@ class App {
     });
 
     window.addEventListener('pagehide', () => {
-      if (this.state && !this.state.over) saveGame(this.state);
+      if (this.state && !this.state.over && !this.testPlay) saveGame(this.state);
     });
 
     this.toTitle();
@@ -165,6 +176,11 @@ class App {
 
   private human(): FactionId {
     return humanFaction(this.state!);
+  }
+
+  /** 일반 플레이 자동 저장. 테스트 플레이는 실제 저장을 오염시키지 않는다. */
+  private persist(state: GameState): void {
+    if (!this.testPlay) saveGame(state);
   }
 
   // ---------------- 화면 전환 ----------------
@@ -327,19 +343,32 @@ class App {
     this.launch(state);
   }
 
-  private launch(state: GameState): void {
-    this.closeEditorSession();
+  private launch(state: GameState, opts: { testPlay?: boolean; spectate?: boolean } = {}): void {
+    if (opts.testPlay) this.suspendEditorUi();
+    else this.closeEditorSession();
+    this.testPlay = !!opts.testPlay;
+    this.spectate = !!opts.spectate;
+    this.testPlayBar?.destroy();
+    this.testPlayBar = null;
     this.mode = 'play';
     this.state = state;
     this.selectedUnitId = null;
     this.busy = false;
     this.overlay.hide();
+    this.hud.setPlayControlsVisible(true);
     this.hud.hideProduction();
     this.hud.hideTutorial();
     this.hud.showUnitPanel(null, null, '');
     this.hud.updateTop(state);
-    this.hud.setEndTurnEnabled(true);
-    saveGame(state);
+    this.hud.setEndTurnEnabled(!this.spectate);
+    this.persist(state);
+    if (this.testPlay) {
+      this.testPlayBar = new TestPlayBar(
+        document.getElementById('hud')!,
+        () => this.state,
+        { onBackToEditor: () => this.backToEditor() },
+      );
+    }
 
     const callbacks = {
       onTileTap: (q: number, r: number) => this.onTileTap(q, r),
@@ -361,8 +390,8 @@ class App {
       this.finishGame();
       return;
     }
-    // 저장 시점이 AI 차례였다면 남은 AI 턴을 이어서 진행한다
-    if (!isHumanTurn(state)) {
+    // 저장 시점이 AI 차례였다면(또는 관전이면) 남은 AI 턴을 이어서 진행한다
+    if (this.spectate || !isHumanTurn(state)) {
       void this.runAiPhases();
     }
   }
@@ -560,7 +589,7 @@ class App {
       this.hud.toast(`${BUILDING_NAMES[captured.building]} 점령!${bonus}`);
     }
     this.hud.updateTop(state);
-    saveGame(state);
+    this.persist(state);
     this.busy = false;
 
     if (this.tutorialStep === 2) this.advanceTutorial(3);
@@ -607,7 +636,7 @@ class App {
     if (defenderDied || attackerDied) sfx.hit();
     if (defenderDied) this.hud.toast('적 유닛 처치!');
     this.hud.updateTop(state);
-    saveGame(state);
+    this.persist(state);
     this.busy = false;
     this.deselect();
     if (state.over) this.finishGame();
@@ -658,7 +687,7 @@ class App {
     void this.scene?.animateSpawn(produced.unitId);
     this.hud.toast(`${UNIT_NAMES[type]} 생산 완료 — 다음 턴부터 행동합니다`);
     this.hud.updateTop(state);
-    saveGame(state);
+    this.persist(state);
   }
 
   // ---------------- 턴 진행 ----------------
@@ -679,18 +708,25 @@ class App {
     this.busy = true;
     this.hud.setEndTurnEnabled(false);
     this.scene?.setSpeed(this.settings.aiSpeed === 2 ? 2 : 1);
-    while (!state.over && !isHumanTurn(state)) {
+    // 관전(AI 대 AI 테스트)에서는 인간 차례도 AI가 대신 진행한다
+    // (에디터 복귀 등으로 상태가 바뀌면 즉시 멈춘다)
+    while (this.state === state && !state.over && (this.spectate || !isHumanTurn(state))) {
       const fid = state.current;
       this.hud.setAiThinking(fid);
       // 행동·페이즈 전환(END_PHASE 포함)을 동기적으로 확정한 뒤(페이즈 경계) 저장하고, 연출은 그 후 재생한다.
       // 연출 중 이탈해도 저장본은 항상 "다음 세력이 아직 행동하지 않은" 경계 상태라 중복 실행이 없다.
       const result = runAiTurn(state, fid);
-      if (!state.over) saveGame(state);
+      if (!state.over) this.persist(state);
       await this.playEvents(result.events, this.settings.aiSpeed === 0);
       this.hud.updateTop(state);
     }
     this.hud.setAiThinking(null);
     this.scene?.setSpeed(1);
+    if (this.state !== state) {
+      // 진행 중 화면이 전환됨(테스트 플레이 → 에디터 복귀 등)
+      this.busy = false;
+      return;
+    }
     this.scene?.refresh();
     this.hud.updateTop(state);
 
@@ -700,7 +736,7 @@ class App {
       this.hud.setEndTurnEnabled(true);
       return;
     }
-    saveGame(state);
+    this.persist(state);
     sfx.turn();
     // 카메라를 플레이어 진영으로 되돌린다
     const me = this.human();
@@ -865,10 +901,17 @@ class App {
 
   /** 에디터 세션을 연다(문서의 id가 초안 키가 된다). */
   private openEditorSession(doc: ScenarioDocumentV1): void {
+    this.editor?.dispose();
+    this.editor = new EditorController(documentStore(), doc, doc.id);
+    this.mountEditorUi();
+  }
+
+  /** 에디터 씬·패널을 (재)구성한다. 세션(문서·undo 히스토리)은 유지된다. */
+  private mountEditorUi(): void {
+    if (!this.editor) return;
     this.mode = 'editor';
     this.overlay.hide();
     this.hud.setPlayControlsVisible(false);
-    this.editor = new EditorController(documentStore(), doc, doc.id);
     const callbacks: EditorSceneCallbacks = {
       onTap: (q, r) => this.editorTap(q, r),
       onPaint: (q, r) => {
@@ -912,7 +955,8 @@ class App {
             this.hud.toast(ok ? '초안을 저장했습니다' : '저장하지 못했습니다'),
           );
         },
-        onTestPlay: () => this.hud.toast('테스트 플레이는 다음 단계에서 열립니다'),
+        onTestPlay: () => this.startTestPlay(false),
+        onSpectate: () => this.startTestPlay(true),
         onExport: () => this.exportScenario(),
         onExit: () => void this.exitEditorSession(),
         onMetaChange: (meta) => {
@@ -1081,8 +1125,85 @@ class App {
     void this.showEditorHome();
   }
 
+  // ---------------- 테스트 플레이 ----------------
+
+  /**
+   * 편집 중 문서를 검증→정규화해 실제 게임 엔진으로 테스트한다.
+   * 스냅샷을 새로 만들므로 편집 원본은 게임 상태의 영향을 받지 않는다.
+   */
+  private startTestPlay(spectate: boolean): void {
+    const ed = this.editor;
+    if (!ed) return;
+    const issues = ed.validate();
+    if (!isPlayable(issues)) {
+      this.editorPanel?.showValidation(issues);
+      return;
+    }
+    let state: GameState;
+    try {
+      const snapshot = normalizeScenario(ed.doc);
+      state = newGameFromScenario(Date.now() >>> 0, snapshot, {
+        mode: 'custom',
+        difficulty: 'normal',
+      });
+    } catch {
+      this.hud.toast('시나리오를 시작할 수 없습니다 — 검증을 확인하세요');
+      return;
+    }
+    void ed.autosaveNow();
+    this.launch(state, { testPlay: true, spectate });
+    this.hud.toast(spectate ? 'AI 관전 테스트 — 목표 버튼으로 상태를 확인하세요' : '테스트 플레이 — 에디터로 버튼으로 돌아갑니다');
+  }
+
+  /** 테스트 플레이 화면 요소만 걷어낸다(에디터 세션은 유지). */
+  private suspendEditorUi(): void {
+    this.endTilePick();
+    this.editorPanel?.destroy();
+    this.editorPanel = null;
+    if (this.editorSceneStarted) this.game.scene.stop('editor');
+    if (this.boardStarted && this.game.scene.isSleeping('board')) this.game.scene.wake('board');
+  }
+
+  /** 테스트 플레이에서 에디터로 복귀한다. 편집 원본과 undo 히스토리는 유지된다. */
+  private backToEditor(): void {
+    this.testPlay = false;
+    this.spectate = false;
+    this.testPlayBar?.destroy();
+    this.testPlayBar = null;
+    this.state = null;
+    this.busy = false;
+    this.deselect();
+    this.closeProduction();
+    this.hud.setAiThinking(null);
+    this.mountEditorUi();
+  }
+
+  /** 테스트 플레이 종료 결과: 간단한 요약과 재테스트·에디터 복귀만 제공한다. */
+  private showTestPlayResult(state: GameState): void {
+    const me = state.config.humanFaction;
+    const word = state.winner === 'draw' ? '무승부' : state.winner === me ? '승리' : '패배';
+    const winnerName = state.winner && state.winner !== 'draw' ? FACTION_NAMES[state.winner] : null;
+    this.overlay.show(`
+      <h1 class="result-word ${state.winner === me ? 'win' : 'lose'}" style="font-size:34px;">${word}</h1>
+      <p class="subtitle">테스트 플레이 종료 · ${Math.min(state.turn, state.maxTurns)}턴${
+        winnerName ? ` · 승자: ${winnerName}` : ''
+      } · 점수 ${factionScore(state, me)}점</p>
+      <button class="big-btn" id="tp-again">다시 테스트</button>
+      <button class="sub-btn" id="tp-spectate">AI 관전으로 다시</button>
+      <button class="sub-btn" id="tp-editor">에디터로 돌아가기</button>`);
+    this.overlay.bind({
+      'tp-again': () => this.startTestPlay(false),
+      'tp-spectate': () => this.startTestPlay(true),
+      'tp-editor': () => this.backToEditor(),
+    });
+  }
+
   /** 에디터 세션·씬·패널을 정리한다(홈·타이틀로 나갈 때). */
   private closeEditorSession(): void {
+    this.testPlayBar?.destroy();
+    this.testPlayBar = null;
+    this.testPlay = false;
+    this.spectate = false;
     this.endTilePick();
     this.editor?.dispose();
     this.editor = null;
@@ -1390,11 +1511,17 @@ class App {
 
   private finishGame(): void {
     const state = this.state!;
-    clearSave();
     this.deselect();
     this.hud.hideTutorial();
     if (state.winner === this.human()) sfx.win();
     else sfx.lose();
+
+    // 테스트 플레이: 실제 저장·기록·리플레이 보관함을 건드리지 않는다
+    if (this.testPlay) {
+      window.setTimeout(() => this.showTestPlayResult(state), 500);
+      return;
+    }
+    clearSave();
 
     // 기록 반영(1회)
     const records = loadRecords();

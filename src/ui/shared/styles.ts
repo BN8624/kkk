@@ -275,6 +275,8 @@ export function injectSharedStyles(): void {
   font-size: 14px; font-weight: bold; pointer-events: auto; display: flex; gap: 10px; align-items: center;
 }
 .ed-pick-banner button { border: 1px solid #8a6d14; border-radius: 8px; background: #f2ead8; height: 30px; padding: 0 10px; }
+.tp-bar { top: calc(env(safe-area-inset-top, 0px) + 100px); }
+.tp-line { font-size: 13.5px; padding: 3px 2px; color: #2b2416; }
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }

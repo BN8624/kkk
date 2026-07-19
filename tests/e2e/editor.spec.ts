@@ -13,6 +13,8 @@ interface EditorBridge {
   openEditor: () => void;
   editorDoc: () => EditorDoc | null;
   editorTap: (q: number, r: number) => void;
+  state: () => { turn: number; over: boolean; config?: { mode: string } } | null;
+  mode: () => string;
 }
 declare const window: { __tc?: Partial<EditorBridge> } & typeof globalThis;
 
@@ -69,4 +71,42 @@ test('에디터: 새 문서→칠하기→유닛 배치→undo→검증→초안
   await expect(page.locator('.ed-palette')).toBeVisible();
   doc = (await page.evaluate(() => window.__tc!.editorDoc!()))!;
   expect(doc.board.tiles.find((t) => t.q === 2 && t.r === 2)?.terrain).toBe('forest');
+});
+
+test('에디터: 내장 복제→테스트 플레이→에디터 복귀 시 원본 유지', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'three-crowns-settings',
+      JSON.stringify({ soundOn: false, tutorialDone: true, aiSpeed: 0 }),
+    );
+  });
+  await page.goto('/');
+  await page.waitForFunction(() => !!window.__tc?.openEditor);
+  await page.evaluate(() => window.__tc!.openEditor!());
+  await page.getByRole('button', { name: '세 왕관 전쟁 복제' }).click();
+  await expect(page.locator('.ed-palette')).toBeVisible();
+  const before = JSON.stringify(await page.evaluate(() => window.__tc!.editorDoc!()));
+
+  // 메뉴 → 테스트 플레이: 실제 게임 엔진으로 시작된다
+  await page.locator('#ed-menu').click();
+  await page.locator('[data-m="test"]').click();
+  await expect(page.locator('.tp-bar')).toBeVisible();
+  await page.waitForFunction(() => {
+    const s = window.__tc!.state!();
+    return s !== null && s.config?.mode === 'custom';
+  });
+
+  // 목표 상태 시트(테스트 플레이 전용 검증 정보)
+  await page.locator('#tp-objectives').click();
+  await expect(page.locator('.tp-line').first()).toBeVisible();
+  await page.locator('.ed-sheet .close-btn').click();
+
+  // 에디터 복귀: 편집 원본이 게임 상태에 오염되지 않는다
+  await page.locator('#tp-exit').click();
+  await expect(page.locator('.ed-palette')).toBeVisible();
+  const after = JSON.stringify(await page.evaluate(() => window.__tc!.editorDoc!()));
+  expect(after).toBe(before);
+  // 테스트 플레이는 일반 저장을 만들지 않는다
+  const saved = await page.evaluate(() => localStorage.getItem('three-crowns-save'));
+  expect(saved).toBeNull();
 });

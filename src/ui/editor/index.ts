@@ -108,6 +108,8 @@ export interface EditorPanelHandlers {
   onValidate: () => void;
   onSave: () => void;
   onTestPlay: () => void;
+  /** AI 대 AI 관전 테스트 */
+  onSpectate: () => void;
   onExport: () => void;
   onExit: () => void;
   onMetaChange: (meta: { title: string; description: string; author?: string }) => void;
@@ -255,6 +257,7 @@ export class EditorPanel {
       <div class="ed-menu-grid">
         <button data-m="save">초안 저장</button>
         <button data-m="test">테스트 플레이</button>
+        <button data-m="spectate">AI 관전 테스트</button>
         <button data-m="info">문서 정보</button>
         <button data-m="rules">규칙</button>
         <button data-m="factions">세력</button>
@@ -270,6 +273,10 @@ export class EditorPanel {
     s.querySelector('[data-m="test"]')!.addEventListener('click', () => {
       this.closeSheet();
       this.handlers.onTestPlay();
+    });
+    s.querySelector('[data-m="spectate"]')!.addEventListener('click', () => {
+      this.closeSheet();
+      this.handlers.onSpectate();
     });
     s.querySelector('[data-m="info"]')!.addEventListener('click', () => this.openInfoSheet());
     s.querySelector('[data-m="rules"]')!.addEventListener('click', () => this.openRulesSheet());
