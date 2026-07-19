@@ -9,8 +9,9 @@ import {
 } from './command';
 import { MAX_UNITS_PER_FACTION, UNIT_STATS } from './data';
 import { forecastAttack, terrainDefBonus, unitCost, unitRange } from './game';
-import { hexDistance, hexKey } from './hex';
+import { hexDistance, hexKey, neighbors } from './hex';
 import { movementRange } from './pathfind';
+import { crownStatus } from './scenario/crown-status';
 import { holdVictoryCondition } from './scenario/objectives';
 import type { VictoryCondition } from './scenario/types';
 import type {
@@ -49,6 +50,11 @@ interface AiProfile {
   /** 목표 탐색 지평(이 거리보다 먼 목표는 보지 못한다). 없으면 전장 전체 */
   horizon?: number;
   production: 'cycle' | 'balanced' | 'adaptive';
+  /**
+   * 적 왕관 임박 저지 가치 가산(hard 전용).
+   * 자신이 이길 수 없어도 상대 즉시 승리를 막는 행동을 우선한다.
+   */
+  crownDenyBonus: number;
 }
 
 const PROFILES: Record<Difficulty, AiProfile> = {
@@ -61,6 +67,7 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     seekTerrain: false,
     horizon: 3,
     production: 'cycle',
+    crownDenyBonus: 0,
   },
   normal: {
     moveAttack: true,
@@ -70,6 +77,7 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     focusFire: false,
     seekTerrain: false,
     production: 'balanced',
+    crownDenyBonus: 0,
   },
   hard: {
     moveAttack: true,
@@ -79,6 +87,7 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     focusFire: true,
     seekTerrain: true,
     production: 'adaptive',
+    crownDenyBonus: 200,
   },
 };
 
@@ -98,6 +107,12 @@ interface Analysis {
   crownTile: Tile | null;
   /** hold-building 승리 조건이 있는 시나리오(왕관의 심장 등) */
   crownScenario: boolean;
+  crownOwner: FactionId | null;
+  crownActive: boolean;
+  crownHeldTurns: number;
+  crownNeed: number;
+  /** 적 왕관 임박(다음 라운드 승리 가능) — 저지 최우선 */
+  crownDenyImminent: boolean;
   objectives: Objective[];
   /** 사망이 패배(또는 생존이 승리 필수)인 유닛 태그 — 보호 역할을 받는다 */
   protectedTags: Set<string>;
@@ -140,7 +155,7 @@ export function runAiTurn(
   }
   const profile = PROFILES[difficultyOverride ?? state.config.difficulty] ?? PROFILES.normal;
 
-  const analysis = analyze(state, faction);
+  const analysis = analyze(state, faction, profile);
   const { roles, holdTargets } = assignRoles(state, faction, analysis, profile);
 
   const unitIds = unitsOf(state, faction).map((u) => u.id);
@@ -156,7 +171,7 @@ export function runAiTurn(
 
 // ---------------- 8.1 전략 상태 분석 ----------------
 
-function analyze(state: GameState, faction: FactionId): Analysis {
+function analyze(state: GameState, faction: FactionId, profile: AiProfile): Analysis {
   const enemies = state.units.filter((u) => u.faction !== faction);
   const myCapital =
     state.tiles.find((t) => t.building === 'capital' && t.owner === faction) ?? null;
@@ -167,22 +182,54 @@ function analyze(state: GameState, faction: FactionId): Analysis {
       )
     : [];
   const hold = holdVictoryCondition(state);
+  const cs = crownStatus(state);
   const crownTile = hold
     ? (tileAt(state, hold.at.q, hold.at.r) ?? null)
     : (state.tiles.find((t) => t.building === 'crown') ?? null);
   const isCrownScenario = hold !== null;
+  const crownOwner = cs?.owner ?? null;
+  const crownActive = cs?.active ?? false;
+  const crownHeldTurns = cs?.heldTurns ?? 0;
+  const crownNeed = cs?.needTurns ?? 0;
+  const enemyHoldsCrown =
+    isCrownScenario && crownActive && crownOwner !== null && crownOwner !== faction;
+  const crownDenyImminent = enemyHoldsCrown && crownHeldTurns >= crownNeed - 1;
+
+  // 왕관 목표 가치: 활성 전 110 / 활성 후 160 / 적 보유 시 상향 / 임박 시 최우선
+  let crownObjValue = isCrownScenario ? (crownActive ? 160 : 110) : 70;
+  if (enemyHoldsCrown) {
+    crownObjValue = crownDenyImminent ? 500 : 280;
+    crownObjValue += profile.crownDenyBonus;
+  }
+
   const objectives: Objective[] = [];
   for (const t of state.tiles) {
     if (!t.building || t.owner === faction) continue;
     const value =
       t.building === 'crown'
-        ? isCrownScenario
-          ? 160
-          : 70
+        ? crownObjValue
         : t.building === 'capital'
-          ? 100
+          ? // 적 왕관 임박 시 수도 공격보다 왕관 저지를 우선(가치 상한)
+            crownDenyImminent
+            ? 90
+            : 100
           : 50;
     objectives.push({ q: t.q, r: t.r, value, claimed: 0 });
+  }
+
+  // 적 왕관 저지: 인접 타일로 이동해 경합(카운트 정지) — 거점이 아닌 좌표도 목표로 추가
+  if (enemyHoldsCrown && crownTile) {
+    const adjValue = crownDenyImminent
+      ? 420 + profile.crownDenyBonus
+      : 220 + Math.floor(profile.crownDenyBonus / 2);
+    for (const n of neighbors(crownTile)) {
+      const nt = tileAt(state, n.q, n.r);
+      if (!nt || nt.terrain === 'water') continue;
+      if (nt.owner === faction && nt.building) continue;
+      const existing = objectives.find((o) => o.q === n.q && o.r === n.r);
+      if (existing) existing.value = Math.max(existing.value, adjValue);
+      else objectives.push({ q: n.q, r: n.r, value: adjValue, claimed: 0 });
+    }
   }
 
   // 목표 인식 계층: 승패 조건이 이 세력(인간 세력) 기준이면 미션 목표를 가중치·보호 대상에 반영한다
@@ -221,6 +268,11 @@ function analyze(state: GameState, faction: FactionId): Analysis {
     capitalThreats,
     crownTile,
     crownScenario: isCrownScenario,
+    crownOwner,
+    crownActive,
+    crownHeldTurns,
+    crownNeed,
+    crownDenyImminent,
     objectives,
     protectedTags,
     holdTiles,
@@ -275,13 +327,23 @@ function assignRoles(
     for (const d of defenders) roles.set(d.id, 'defend');
   }
 
-  // 왕관 요새를 소유 중이면 비어 있는 요새에 수비대를 보낸다
+  // 왕관 요새를 소유 중이면(활성화 후) 비어 있는 요새에 수비대를 보낸다
   if (
     an.crownTile &&
     an.crownTile.owner === faction &&
     an.crownScenario &&
+    an.crownActive &&
     !unitAt(state, an.crownTile.q, an.crownTile.r)
   ) {
+    const crown = an.crownTile;
+    const candidate = units
+      .filter((u) => !roles.has(u.id))
+      .sort((a, b) => hexDistance(a, crown) - hexDistance(b, crown))[0];
+    if (candidate) roles.set(candidate.id, 'garrison');
+  }
+
+  // 적 왕관 임박 저지: 가장 가까운 유닛을 왕관(점령) 또는 인접(경합)으로 보낸다
+  if (an.crownDenyImminent && an.crownTile) {
     const crown = an.crownTile;
     const candidate = units
       .filter((u) => !roles.has(u.id))
@@ -340,10 +402,14 @@ function actUnit(
     return;
   }
   if (role === 'garrison') {
-    // 수비대: 요새 위로 이동(도달 불가면 접근). 인접 적은 공격
+    // 수비대·저지: 요새 위(또는 적 왕관 임박 시 인접 경합)로 이동. 인접 적은 공격
     if (an.crownTile) {
+      // ① 왕관 위 점령/주둔
       if (tryOccupy(state, unit, an.crownTile, issue)) return;
+      // ② 왕관 위 적 또는 인근 적 공격
       if (tryAttack(state, unit, an, profile, issue)) return;
+      // ③ 적 왕관 저지: 인접 빈칸으로 경합(카운트 정지)
+      if (an.crownDenyImminent && tryOccupyCrownAdjacent(state, unit, an.crownTile, issue)) return;
       moveToward(state, unit, an.crownTile, profile, issue);
       return;
     }
@@ -418,6 +484,14 @@ function tryAttack(
         const t = tileAt(state, pos.q, pos.r)!;
         score += terrainDefBonus(t) * 1.2;
       }
+      // 적 왕관 저지: 왕관 위 적·왕관 소유 세력 유닛 우선
+      if (an.crownScenario && an.crownActive && an.crownOwner && an.crownOwner !== unit.faction) {
+        if (an.crownTile && enemy.q === an.crownTile.q && enemy.r === an.crownTile.r) {
+          score += an.crownDenyImminent ? 80 + profile.crownDenyBonus / 4 : 40;
+        } else if (enemy.faction === an.crownOwner) {
+          score += an.crownDenyImminent ? 50 + profile.crownDenyBonus / 5 : 20;
+        }
+      }
       if (!best || score > best.score) best = { destKey: pos.key, target: enemy, score };
     }
   }
@@ -432,7 +506,7 @@ function tryAttack(
 }
 
 /** 특정 타일 위로 이동을 시도한다(왕관 수비 등). */
-function tryOccupy(state: GameState, unit: Unit, target: Tile, issue: IssueFn): boolean {
+function tryOccupy(state: GameState, unit: Unit, target: Axial, issue: IssueFn): boolean {
   if (unit.moved) return false;
   if (unit.q === target.q && unit.r === target.r) return true;
   if (unitAt(state, target.q, target.r)) return false;
@@ -440,6 +514,30 @@ function tryOccupy(state: GameState, unit: Unit, target: Tile, issue: IssueFn): 
   const key = hexKey(target.q, target.r);
   if (!reach.has(key)) return false;
   return issue({ type: 'move-unit', unitId: unit.id, to: { q: target.q, r: target.r } }).ok;
+}
+
+/** 왕관 인접 빈칸 중 도달 가능한 곳으로 이동해 경합을 만든다. */
+function tryOccupyCrownAdjacent(
+  state: GameState,
+  unit: Unit,
+  crown: Axial,
+  issue: IssueFn,
+): boolean {
+  if (unit.moved) return false;
+  // 이미 인접이면 자리 유지
+  if (hexDistance(unit, crown) === 1) return true;
+  const reach = movementRange(state, unit);
+  let best: { q: number; r: number; dist: number } | null = null;
+  for (const n of neighbors(crown)) {
+    const t = tileAt(state, n.q, n.r);
+    if (!t || t.terrain === 'water') continue;
+    if (unitAt(state, n.q, n.r)) continue;
+    if (!reach.has(hexKey(n.q, n.r))) continue;
+    const dist = hexDistance(unit, n);
+    if (!best || dist < best.dist) best = { q: n.q, r: n.r, dist };
+  }
+  if (!best) return false;
+  return issue({ type: 'move-unit', unitId: unit.id, to: { q: best.q, r: best.r } }).ok;
 }
 
 /** 적의 다음 턴 위협권 밖으로 물러난다(안전 타일이 없으면 위협이 가장 적은 곳으로). */
