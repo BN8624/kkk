@@ -19,6 +19,10 @@ export const KO = {
   'title.replays': '리플레이',
   'title.analysis': '플레이 분석',
   'title.records': '기록',
+  'title.saveSummary': '{faction} · {scenario} · {difficulty} · {turns}턴{daily}',
+  'title.dailySuffix': ' · 일일 도전',
+  'share.readFailed': '공유 코드를 읽을 수 없습니다',
+  'share.confirmOpen': '공유된 시나리오 "{title}"을(를) 제작실에서 열까요?',
 
   // 일일 도전·기록 화면
   'daily.title': '일일 도전',

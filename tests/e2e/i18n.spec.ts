@@ -1,6 +1,24 @@
 // 한 줄 목적: 영어 모바일 환경에서 설정·HUD·일시정지 핵심 흐름이 한국어 없이 렌더링되는지 검증한다
 import { expect, test } from '@playwright/test';
 
+async function expectVisibleButtonsInsideViewport(page: import('@playwright/test').Page): Promise<void> {
+  const clipped = await page
+    .locator('.overlay.show button:visible, .ed-sheet.show button:visible')
+    .evaluateAll((buttons) =>
+      buttons
+        .map((button) => {
+          const rect = button.getBoundingClientRect();
+          return {
+            label: button.getAttribute('aria-label') ?? button.textContent?.trim(),
+            left: rect.left,
+            right: rect.right,
+          };
+        })
+        .filter(({ left, right }) => left < -1 || right > window.innerWidth + 1),
+    );
+  expect(clipped).toEqual([]);
+}
+
 test('영어 모바일 설정·HUD·일시정지', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('three-crowns-locale', 'en');
@@ -18,6 +36,7 @@ test('영어 모바일 설정·HUD·일시정지', async ({ page }) => {
   await expect(page.getByText('Defense and Discipline')).toBeVisible();
   await expect(page.getByText('Broken Strait')).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await expectVisibleButtonsInsideViewport(page);
 
   await page.getByRole('button', { name: 'Start with this kingdom' }).click();
   await expect(page.getByRole('button', { name: 'End Turn' })).toBeVisible();
@@ -27,6 +46,7 @@ test('영어 모바일 설정·HUD·일시정지', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'AI speed: Normal' })).toBeVisible();
+  await expectVisibleButtonsInsideViewport(page);
   await page.getByRole('button', { name: 'Language: English' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
   await expect(page.getByRole('heading', { name: '일시정지' })).toBeVisible();
@@ -98,6 +118,7 @@ test('영어 모바일 시나리오 제작실 홈·편집 메뉴', async ({ page
   await expect(page.getByRole('button', { name: 'Random Map' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Import JSON' })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await expectVisibleButtonsInsideViewport(page);
 
   await page.getByRole('button', { name: 'Empty Map' }).click();
   await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible();
@@ -106,6 +127,7 @@ test('영어 모바일 시나리오 제작실 홈·편집 메뉴', async ({ page
   await expect(page.getByRole('button', { name: 'Test Play' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Quality Report' })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await expectVisibleButtonsInsideViewport(page);
   const editorSheet = page.locator('.ed-sheet');
   await expect(editorSheet).toHaveAttribute('role', 'dialog');
   await editorSheet.getByRole('button', { name: 'Close' }).focus();

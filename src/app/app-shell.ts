@@ -1,10 +1,10 @@
 // 한 줄 목적: Phaser 게임·HUD·오버레이·설정·모드 전환을 소유하고 모드별 컨트롤러를 조립·중재한다
 import Phaser from 'phaser';
 import { humanFaction } from '../core/board';
-import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
 import { stateDigest } from '../core/replay';
 import { loadGame, loadSettings, type Settings } from '../core/save';
 import { scenarioDisplayName } from '../core/scenarios';
+import { difficultyName, factionName, localizedScenarioName, t } from '../i18n';
 import { decodeShareCode } from '../editor/share';
 import type { GameState } from '../core/types';
 import { BoardScene } from '../render/BoardScene';
@@ -201,9 +201,16 @@ export class AppShell implements AppContext, AppNavigation {
     this.editorCtrl.closeSession();
     const saved = loadGame();
     const summary = saved
-      ? `${FACTION_NAMES[saved.config.humanFaction]} · ${scenarioDisplayName(saved.config.scenario, saved)} · ${
-          DIFFICULTY_NAMES[saved.config.difficulty]
-        } · ${Math.min(saved.turn, saved.maxTurns)}턴${saved.config.mode === 'daily' ? ' · 일일 도전' : ''}`
+      ? t('title.saveSummary', {
+          faction: factionName(saved.config.humanFaction),
+          scenario: localizedScenarioName(
+            saved.config.scenario,
+            scenarioDisplayName(saved.config.scenario, saved),
+          ),
+          difficulty: difficultyName(saved.config.difficulty),
+          turns: Math.min(saved.turn, saved.maxTurns),
+          daily: saved.config.mode === 'daily' ? t('title.dailySuffix') : '',
+        })
       : undefined;
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
@@ -276,13 +283,13 @@ export class AppShell implements AppContext, AppNavigation {
     // 새로 고침 시 재가져오기를 막기 위해 해시를 즉시 지운다
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     const token = this.currentToken();
-    const { doc, issues } = await decodeShareCode(hash.slice(3));
+    const { doc } = await decodeShareCode(hash.slice(3));
     if (!token.alive) return; // 해제 중 다른 화면으로 이동한 경우
     if (!doc) {
-      this.hud.toast(issues[0]?.message ?? '공유 코드를 읽을 수 없습니다');
+      this.hud.toast(t('share.readFailed'));
       return;
     }
-    if (!window.confirm(`공유된 시나리오 "${doc.title}"을(를) 제작실에서 열까요?`)) return;
+    if (!window.confirm(t('share.confirmOpen', { title: doc.title }))) return;
     this.editorCtrl.openImportedDocument(doc);
   }
 

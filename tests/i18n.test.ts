@@ -1,5 +1,8 @@
 // 한 줄 목적: ko/en 사전의 키 완전성·자리 표시자 정합·언어 전환 동작을 검증한다
 import { afterEach, describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
+import ts from 'typescript';
 import {
   getLocale,
   onLocaleChange,
@@ -36,6 +39,46 @@ describe('i18n 사전', () => {
     for (const [k, v] of [...Object.entries(KO), ...Object.entries(EN)]) {
       expect(v.includes('<'), k).toBe(false);
     }
+  });
+
+  it('사용자 화면 계층에 한국어 문자열 리터럴을 하드코딩하지 않는다', () => {
+    const targets = [
+      resolve('src/app'),
+      resolve('src/controllers'),
+      resolve('src/ui'),
+      resolve('src/core/scenario/validate.ts'),
+      resolve('src/core/scenario/quality.ts'),
+      resolve('src/editor/new-doc.ts'),
+    ];
+    const files: string[] = [];
+    const collect = (target: string) => {
+      if (statSync(target).isDirectory()) {
+        for (const name of readdirSync(target)) collect(resolve(target, name));
+      } else if (target.endsWith('.ts')) {
+        files.push(target);
+      }
+    };
+    targets.forEach(collect);
+
+    const violations: string[] = [];
+    for (const file of files) {
+      const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+      const visit = (node: ts.Node) => {
+        const text =
+          ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
+            ? node.text
+            : ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)
+              ? node.text
+              : null;
+        if (text && /[가-힣]/.test(text)) {
+          const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+          violations.push(`${file}:${line} ${text}`);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(violations).toEqual([]);
   });
 });
 

@@ -21,6 +21,10 @@ export const EN: Record<keyof typeof KO, string> = {
   'title.replays': 'Replays',
   'title.analysis': 'Play Analysis',
   'title.records': 'Records',
+  'title.saveSummary': '{faction} · {scenario} · {difficulty} · turn {turns}{daily}',
+  'title.dailySuffix': ' · Daily Challenge',
+  'share.readFailed': 'Unable to read the share code.',
+  'share.confirmOpen': 'Open the shared scenario "{title}" in Scenario Studio?',
 
   // 일일 도전·기록 화면
   'daily.title': 'Daily Challenge',
