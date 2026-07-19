@@ -102,9 +102,9 @@ test('turn 1: crown 상태 UI가 봉인을 표시하고 왕관 패널 규칙이 
   expect(crown).toBeTruthy();
   await tapHex(page, crown!.q, crown!.r);
   await expect(page.locator('.unit-panel')).toHaveClass(/show/);
-  // 패널: 봉인 문구 + 규칙(4턴 연속 보유)
+  // 패널: 봉인 문구 + 규칙(4턴 연속 확보)
   await expect(page.locator('.unit-panel')).toContainText(/봉인/);
-  await expect(page.locator('.unit-panel')).toContainText(/4턴 연속 보유/);
+  await expect(page.locator('.unit-panel')).toContainText(/4턴 연속 확보/);
   await expect(page.locator('.unit-panel')).toContainText(/왕관/);
 });
 
