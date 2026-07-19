@@ -114,6 +114,33 @@ test('에디터: 내장 복제→테스트 플레이→에디터 복귀 시 원�
   expect(saved).toBeNull();
 });
 
+test('커스텀 시나리오: 초안 저장 후 타이틀에서 실제 게임으로 플레이', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'three-crowns-settings',
+      JSON.stringify({ soundOn: false, tutorialDone: true, aiSpeed: 0 }),
+    );
+  });
+  await page.goto('/');
+  await page.waitForFunction(() => !!window.__tc?.openEditor);
+  await page.evaluate(() => window.__tc!.openEditor!());
+  await page.getByRole('button', { name: '세 왕관 전쟁 복제' }).click();
+  await expect(page.locator('.ed-palette')).toBeVisible();
+  await page.locator('#ed-menu').click();
+  await page.locator('[data-m="save"]').click();
+  await expect(page.getByText('초안을 저장했습니다')).toBeVisible();
+
+  // 타이틀 메뉴 → 커스텀 시나리오 → 저장한 초안을 탭하면 일반 게임이 시작된다
+  await page.reload();
+  await page.getByRole('button', { name: '커스텀 시나리오' }).click();
+  await page.locator('.rp-item .rp-main').first().click();
+  await page.waitForFunction(() => {
+    const s = window.__tc!.state!();
+    return s !== null && s.config?.mode === 'custom' && window.__tc!.mode!() === 'play';
+  });
+  await expect(page.getByRole('button', { name: '턴 종료' })).toBeVisible();
+});
+
 test('에디터: 공유 코드 붙여넣기 가져오기', async ({ page }) => {
   const doc = cloneBuiltinDocument('three-crowns', 'custom-e2e', 11, '공유 E2E');
   const code = await encodeShareCode(doc);

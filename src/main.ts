@@ -28,11 +28,12 @@ import { cloneBuiltinDocument, emptyDocument, randomDocument } from './editor/ne
 import { clone } from './editor/ops';
 import { decodeShareCode, encodeShareCode, shareUrlFromCode } from './editor/share';
 import { normalizeScenario } from './core/scenario/normalize';
-import { isPlayable, parseScenarioDocument } from './core/scenario/validate';
+import { isPlayable, parseScenarioDocument, validateScenario } from './core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from './core/scenario/types';
 import { EditorScene, type EditorSceneCallbacks } from './render/EditorScene';
 import {
   EditorPanel,
+  showCustomScenarioListScreen,
   showEditorHomeScreen,
   showImportTextScreen,
   type EditorDraftItem,
@@ -205,14 +206,14 @@ class App {
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
       saveSummary: summary,
-      // 캠페인·보관함·제작실 메뉴는 해당 단계가 실제로 완성되면 켠다
-      features: { campaign: false, scenarios: false, editor: false, replays: true },
+      // 캠페인 메뉴는 해당 단계가 실제로 완성되면 켠다
+      features: { campaign: false, scenarios: true, editor: true, replays: true },
       handlers: {
         onContinue: () => this.continueGame(),
         onNewGame: () => this.startNewGame(),
         onDaily: () => this.showDaily(),
         onCampaign: () => {},
-        onScenarios: () => {},
+        onScenarios: () => void this.showCustomScenarios(),
         onEditor: () => void this.showEditorHome(),
         onReplays: () => void this.showReplayArchive(),
         onRecords: () => this.showRecords(),
@@ -824,18 +825,7 @@ class App {
   private async showEditorHome(): Promise<void> {
     this.mode = 'editor';
     this.closeEditorSession();
-    const drafts: EditorDraftItem[] = [];
-    try {
-      const list = await documentStore().list('scenario-drafts');
-      for (const s of list) {
-        const rec = await documentStore().get<ScenarioDocumentV1>('scenario-drafts', s.id);
-        if (rec?.data) {
-          drafts.push({ id: s.id, title: rec.data.title, updatedAt: s.updatedAt, sizeBytes: s.size });
-        }
-      }
-    } catch {
-      /* 저장소 접근 실패: 초안 없이 표시 */
-    }
+    const drafts = await this.loadDraftItems();
     if (this.mode !== 'editor') return;
     showEditorHomeScreen(
       this.overlay,
@@ -867,6 +857,60 @@ class App {
         onBack: () => this.toTitle(),
       },
     );
+  }
+
+  private async loadDraftItems(): Promise<EditorDraftItem[]> {
+    const drafts: EditorDraftItem[] = [];
+    try {
+      const list = await documentStore().list('scenario-drafts');
+      for (const s of list) {
+        const rec = await documentStore().get<ScenarioDocumentV1>('scenario-drafts', s.id);
+        if (rec?.data) {
+          drafts.push({ id: s.id, title: rec.data.title, updatedAt: s.updatedAt, sizeBytes: s.size });
+        }
+      }
+    } catch {
+      /* 저장소 접근 실패: 초안 없이 표시 */
+    }
+    return drafts;
+  }
+
+  /** 커스텀 시나리오 보관함: 저장된 초안을 일반 게임으로 플레이한다. */
+  private async showCustomScenarios(): Promise<void> {
+    this.mode = 'scenarios';
+    this.overlay.show('<p class="subtitle">불러오는 중…</p>');
+    const drafts = await this.loadDraftItems();
+    if (this.mode !== 'scenarios') return;
+    showCustomScenarioListScreen(this.overlay, drafts, {
+      onPlay: (id) => void this.playCustomScenario(id),
+      onBack: () => this.toTitle(),
+    });
+  }
+
+  private async playCustomScenario(id: string): Promise<void> {
+    const rec = await documentStore()
+      .get<ScenarioDocumentV1>('scenario-drafts', id)
+      .catch(() => null);
+    const doc = rec?.data;
+    if (!doc) {
+      this.hud.toast('시나리오를 불러오지 못했습니다');
+      return;
+    }
+    if (!isPlayable(validateScenario(doc))) {
+      this.hud.toast('검증 오류가 있습니다 — 제작실에서 확인하세요');
+      return;
+    }
+    let state: GameState;
+    try {
+      state = newGameFromScenario(Date.now() >>> 0, normalizeScenario(doc), {
+        mode: 'custom',
+        difficulty: 'normal',
+      });
+    } catch {
+      this.hud.toast('시나리오를 시작할 수 없습니다 — 제작실에서 검증을 확인하세요');
+      return;
+    }
+    this.launch(state);
   }
 
   private async openDraft(id: string): Promise<void> {

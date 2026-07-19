@@ -102,6 +102,40 @@ export function showEditorHomeScreen(
   });
 }
 
+/** 커스텀 시나리오 보관함: 저장된 초안을 실제 게임으로 플레이한다. */
+export function showCustomScenarioListScreen(
+  overlay: OverlayHost,
+  drafts: EditorDraftItem[],
+  handlers: { onPlay: (id: string) => void; onBack: () => void },
+): void {
+  const rows = drafts
+    .map(
+      (d) => `
+      <div class="rp-item" data-id="${escapeHtml(d.id)}">
+        <button class="rp-main" data-act="play">
+          <span class="rp-title"><b>${escapeHtml(d.title || '제목 없음')}</b></span>
+          <span class="rp-sub">${escapeHtml(d.updatedAt.slice(0, 10))} · 탭하여 플레이</span>
+        </button>
+      </div>`,
+    )
+    .join('');
+  const root = overlay.show(`
+      <h1 style="font-size:24px;">커스텀 시나리오</h1>
+      <p class="subtitle" style="font-size:12.5px;">제작실에서 만든 시나리오를 플레이합니다</p>
+      ${
+        drafts.length > 0
+          ? `<div class="rp-list">${rows}</div>`
+          : '<p class="subtitle">저장된 시나리오가 없습니다 — 제작실에서 만들어 보세요</p>'
+      }
+      <button class="sub-btn" id="btn-back">뒤로</button>`);
+  for (const row of root.querySelectorAll<HTMLElement>('.rp-item')) {
+    row
+      .querySelector('[data-act="play"]')!
+      .addEventListener('click', () => handlers.onPlay(row.dataset.id!));
+  }
+  overlay.bind({ 'btn-back': handlers.onBack });
+}
+
 /** 공유 코드·JSON 텍스트 붙여넣기 가져오기 화면. */
 export function showImportTextScreen(
   overlay: OverlayHost,
