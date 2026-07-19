@@ -16,6 +16,14 @@ import {
   type ReplayDocumentV1,
 } from './core/replay';
 import { ReplayPlayback } from './replay/playback';
+import { EditorController, type EditorTool } from './editor/controller';
+import { cloneBuiltinDocument, emptyDocument, randomDocument } from './editor/new-doc';
+import { clone } from './editor/ops';
+import { UNIT_STATS } from './core/data';
+import { parseScenarioDocument } from './core/scenario/validate';
+import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from './core/scenario/types';
+import { EditorScene, type EditorSceneCallbacks } from './render/EditorScene';
+import { EditorPanel, showEditorHomeScreen, type EditorDraftItem } from './ui/editor';
 import { newDocId } from './storage/docstore';
 import { documentStore } from './storage/idb';
 import {
@@ -90,6 +98,12 @@ class App {
   private playbackBusy = false;
   private replayControls: ReplayControls | null = null;
   private lastReplay: ReplayDocumentV1 | null = null;
+  private editor: EditorController | null = null;
+  private editorPanel: EditorPanel | null = null;
+  private editorScene: EditorScene | null = null;
+  private editorSceneStarted = false;
+  private tilePickResolve: ((v: Axial | null) => void) | null = null;
+  private pickBanner: HTMLElement | null = null;
 
   constructor() {
     this.settings = loadSettings();
@@ -142,6 +156,9 @@ class App {
             ? attackTargets(this.state, u).map((t) => ({ id: t.id, q: t.q, r: t.r }))
             : [];
         },
+        openEditor: () => void this.showEditorHome(),
+        editorDoc: () => this.editor?.doc ?? null,
+        editorTap: (q: number, r: number) => this.editorTap(q, r),
       };
     }
   }
@@ -155,6 +172,7 @@ class App {
   private toTitle(): void {
     this.mode = 'title';
     this.exitPlaybackUi();
+    this.closeEditorSession();
     const saved = loadGame();
     const summary = saved
       ? `${FACTION_NAMES[saved.config.humanFaction]} · ${scenarioDisplayName(saved.config.scenario, saved)} · ${
@@ -172,7 +190,7 @@ class App {
         onDaily: () => this.showDaily(),
         onCampaign: () => {},
         onScenarios: () => {},
-        onEditor: () => {},
+        onEditor: () => void this.showEditorHome(),
         onReplays: () => void this.showReplayArchive(),
         onRecords: () => this.showRecords(),
       },
@@ -310,6 +328,7 @@ class App {
   }
 
   private launch(state: GameState): void {
+    this.closeEditorSession();
     this.mode = 'play';
     this.state = state;
     this.selectedUnitId = null;
@@ -750,6 +769,330 @@ class App {
       }
     }
     this.scene.refresh();
+  }
+
+  // ---------------- 시나리오 제작실 ----------------
+
+  private isEditorPaintTool(): boolean {
+    const t = this.editor?.tool;
+    return t === 'plains' || t === 'forest' || t === 'mountain' || t === 'water' || t === 'erase';
+  }
+
+  private async showEditorHome(): Promise<void> {
+    this.mode = 'editor';
+    this.closeEditorSession();
+    const drafts: EditorDraftItem[] = [];
+    try {
+      const list = await documentStore().list('scenario-drafts');
+      for (const s of list) {
+        const rec = await documentStore().get<ScenarioDocumentV1>('scenario-drafts', s.id);
+        if (rec?.data) {
+          drafts.push({ id: s.id, title: rec.data.title, updatedAt: s.updatedAt, sizeBytes: s.size });
+        }
+      }
+    } catch {
+      /* 저장소 접근 실패: 초안 없이 표시 */
+    }
+    if (this.mode !== 'editor') return;
+    showEditorHomeScreen(
+      this.overlay,
+      drafts,
+      SCENARIO_IDS.map((id) => ({ id, name: SCENARIOS[id].name })),
+      {
+        onNewEmpty: () => this.openEditorSession(emptyDocument(newDocId('custom'))),
+        onNewRandom: () =>
+          this.openEditorSession(randomDocument(newDocId('custom'), Date.now() >>> 0)),
+        onCloneBuiltin: (id) =>
+          this.openEditorSession(
+            cloneBuiltinDocument(id, newDocId('custom'), Date.now() >>> 0, `${SCENARIOS[id].name} 사본`),
+          ),
+        onOpenDraft: (id) => void this.openDraft(id),
+        onDeleteDraft: (id) => {
+          if (!window.confirm('이 초안을 삭제할까요?')) return;
+          documentStore()
+            .remove('scenario-drafts', id)
+            .then(() => documentStore().remove('editor-autosave', id))
+            .then(() => this.showEditorHome())
+            .catch(() => this.hud.toast('삭제하지 못했습니다'));
+        },
+        onImportFile: (file) => void this.importScenarioFile(file),
+        onBack: () => this.toTitle(),
+      },
+    );
+  }
+
+  private async openDraft(id: string): Promise<void> {
+    // 자동 저장본이 더 최신이면 그것을 제안한다
+    const draft = await documentStore().get<ScenarioDocumentV1>('scenario-drafts', id).catch(() => null);
+    const auto = await documentStore().get<ScenarioDocumentV1>('editor-autosave', id).catch(() => null);
+    let doc = draft?.data ?? null;
+    if (auto?.data && (!draft || auto.updatedAt > draft.updatedAt)) {
+      if (!doc || window.confirm('저장하지 않은 자동 저장본이 있습니다. 이어서 편집할까요?')) {
+        doc = auto.data;
+      }
+    }
+    if (!doc) {
+      this.hud.toast('초안을 불러오지 못했습니다');
+      return;
+    }
+    this.openEditorSession(doc);
+  }
+
+  private async importScenarioFile(file: File): Promise<void> {
+    if (file.size > SCENARIO_LIMITS.maxImportBytes) {
+      this.hud.toast('파일이 너무 큽니다');
+      return;
+    }
+    const text = await file.text().catch(() => null);
+    let raw: unknown = null;
+    try {
+      raw = text ? JSON.parse(text) : null;
+    } catch {
+      this.hud.toast('JSON을 읽을 수 없습니다');
+      return;
+    }
+    const { doc, issues } = parseScenarioDocument(raw);
+    if (!doc) {
+      this.hud.toast(issues[0]?.message ?? '시나리오 형식이 아닙니다');
+      return;
+    }
+    // 가져온 문서는 새 ID로 초안이 된다(내장·기존 문서를 덮어쓰지 않는다)
+    const imported = clone(doc);
+    imported.id = newDocId('custom');
+    this.openEditorSession(imported);
+    this.hud.toast('가져온 시나리오를 편집합니다 — 검증을 실행해 보세요');
+  }
+
+  /** 에디터 세션을 연다(문서의 id가 초안 키가 된다). */
+  private openEditorSession(doc: ScenarioDocumentV1): void {
+    this.mode = 'editor';
+    this.overlay.hide();
+    this.hud.setPlayControlsVisible(false);
+    this.editor = new EditorController(documentStore(), doc, doc.id);
+    const callbacks: EditorSceneCallbacks = {
+      onTap: (q, r) => this.editorTap(q, r),
+      onPaint: (q, r) => {
+        if (this.editor?.paintAt(q, r)) this.editorScene?.refresh();
+      },
+      onStrokeStart: () => this.editor?.beginStroke(),
+      onStrokeEnd: () => {
+        this.editor?.endStroke();
+        this.updateEditorPanel();
+      },
+      isPaintTool: () => this.isEditorPaintTool(),
+      onReady: () => {},
+    };
+    if (this.boardStarted && !this.game.scene.isSleeping('board')) this.game.scene.sleep('board');
+    if (!this.editorSceneStarted) {
+      this.game.scene.add('editor', EditorScene, true, { doc: this.editor.doc, callbacks });
+      this.editorSceneStarted = true;
+    } else {
+      this.game.scene.start('editor', { doc: this.editor.doc, callbacks });
+    }
+    this.editorScene = this.game.scene.getScene('editor') as EditorScene;
+    this.editorPanel?.destroy();
+    this.editorPanel = new EditorPanel(
+      document.getElementById('hud')!,
+      () => this.editor!.doc,
+      {
+        onTool: (tool: EditorTool) => {
+          this.editor!.tool = tool;
+          this.editorScene?.showSelection(null);
+          this.updateEditorPanel();
+        },
+        onOptions: (patch) => {
+          Object.assign(this.editor!.options, patch);
+          this.updateEditorPanel();
+        },
+        onUndo: () => this.editorHistoryStep('undo'),
+        onRedo: () => this.editorHistoryStep('redo'),
+        onValidate: () => this.editorPanel!.showValidation(this.editor!.validate()),
+        onSave: () => {
+          void this.editor!.saveDraft().then((ok) =>
+            this.hud.toast(ok ? '초안을 저장했습니다' : '저장하지 못했습니다'),
+          );
+        },
+        onTestPlay: () => this.hud.toast('테스트 플레이는 다음 단계에서 열립니다'),
+        onExport: () => this.exportScenario(),
+        onExit: () => void this.exitEditorSession(),
+        onMetaChange: (meta) => {
+          const d = this.editor!.doc;
+          this.editor!.pushOp({
+            type: 'meta',
+            before: { title: d.title, description: d.description, ...(d.author ? { author: d.author } : {}) },
+            after: meta,
+          });
+          this.updateEditorPanel();
+        },
+        onRulesChange: (rules) => {
+          this.editor!.pushOp({ type: 'rules', before: clone(this.editor!.doc.rules), after: rules });
+          this.updateEditorPanel();
+        },
+        onFactionChange: (setup) => {
+          const before = this.editor!.doc.factions.find((f) => f.id === setup.id)!;
+          this.editor!.pushOp({ type: 'faction', id: setup.id, before: clone(before), after: setup });
+          this.updateEditorPanel();
+        },
+        onResize: (cols, rows) => {
+          if (this.editor!.resizeBoard(cols, rows)) {
+            this.editorScene?.setDoc(this.editor!.doc);
+            this.updateEditorPanel();
+          } else {
+            this.hud.toast('허용 범위 밖의 크기입니다');
+          }
+        },
+        onConditionsChange: (next) => {
+          const d = this.editor!.doc;
+          this.editor!.pushOp({
+            type: 'conditions',
+            before: {
+              victory: clone(d.victoryConditions),
+              defeat: clone(d.defeatConditions),
+              stars: clone(d.starConditions ?? []),
+            },
+            after: next,
+          });
+          this.updateEditorPanel();
+        },
+        onUnitUpdate: (index, setup) => {
+          this.editor!.updateUnit(index, setup);
+          this.editorScene?.refresh();
+          this.updateEditorPanel();
+        },
+        onUnitRemove: (index) => {
+          const u = this.editor!.doc.units[index];
+          if (u) this.editor!.removeUnitAt(u.q, u.r);
+          this.editorScene?.refresh();
+          this.updateEditorPanel();
+        },
+        requestTilePick: (label) => this.beginTilePick(label),
+      },
+    );
+    this.updateEditorPanel();
+  }
+
+  private editorHistoryStep(dir: 'undo' | 'redo'): void {
+    const ed = this.editor;
+    if (!ed) return;
+    const tilesBefore = ed.doc.board.tiles.length;
+    const ok = dir === 'undo' ? ed.undo() : ed.redo();
+    if (!ok) return;
+    if (ed.doc.board.tiles.length !== tilesBefore) this.editorScene?.setDoc(ed.doc);
+    else this.editorScene?.refresh();
+    this.updateEditorPanel();
+  }
+
+  private editorTap(q: number, r: number): void {
+    const ed = this.editor;
+    if (!ed) return;
+    // 조건 대상 타일 선택 모드
+    if (this.tilePickResolve) {
+      const exists = ed.doc.board.tiles.some((t) => t.q === q && t.r === r);
+      if (!exists) return;
+      const resolve = this.tilePickResolve;
+      this.endTilePick();
+      resolve({ q, r });
+      this.editorPanel?.openObjectivesSheet();
+      return;
+    }
+    if (ed.tool === 'unit') {
+      const result = ed.placeUnitAt(q, r);
+      if (result === 'blocked') this.hud.toast('여기에는 유닛을 배치할 수 없습니다');
+      this.editorScene?.refresh();
+      this.updateEditorPanel();
+      return;
+    }
+    if (ed.tool === 'select') {
+      const idx = ed.unitIndexAt(q, r);
+      if (idx >= 0) {
+        const unit = ed.doc.units[idx];
+        this.editorScene?.showSelection({ q, r });
+        this.editorPanel?.openUnitSheet(idx, unit, UNIT_STATS[unit.type].hp);
+      } else {
+        this.editorScene?.showSelection(
+          ed.doc.board.tiles.some((t) => t.q === q && t.r === r) ? { q, r } : null,
+        );
+        this.editorPanel?.closeSheet();
+      }
+      return;
+    }
+    if (ed.tool === 'erase' && ed.removeUnitAt(q, r)) {
+      this.editorScene?.refresh();
+      this.updateEditorPanel();
+      return;
+    }
+    // 칠 도구 탭 = 단일 획
+    if (ed.paintAt(q, r)) {
+      this.editorScene?.refresh();
+      this.updateEditorPanel();
+    }
+  }
+
+  private beginTilePick(label: string): Promise<Axial | null> {
+    this.endTilePick();
+    const banner = document.createElement('div');
+    banner.className = 'ed-pick-banner';
+    banner.innerHTML = `<span>${label}</span><button>취소</button>`;
+    document.getElementById('hud')!.appendChild(banner);
+    this.pickBanner = banner;
+    return new Promise<Axial | null>((resolve) => {
+      this.tilePickResolve = resolve;
+      banner.querySelector('button')!.addEventListener('click', () => {
+        this.endTilePick();
+        resolve(null);
+        this.editorPanel?.openObjectivesSheet();
+      });
+    });
+  }
+
+  private endTilePick(): void {
+    this.tilePickResolve = null;
+    this.pickBanner?.remove();
+    this.pickBanner = null;
+  }
+
+  private updateEditorPanel(): void {
+    const ed = this.editor;
+    if (!ed || !this.editorPanel) return;
+    this.editorPanel.update(ed.tool, ed.options, ed.history.canUndo, ed.history.canRedo);
+  }
+
+  private exportScenario(): void {
+    const ed = this.editor;
+    if (!ed) return;
+    const blob = new Blob([JSON.stringify(ed.doc, null, 1)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ed.doc.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** 에디터에서 나간다(변경이 있으면 초안 저장 여부 확인, 자동 저장은 항상 남긴다). */
+  private async exitEditorSession(): Promise<void> {
+    const ed = this.editor;
+    if (ed?.dirty) {
+      await ed.autosaveNow();
+      if (window.confirm('저장하지 않은 변경이 있습니다. 초안으로 저장할까요?')) {
+        await ed.saveDraft();
+      }
+    }
+    void this.showEditorHome();
+  }
+
+  /** 에디터 세션·씬·패널을 정리한다(홈·타이틀로 나갈 때). */
+  private closeEditorSession(): void {
+    this.endTilePick();
+    this.editor?.dispose();
+    this.editor = null;
+    this.editorPanel?.destroy();
+    this.editorPanel = null;
+    if (this.editorSceneStarted && this.editorScene) {
+      this.game.scene.stop('editor');
+    }
+    this.editorScene = null;
+    if (this.boardStarted && this.game.scene.isSleeping('board')) this.game.scene.wake('board');
   }
 
   // ---------------- 리플레이 보관함·재생 ----------------

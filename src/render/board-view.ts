@@ -70,7 +70,7 @@ export function fitCameraToTiles(scene: Phaser.Scene, tiles: { q: number; r: num
  */
 export class BoardView {
   private scene: Phaser.Scene;
-  private terrainSprites: Phaser.GameObjects.Image[] = [];
+  private terrainSprites = new Map<string, Phaser.GameObjects.Image>();
   private buildingSprites = new Map<string, Phaser.GameObjects.Image>();
   private unitViews = new Map<number, UnitView>();
 
@@ -84,15 +84,36 @@ export class BoardView {
 
   /** 지형 스프라이트를 전부 다시 만든다(보드 구조가 바뀔 때). */
   buildTerrain(tiles: Tile[]): void {
-    for (const s of this.terrainSprites) s.destroy();
-    this.terrainSprites = [];
+    for (const s of this.terrainSprites.values()) s.destroy();
+    this.terrainSprites.clear();
+    for (const tile of tiles) this.createTerrainSprite(tile);
+  }
+
+  /** 지형을 증분 동기화한다(에디터 칠하기: 바뀐 타일만 텍스처 교체). */
+  syncTerrain(tiles: Tile[]): void {
+    const present = new Set<string>();
     for (const tile of tiles) {
-      const { x, y } = this.pos(tile);
-      const img = this.scene.add.image(x, y, textureKey(`terrain.${tile.terrain}` as AssetId));
-      img.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
-      img.setDepth(0);
-      this.terrainSprites.push(img);
+      const key = hexKey(tile.q, tile.r);
+      present.add(key);
+      const sprite = this.terrainSprites.get(key);
+      const tex = textureKey(`terrain.${tile.terrain}` as AssetId);
+      if (!sprite) this.createTerrainSprite(tile);
+      else if (sprite.texture.key !== tex) sprite.setTexture(tex);
     }
+    for (const [key, sprite] of this.terrainSprites) {
+      if (!present.has(key)) {
+        sprite.destroy();
+        this.terrainSprites.delete(key);
+      }
+    }
+  }
+
+  private createTerrainSprite(tile: Tile): void {
+    const { x, y } = this.pos(tile);
+    const img = this.scene.add.image(x, y, textureKey(`terrain.${tile.terrain}` as AssetId));
+    img.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
+    img.setDepth(0);
+    this.terrainSprites.set(hexKey(tile.q, tile.r), img);
   }
 
   /** 건물 스프라이트를 상태와 동기화한다(추가·소유 변경·제거). */
@@ -176,7 +197,7 @@ export class BoardView {
 
   /** 씬이 children을 파괴한 뒤 내부 참조만 초기화한다. */
   resetRefs(): void {
-    this.terrainSprites = [];
+    this.terrainSprites.clear();
     this.buildingSprites.clear();
     this.unitViews.clear();
   }

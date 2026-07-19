@@ -216,6 +216,65 @@ export function injectSharedStyles(): void {
   background: rgba(29,26,20,.85); color: #e8d9a0; font-size: 15px; pointer-events: auto;
 }
 .rp-controls .rp-play { min-width: 54px; background: linear-gradient(#d9b544, #c9a227); color: #2b2416; font-weight: bold; }
+.ed-topbar {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
+  display: flex; align-items: center; gap: 6px; pointer-events: none;
+}
+.ed-topbar .rp-exit { pointer-events: auto; }
+.ed-topbar .hud-chip { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; }
+.ed-topbar button:disabled { opacity: .4; }
+.ed-palette {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 6px 8px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.ed-tool-row { display: flex; gap: 6px; overflow-x: auto; pointer-events: auto; padding-bottom: 2px; }
+.ed-sub-row { align-items: center; }
+.ed-sub-label { color: #a9b4cc; font-size: 12.5px; flex: none; align-self: center; }
+.ed-chip {
+  flex: none; height: 40px; padding: 0 13px; border-radius: 11px;
+  border: 1px solid #6b7894; background: rgba(29,26,20,.85); color: #d8deeb; font-size: 14px;
+}
+.ed-chip.on { border-color: #c9a227; background: rgba(201,162,39,.25); color: #f2ead8; font-weight: bold; }
+.ed-sheet { z-index: 5; max-height: 72vh; overflow-y: auto; }
+.ed-menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+.ed-menu-grid button {
+  height: 46px; border-radius: 11px; border: 1.5px solid #8a6d14;
+  background: #faf5e8; font-size: 14.5px; color: #2b2416;
+}
+.ed-field { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; color: #4f4636; margin-top: 8px; flex: 1; }
+.ed-field input, .ed-field select, .ed-field textarea {
+  border: 1.5px solid #8a6d14; border-radius: 9px; padding: 8px 10px; font-size: 15px;
+  background: #faf5e8; color: #2b2416; width: 100%;
+}
+.ed-row { display: flex; gap: 8px; }
+.ed-row .close-btn { flex: 1; }
+.ed-hint { font-size: 12.5px; color: #6b6250; margin-top: 4px; line-height: 1.5; }
+.ed-fac-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.ed-fac-row b { min-width: 74px; font-size: 14px; }
+.ed-fac-row select, .ed-fac-row input {
+  border: 1.5px solid #8a6d14; border-radius: 8px; padding: 6px; font-size: 13.5px; background: #faf5e8; color: #2b2416;
+}
+.ed-cond-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.ed-cond-list b { font-size: 13.5px; margin-top: 6px; color: #4f4636; }
+.ed-cond {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  border: 1px solid #c8b98e; border-radius: 9px; padding: 7px 10px; font-size: 13.5px; background: #faf5e8;
+}
+.ed-cond button { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #8a6d14; background: #e5dbc2; }
+.ed-add { height: 38px; border-radius: 9px; border: 1.5px dashed #8a6d14; background: none; font-size: 13.5px; color: #6b5b2a; }
+.ed-issue { border-left: 3px solid #a33636; padding: 6px 9px; margin-top: 6px; font-size: 13px; background: #faf5e8; border-radius: 0 8px 8px 0; }
+.ed-issue.warning { border-left-color: #c9a227; }
+.ed-issue.info { border-left-color: #6b7894; }
+.ed-issue .ed-repair { color: #6b5b2a; margin-top: 2px; font-size: 12.5px; }
+.ed-issue-list { max-height: 44vh; overflow-y: auto; }
+.ed-pick-banner {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 58px); left: 50%; transform: translateX(-50%);
+  background: rgba(201,162,39,.95); color: #2b2416; border-radius: 12px; padding: 8px 16px;
+  font-size: 14px; font-weight: bold; pointer-events: auto; display: flex; gap: 10px; align-items: center;
+}
+.ed-pick-banner button { border: 1px solid #8a6d14; border-radius: 8px; background: #f2ead8; height: 30px; padding: 0 10px; }
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }
