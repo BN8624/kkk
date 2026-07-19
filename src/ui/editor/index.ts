@@ -1,5 +1,8 @@
 // 한 줄 목적: 시나리오 제작실 UI(홈 화면·도구 팔레트·속성 시트·조건 편집·검증 패널)를 렌더링한다
 import { FACTION_NAMES, UNIT_NAMES } from '../../core/data';
+import { EVAL_POLICY_NAMES, type EvalPolicyId } from '../../core/eval/policies';
+import type { QualityTrialReport } from '../../core/eval/quality-trial';
+import type { QualityReport } from '../../core/scenario/quality';
 import type { EditorTool, EditorToolOptions } from '../../editor/controller';
 import {
   SCENARIO_LIMITS,
@@ -163,6 +166,10 @@ export interface EditorPanelHandlers {
   onUndo: () => void;
   onRedo: () => void;
   onValidate: () => void;
+  /** 품질 보고서(전력 균형·거리·병목·별점 달성 가능성) */
+  onQuality: () => void;
+  /** AI 품질 시험(평가 정책 자동 관전) */
+  onAiTrial: () => void;
   onSave: () => void;
   onTestPlay: () => void;
   /** AI 대 AI 관전 테스트 */
@@ -315,6 +322,8 @@ export class EditorPanel {
         <button data-m="save">초안 저장</button>
         <button data-m="test">테스트 플레이</button>
         <button data-m="spectate">AI 관전 테스트</button>
+        <button data-m="quality">품질 보고서</button>
+        <button data-m="trial">AI 품질 시험</button>
         <button data-m="info">문서 정보</button>
         <button data-m="rules">규칙</button>
         <button data-m="factions">세력</button>
@@ -334,6 +343,14 @@ export class EditorPanel {
     s.querySelector('[data-m="spectate"]')!.addEventListener('click', () => {
       this.closeSheet();
       this.handlers.onSpectate();
+    });
+    s.querySelector('[data-m="quality"]')!.addEventListener('click', () => {
+      this.closeSheet();
+      this.handlers.onQuality();
+    });
+    s.querySelector('[data-m="trial"]')!.addEventListener('click', () => {
+      this.closeSheet();
+      this.handlers.onAiTrial();
     });
     s.querySelector('[data-m="info"]')!.addEventListener('click', () => this.openInfoSheet());
     s.querySelector('[data-m="rules"]')!.addEventListener('click', () => this.openRulesSheet());
@@ -661,6 +678,86 @@ export class EditorPanel {
       <div class="ed-issue-list">${rows || '<p class="ed-hint">플레이 가능한 시나리오입니다.</p>'}</div>
       <button class="close-btn" id="v-close">닫기</button>`);
     s.querySelector('#v-close')!.addEventListener('click', () => this.closeSheet());
+  }
+
+  /** 품질 보고서 패널: 전력 요약 지표와 품질 이슈를 보여 준다. */
+  showQuality(report: QualityReport): void {
+    const sev = { error: '오류', warning: '경고', info: '정보' } as const;
+    const m = report.metrics;
+    const strengthRows = m.factionStrengths
+      .map(
+        (s) =>
+          `<div class="ed-issue info">${FACTION_NAMES[s.faction]} — 유닛 ${s.unitCount}기(가치 ${s.unitValue}) · 금 ${s.startGold} · 수도 ${s.hasCapital ? '있음' : '없음'}</div>`,
+      )
+      .join('');
+    const facts = [
+      m.objectiveDistance !== null ? `핵심 목표 거리 ${m.objectiveDistance}칸` : null,
+      m.estimatedFirstCombatTurn !== null ? `첫 전투 예상 ${m.estimatedFirstCombatTurn}턴` : null,
+      `물 비율 ${(m.waterRatio * 100).toFixed(0)}%`,
+      `병목 ${m.bottleneckCount}곳`,
+      m.unusedLandTiles > 0 ? `미사용 지상 ${m.unusedLandTiles}칸` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const rows = report.issues
+      .slice(0, 30)
+      .map(
+        (i) => `
+        <div class="ed-issue ${i.severity}">
+          <b>[${sev[i.severity]}]</b> ${escapeHtml(i.message)}
+        </div>`,
+      )
+      .join('');
+    const s = this.openSheet(`
+      <h3>품질 보고서 ${report.issues.length === 0 ? '— 특이 사항 없음 ✓' : `(${report.issues.length}건)`}</h3>
+      <p class="ed-hint">${facts}</p>
+      ${strengthRows}
+      <div class="ed-issue-list">${rows}</div>
+      <button class="close-btn" id="q-close">닫기</button>`);
+    s.querySelector('#q-close')!.addEventListener('click', () => this.closeSheet());
+  }
+
+  /** AI 품질 시험 진행 패널을 열고, 진행 갱신 함수를 반환한다. */
+  showTrialRunning(onCancel: () => void): (done: number, total: number) => void {
+    const s = this.openSheet(`
+      <h3>AI 품질 시험</h3>
+      <p class="ed-hint" id="t-progress">평가 정책으로 자동 관전을 시작합니다…</p>
+      <button class="close-btn" id="t-cancel">중단</button>`);
+    s.querySelector('#t-cancel')!.addEventListener('click', () => {
+      onCancel();
+      this.closeSheet();
+    });
+    const label = s.querySelector('#t-progress')!;
+    return (done, total) => {
+      label.textContent = `자동 관전 중… ${done}/${total}판`;
+    };
+  }
+
+  /** AI 품질 시험 결과 패널. */
+  showTrialResult(report: QualityTrialReport): void {
+    const winnerRows = Object.entries(report.winners)
+      .map(
+        ([w, n]) =>
+          `<div class="ed-issue info">${w === 'draw' ? '무승부' : FACTION_NAMES[w as FactionId]} 승리 ${n}판</div>`,
+      )
+      .join('');
+    const policyRows = Object.entries(report.policyWins)
+      .map(([p, n]) => `<div class="ed-issue info">${EVAL_POLICY_NAMES[p as EvalPolicyId]} — 인간 세력 ${n}승</div>`)
+      .join('');
+    const problems: string[] = [];
+    if (report.unfinished > 0) problems.push(`제한 안에 끝나지 않은 판 ${report.unfinished}`);
+    if (report.invalidStates > 0) problems.push(`불법 상태 ${report.invalidStates}`);
+    if (report.rejectedCommands > 0) problems.push(`거부된 명령 ${report.rejectedCommands}`);
+    if (report.stalledFactions.length > 0)
+      problems.push(`정체 세력 ${report.stalledFactions.map((f) => FACTION_NAMES[f]).join('·')}`);
+    const s = this.openSheet(`
+      <h3>AI 품질 시험 결과 — ${report.games}판</h3>
+      <p class="ed-hint">평균 종료 ${report.avgEndTurn}턴 · 승리 별 분포 0/1/2/3 = ${report.starHistogram.join('/')}</p>
+      ${problems.length > 0 ? `<div class="ed-issue warning"><b>[경고]</b> ${escapeHtml(problems.join(' · '))}</div>` : '<div class="ed-issue info">종료 불능·불법 상태·거부 명령 없음 ✓</div>'}
+      ${winnerRows}
+      ${policyRows}
+      <button class="close-btn" id="t-close">닫기</button>`);
+    s.querySelector('#t-close')!.addEventListener('click', () => this.closeSheet());
   }
 }
 

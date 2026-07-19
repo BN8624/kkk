@@ -2,7 +2,9 @@
 import { UNIT_STATS, FACTION_NAMES } from '../core/data';
 import { factionScore, newGameFromScenario } from '../core/game';
 import { decodeScenarioInput } from '../core/decode';
+import { runQualityTrial } from '../core/eval/quality-trial';
 import { normalizeScenario } from '../core/scenario/normalize';
+import { scenarioQualityReport } from '../core/scenario/quality';
 import { isPlayable } from '../core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from '../core/scenario/types';
 import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
@@ -202,6 +204,8 @@ export class EditorFlowController implements AppController, EditorFlow {
         onUndo: () => this.historyStep('undo'),
         onRedo: () => this.historyStep('redo'),
         onValidate: () => this.panel!.showValidation(this.editor!.validate()),
+        onQuality: () => this.showQualityReport(),
+        onAiTrial: () => void this.runAiQualityTrial(),
         onSave: () => {
           void this.editor!.saveDraft().then((ok) =>
             this.ctx.hud.toast(ok ? '초안을 저장했습니다' : '저장하지 못했습니다'),
@@ -454,6 +458,55 @@ export class EditorFlowController implements AppController, EditorFlow {
     void ed.autosaveNow();
     this.ctx.nav.launch(state, { testPlay: true, spectate });
     this.ctx.hud.toast(spectate ? 'AI 관전 테스트 — 목표 버튼으로 상태를 확인하세요' : '테스트 플레이 — 에디터로 버튼으로 돌아갑니다');
+  }
+
+  // ---------------- 품질 보고서·AI 품질 시험 ----------------
+
+  /** 구조 검증을 통과한 문서의 품질 보고서를 연다(오류가 있으면 검증 결과를 먼저 보여 준다). */
+  private showQualityReport(): void {
+    const ed = this.editor;
+    if (!ed || !this.panel) return;
+    const issues = ed.validate();
+    if (!isPlayable(issues)) {
+      this.panel.showValidation(issues);
+      return;
+    }
+    this.panel.showQuality(scenarioQualityReport(ed.doc));
+  }
+
+  private trialCancel = false;
+  private trialRunning = false;
+
+  /** 평가 정책 자동 관전으로 시나리오를 시험한다. 게임 사이에 양보해 UI를 멈추지 않고, 중단·화면 이탈 시 즉시 취소된다. */
+  private async runAiQualityTrial(): Promise<void> {
+    const ed = this.editor;
+    if (!ed || !this.panel || this.trialRunning) return;
+    const issues = ed.validate();
+    if (!isPlayable(issues)) {
+      this.panel.showValidation(issues);
+      return;
+    }
+    let snapshot;
+    try {
+      snapshot = normalizeScenario(ed.doc);
+    } catch {
+      this.ctx.hud.toast('시나리오를 시작할 수 없습니다 — 검증을 확인하세요');
+      return;
+    }
+    const token = this.ctx.currentToken();
+    this.trialCancel = false;
+    this.trialRunning = true;
+    const progress = this.panel.showTrialRunning(() => {
+      this.trialCancel = true;
+    });
+    const report = await runQualityTrial(snapshot, {
+      noisySeeds: 4,
+      onProgress: progress,
+      shouldCancel: () => this.trialCancel || !token.alive || !this.panel,
+    });
+    this.trialRunning = false;
+    if (!report || !token.alive || !this.panel) return;
+    this.panel.showTrialResult(report);
   }
 
   /** 테스트 플레이 화면 요소만 걷어낸다(에디터 세션은 유지). */

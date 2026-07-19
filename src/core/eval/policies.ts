@@ -79,21 +79,29 @@ export function runEvalPolicyTurn(
   faction: FactionId,
   policy: EvalPolicyId,
   seed = 0,
-): AiTurnResult {
-  if (policy === 'balanced') return runAiTurn(state, faction, 'normal');
+): EvalTurnResult {
+  if (policy === 'balanced') return { ...runAiTurn(state, faction, 'normal'), rejected: 0 };
   if (policy === 'noisy') return runNoisyTurn(state, faction, seed);
   return runProfileTurn(state, faction, POLICY_PROFILES[policy]);
 }
 
 type IssueFn = (payload: GameCommandPayload) => CommandExecutionResult;
 
-function makeResult(state: GameState): { result: AiTurnResult; issue: IssueFn } {
-  const result: AiTurnResult = { commands: [], events: [] };
+/** 평가 정책 턴 결과: 정본 AI 결과에 거부된 명령 수를 더한다(품질 시험 보고용). */
+export interface EvalTurnResult extends AiTurnResult {
+  /** 실행기가 거부한 명령 발행 시도 수(불법 행동은 상태에 반영되지 않는다) */
+  rejected: number;
+}
+
+function makeResult(state: GameState): { result: EvalTurnResult; issue: IssueFn } {
+  const result: EvalTurnResult = { commands: [], events: [], rejected: 0 };
   const issue: IssueFn = (payload) => {
     const r = issueCommand(state, payload, 'test');
     if (r.ok) {
       result.commands.push(r.command);
       result.events.push(...r.events);
+    } else {
+      result.rejected++;
     }
     return r;
   };
@@ -106,7 +114,7 @@ function makeResult(state: GameState): { result: AiTurnResult; issue: IssueFn } 
  * 보통 AI와 같은 결정 로직을 쓰되, 유닛 행동 순서를 시드로 셔플해 궤적을 갈라 낸다.
  * 명령 자체는 항상 정본 실행기를 통과하므로 불법 행동은 생기지 않는다.
  */
-function runNoisyTurn(state: GameState, faction: FactionId, seed: number): AiTurnResult {
+function runNoisyTurn(state: GameState, faction: FactionId, seed: number): EvalTurnResult {
   const { result, issue } = makeResult(state);
   if (state.over || faction !== state.current) return result;
   if (state.factions[faction].eliminated) {
@@ -132,7 +140,7 @@ const NOISY_PROFILE: PolicyProfile = {
 
 // ---------------- 프로파일 실행 ----------------
 
-function runProfileTurn(state: GameState, faction: FactionId, profile: PolicyProfile): AiTurnResult {
+function runProfileTurn(state: GameState, faction: FactionId, profile: PolicyProfile): EvalTurnResult {
   const { result, issue } = makeResult(state);
   if (state.over || faction !== state.current) return result;
   if (state.factions[faction].eliminated) {
@@ -226,6 +234,7 @@ function tryPolicyAttack(
   if (best.destKey && reach) {
     const entry = reach.get(best.destKey)!;
     issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
+    if (state.over) return true; // 이동 점령으로 게임이 끝나면 후속 공격을 발행하지 않는다
   }
   return issue({ type: 'attack-unit', attackerId: unit.id, defenderId: best.targetId }).ok;
 }
