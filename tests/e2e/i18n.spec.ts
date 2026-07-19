@@ -106,7 +106,15 @@ test('영어 모바일 시나리오 제작실 홈·편집 메뉴', async ({ page
   await expect(page.getByRole('button', { name: 'Test Play' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Quality Report' })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  const editorSheet = page.locator('.ed-sheet');
+  await expect(editorSheet).toHaveAttribute('role', 'dialog');
+  await editorSheet.getByRole('button', { name: 'Close' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(editorSheet.getByRole('button', { name: 'Save Draft' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(editorSheet).toHaveAttribute('aria-hidden', 'true');
 
+  await page.getByRole('button', { name: 'Open menu' }).click();
   await page.getByRole('button', { name: 'Document Info' }).click();
   await expect(page.getByText('Author')).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);

@@ -104,6 +104,45 @@ test('시작→유닛 선택→이동→턴 종료→저장→이어하기', asy
   expect(state.units.length).toBeGreaterThan(0);
 });
 
+test('접근성: 선택 상태·포커스 트랩·ESC·게임 상태·reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.getByRole('button', { name: '빠른 전투' }).click();
+
+  const overlay = page.getByRole('dialog');
+  await expect(overlay).toBeVisible();
+  const azure = page.getByRole('button', { name: /청람 왕국/ });
+  await expect(azure).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '보통' })).toHaveAttribute('aria-pressed', 'true');
+
+  const back = page.getByRole('button', { name: '뒤로' });
+  await back.focus();
+  await page.keyboard.press('Tab');
+  await expect(azure).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '빠른 전투' })).toBeVisible();
+
+  await startNewGame(page, 13);
+  const state = await getState(page);
+  const unit = state.units.find((candidate) => candidate.faction === 'azure')!;
+  await tapHex(page, unit.q, unit.r);
+  await expect(page.locator('.sr-only')).toContainText('현재 목표: 모든 수도 점령');
+  await expect(page.locator('.sr-only')).toContainText('선택 유닛: 청람 왕국');
+
+  await page.getByRole('button', { name: '설정' }).click();
+  const toTitle = page.getByRole('button', { name: '타이틀로' });
+  await toTitle.focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: '계속하기' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '턴 종료' })).toBeVisible();
+
+  const duration = await page.locator('.sheet').evaluate((node) =>
+    Number.parseFloat(getComputedStyle(node).transitionDuration),
+  );
+  expect(duration).toBeLessThan(0.01);
+});
+
 test('생산: 수도에서 보병을 생산하면 금이 줄고 유닛이 늘어난다', async ({ page }) => {
   await startNewGame(page, 7);
   const state = await getState(page);

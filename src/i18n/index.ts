@@ -4,6 +4,7 @@ import { KO } from './ko';
 import type { ModifierId } from '../core/daily';
 import type { CompatibilityDecision, ReplayCompatibility } from '../core/replay-compat';
 import type { BuiltinScenarioId, FactionId } from '../core/types';
+import type { VictoryCondition } from '../core/scenario/types';
 
 export type Locale = 'ko' | 'en';
 export type MessageKey = keyof typeof KO;
@@ -88,6 +89,31 @@ export function terrainName(x: 'plains' | 'forest' | 'mountain' | 'water'): stri
 
 export function buildingName(b: 'capital' | 'village' | 'crown'): string {
   return t(`building.${b}`);
+}
+
+export function victoryConditionText(c: VictoryCondition): string {
+  switch (c.type) {
+    case 'conquest':
+      return t('condition.victory.conquest');
+    case 'hold-building':
+      return t('condition.victory.holdBuilding', { q: c.at.q, r: c.at.r, turns: c.turns });
+    case 'capture-building':
+      return t('condition.victory.captureBuilding', { q: c.at.q, r: c.at.r });
+    case 'capture-count':
+      return t('condition.victory.captureCount', { building: buildingName(c.building), count: c.count });
+    case 'eliminate-faction':
+      return t('condition.victory.eliminateFaction', { faction: factionName(c.faction) });
+    case 'survive-turns':
+      return t('condition.victory.surviveTurns', { turns: c.turns });
+    case 'reach-score':
+      return t('condition.victory.reachScore', { score: c.score });
+    case 'unit-alive':
+      return t('condition.victory.unitAlive', { tag: c.tag });
+    case 'all-of':
+      return t('condition.victory.allOf', { count: c.conditions.length });
+    case 'any-of':
+      return t('condition.victory.anyOf', { count: c.conditions.length });
+  }
 }
 
 export function difficultyName(d: 'easy' | 'normal' | 'hard'): string {

@@ -2,7 +2,7 @@
 import { UNIT_STATS } from '../../core/data';
 import { factionScore } from '../../core/game';
 import type { FactionId, GameState, Tile, Unit, UnitTypeId } from '../../core/types';
-import { factionName, t, terrainName, unitName } from '../../i18n';
+import { factionName, t, terrainName, unitName, victoryConditionText } from '../../i18n';
 import { COIN_SVG, EMBLEM_SVG, FACTION_CSS, GEAR_SVG, el, button, escapeHtml } from '../shared/dom';
 
 export interface HudHandlers {
@@ -24,6 +24,12 @@ export class Hud {
   private toastEl!: HTMLElement;
   private aiChip!: HTMLElement;
   private tutorialBar!: HTMLElement;
+  private gameStatusEl!: HTMLElement;
+  private productionReturnFocus: HTMLElement | null = null;
+  private turnStatus = '';
+  private objectiveStatus = '';
+  private selectionStatus = '';
+  private actionStatus = '';
 
   constructor(root: HTMLElement, handlers: HudHandlers) {
     this.root = root;
@@ -59,12 +65,23 @@ export class Hud {
     this.root.appendChild(bottom);
 
     this.productionSheet = el('div', 'sheet');
+    this.productionSheet.setAttribute('role', 'dialog');
+    this.productionSheet.setAttribute('aria-modal', 'true');
+    this.productionSheet.setAttribute('aria-hidden', 'true');
+    this.productionSheet.tabIndex = -1;
+    this.productionSheet.addEventListener('keydown', (event) => this.onProductionKeyDown(event));
     this.root.appendChild(this.productionSheet);
 
     this.toastEl = el('div', 'toast');
     this.toastEl.setAttribute('role', 'status');
     this.toastEl.setAttribute('aria-live', 'polite');
     this.root.appendChild(this.toastEl);
+
+    this.gameStatusEl = el('div', 'sr-only');
+    this.gameStatusEl.setAttribute('role', 'status');
+    this.gameStatusEl.setAttribute('aria-live', 'polite');
+    this.gameStatusEl.setAttribute('aria-atomic', 'true');
+    this.root.appendChild(this.gameStatusEl);
   }
 
   // ---------------- 상단 바 ----------------
@@ -97,6 +114,15 @@ export class Hud {
         <button class="icon-btn" id="hud-gear" aria-label="${escapeHtml(t('hud.settings'))}">${GEAR_SVG}</button>
       </span>`;
     this.topBar.querySelector('#hud-gear')!.addEventListener('click', () => this.handlers.onPause());
+    this.turnStatus = t('a11y.turnStatus', {
+      current: Math.min(state.turn, state.maxTurns),
+      max: state.maxTurns,
+      faction: factionName(state.current),
+    });
+    this.objectiveStatus = t('a11y.objectives', {
+      objectives: state.objectives.victory.map(victoryConditionText).join('; '),
+    });
+    this.updateAccessibleStatus();
   }
 
   setAiThinking(faction: FactionId | null): void {
@@ -129,11 +155,20 @@ export class Hud {
   showUnitPanel(unit: Unit | null, tile: Tile | null, hint: string): void {
     if (!unit && !tile) {
       this.bottomPanel.classList.remove('show');
+      this.selectionStatus = '';
+      this.actionStatus = '';
+      this.updateAccessibleStatus();
       return;
     }
     let html = '';
     if (unit) {
       const s = UNIT_STATS[unit.type];
+      this.selectionStatus = t('a11y.selectedUnit', {
+        faction: factionName(unit.faction),
+        unit: unitName(unit.type),
+        hp: unit.hp,
+        maxHp: s.hp,
+      });
       html = `<h3><span class="dot" style="background:${FACTION_CSS[unit.faction]}"></span>
         ${escapeHtml(factionName(unit.faction))} ${escapeHtml(unitName(unit.type))}</h3>
         <div class="stats">
@@ -141,11 +176,23 @@ export class Hud {
           <span>${escapeHtml(t('hud.defenseStat', { n: s.def }))}</span><span>${escapeHtml(t('hud.moveStat', { n: s.move }))}</span><span>${escapeHtml(t('hud.rangeStat', { n: s.range }))}</span>
         </div>`;
     } else if (tile) {
+      this.selectionStatus = t('a11y.selectedTile', { terrain: terrainName(tile.terrain) });
       html = `<h3>${escapeHtml(terrainName(tile.terrain))}</h3>`;
     }
     if (hint) html += `<div class="hint">${escapeHtml(hint)}</div>`;
+    this.actionStatus = hint ? t('a11y.availableAction', { action: hint }) : '';
     this.bottomPanel.innerHTML = html;
     this.bottomPanel.classList.add('show');
+    this.updateAccessibleStatus();
+  }
+
+  private updateAccessibleStatus(): void {
+    this.gameStatusEl.textContent = [
+      this.turnStatus,
+      this.objectiveStatus,
+      this.selectionStatus,
+      this.actionStatus,
+    ].filter(Boolean).join('. ');
   }
 
   /** 전투 예측 패널: 실제 엔진 계산 결과를 그대로 보여준다. */
@@ -186,6 +233,7 @@ export class Hud {
   // ---------------- 생산 시트 ----------------
 
   showProduction(buildingName: string, gold: number, costFor: (t: UnitTypeId) => number): void {
+    this.productionReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const card = (type: UnitTypeId) => {
       const s = UNIT_STATS[type];
       return `<button class="prod-card" data-type="${type}" ${gold >= costFor(type) ? '' : 'disabled'}>
@@ -205,10 +253,40 @@ export class Hud {
       .querySelector('.close-btn')!
       .addEventListener('click', () => this.handlers.onCloseProduction());
     this.productionSheet.classList.add('show');
+    this.productionSheet.setAttribute('aria-hidden', 'false');
+    queueMicrotask(() => this.productionFocusable()[0]?.focus());
   }
 
   hideProduction(): void {
     this.productionSheet.classList.remove('show');
+    this.productionSheet.setAttribute('aria-hidden', 'true');
+    if (this.productionReturnFocus?.isConnected) this.productionReturnFocus.focus();
+    this.productionReturnFocus = null;
+  }
+
+  private productionFocusable(): HTMLElement[] {
+    return [...this.productionSheet.querySelectorAll<HTMLElement>('button:not([disabled])')];
+  }
+
+  private onProductionKeyDown(event: KeyboardEvent): void {
+    if (!this.productionSheet.classList.contains('show')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.handlers.onCloseProduction();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const nodes = this.productionFocusable();
+    if (nodes.length === 0) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   // ---------------- 튜토리얼 ----------------

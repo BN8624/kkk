@@ -59,13 +59,19 @@ export function showSetupScreen(
     facDesc.innerHTML = opts.describeFaction(sel.faction);
     scnDesc.textContent = opts.scenarios.find((s) => s.id === sel.scenario)?.description ?? '';
     for (const card of root.querySelectorAll<HTMLButtonElement>('.fac-card')) {
-      card.classList.toggle('selected', card.dataset.f === sel.faction);
+      const selected = card.dataset.f === sel.faction;
+      card.classList.toggle('selected', selected);
+      card.setAttribute('aria-pressed', String(selected));
     }
     for (const chip of root.querySelectorAll<HTMLButtonElement>('#scn-row .opt-chip')) {
-      chip.classList.toggle('selected', chip.dataset.s === sel.scenario);
+      const selected = chip.dataset.s === sel.scenario;
+      chip.classList.toggle('selected', selected);
+      chip.setAttribute('aria-pressed', String(selected));
     }
     for (const chip of root.querySelectorAll<HTMLButtonElement>('#dif-row .opt-chip')) {
-      chip.classList.toggle('selected', chip.dataset.d === sel.difficulty);
+      const selected = chip.dataset.d === sel.difficulty;
+      chip.classList.toggle('selected', selected);
+      chip.setAttribute('aria-pressed', String(selected));
     }
   };
   render();

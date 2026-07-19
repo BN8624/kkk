@@ -14,7 +14,7 @@ import {
   type VictoryCondition,
 } from '../../core/scenario/types';
 import type { Axial, BuildingId, FactionId, UnitTypeId } from '../../core/types';
-import { buildingName, factionName, t, unitName } from '../../i18n';
+import { factionName, t, unitName, victoryConditionText } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -246,6 +246,7 @@ export class EditorPanel {
   private top: HTMLElement;
   private palette: HTMLElement;
   private sheet: HTMLElement;
+  private sheetReturnFocus: HTMLElement | null = null;
   private getDoc: () => ScenarioDocumentV1;
 
   constructor(root: HTMLElement, getDoc: () => ScenarioDocumentV1, handlers: EditorPanelHandlers) {
@@ -270,6 +271,11 @@ export class EditorPanel {
 
     this.sheet = document.createElement('div');
     this.sheet.className = 'sheet ed-sheet';
+    this.sheet.setAttribute('role', 'dialog');
+    this.sheet.setAttribute('aria-modal', 'true');
+    this.sheet.setAttribute('aria-hidden', 'true');
+    this.sheet.tabIndex = -1;
+    this.sheet.addEventListener('keydown', (event) => this.onSheetKeyDown(event));
     root.appendChild(this.sheet);
 
     this.top.querySelector('#ed-exit')!.addEventListener('click', handlers.onExit);
@@ -293,7 +299,7 @@ export class EditorPanel {
     (this.top.querySelector('#ed-redo') as HTMLButtonElement).disabled = !canRedo;
 
     const chip = (id: string, label: string, on: boolean, data: string) =>
-      `<button class="ed-chip ${on ? 'on' : ''}" data-${data}="${id}">${escapeHtml(label)}</button>`;
+      `<button class="ed-chip ${on ? 'on' : ''}" data-${data}="${id}" aria-pressed="${on}">${escapeHtml(label)}</button>`;
     let sub = '';
     if (['plains', 'forest', 'mountain', 'water', 'erase'].includes(tool)) {
       sub = `<span class="ed-sub-label">${escapeHtml(t('editor.brush'))}</span>
@@ -340,12 +346,54 @@ export class EditorPanel {
 
   closeSheet(): void {
     this.sheet.classList.remove('show');
+    this.sheet.setAttribute('aria-hidden', 'true');
+    if (this.sheetReturnFocus?.isConnected) this.sheetReturnFocus.focus();
+    this.sheetReturnFocus = null;
   }
 
   private openSheet(html: string): HTMLElement {
+    if (!this.sheet.classList.contains('show')) {
+      this.sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     this.sheet.innerHTML = html;
     this.sheet.classList.add('show');
+    this.sheet.setAttribute('aria-hidden', 'false');
+    queueMicrotask(() => {
+      if (!this.sheet.classList.contains('show')) return;
+      (this.sheetFocusable()[0] ?? this.sheet).focus();
+    });
     return this.sheet;
+  }
+
+  private sheetFocusable(): HTMLElement[] {
+    return [...this.sheet.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )];
+  }
+
+  private onSheetKeyDown(event: KeyboardEvent): void {
+    if (!this.sheet.classList.contains('show')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeSheet();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const nodes = this.sheetFocusable();
+    if (nodes.length === 0) {
+      event.preventDefault();
+      this.sheet.focus();
+      return;
+    }
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   private openMenu(): void {
@@ -510,7 +558,7 @@ export class EditorPanel {
     };
     const item = (kind: string, i: number, text: string) => `
       <div class="ed-cond" data-kind="${kind}" data-i="${i}">
-        <span>${escapeHtml(text)}</span><button data-act="del">✕</button>
+        <span>${escapeHtml(text)}</span><button data-act="del" aria-label="${escapeHtml(t('editor.removeCondition'))}">✕</button>
       </div>`;
     const s = this.openSheet(`
       <h3>${escapeHtml(t('editor.objectives'))}</h3>
@@ -861,28 +909,7 @@ function buildConditionObject(
 }
 
 export function describeVictory(c: VictoryCondition): string {
-  switch (c.type) {
-    case 'conquest':
-      return t('condition.victory.conquest');
-    case 'hold-building':
-      return t('condition.victory.holdBuilding', { q: c.at.q, r: c.at.r, turns: c.turns });
-    case 'capture-building':
-      return t('condition.victory.captureBuilding', { q: c.at.q, r: c.at.r });
-    case 'capture-count':
-      return t('condition.victory.captureCount', { building: buildingName(c.building), count: c.count });
-    case 'eliminate-faction':
-      return t('condition.victory.eliminateFaction', { faction: factionName(c.faction) });
-    case 'survive-turns':
-      return t('condition.victory.surviveTurns', { turns: c.turns });
-    case 'reach-score':
-      return t('condition.victory.reachScore', { score: c.score });
-    case 'unit-alive':
-      return t('condition.victory.unitAlive', { tag: c.tag });
-    case 'all-of':
-      return t('condition.victory.allOf', { count: c.conditions.length });
-    case 'any-of':
-      return t('condition.victory.anyOf', { count: c.conditions.length });
-  }
+  return victoryConditionText(c);
 }
 
 export function describeDefeat(c: DefeatCondition): string {

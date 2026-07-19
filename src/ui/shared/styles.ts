@@ -8,6 +8,15 @@ export function injectSharedStyles(): void {
   style.textContent = `
 #hud * { box-sizing: border-box; margin: 0; font-family: Georgia, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
 #hud button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+#hud button:focus-visible, #hud a:focus-visible, #hud input:focus-visible,
+#hud select:focus-visible, #hud textarea:focus-visible, #hud [tabindex]:focus-visible {
+  outline: 3px solid #f4cf55; outline-offset: 3px;
+}
+#hud button[aria-pressed="true"]::after { content: ' ✓'; }
+.sr-only {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 .hud-top {
   position: absolute; left: 0; right: 0; top: 0;
   padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
@@ -311,6 +320,12 @@ export function injectSharedStyles(): void {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }
   .sheet.show { transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hud *, #hud *::before, #hud *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
 }
 `;
   document.head.appendChild(style);
