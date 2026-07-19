@@ -25,6 +25,8 @@ export interface EditorDraftItem {
   title: string;
   updatedAt: string;
   sizeBytes: number;
+  /** 가져오기(파일·코드·URL)로 만들어진 초안 여부 — 커스텀 목록의 분류에 쓴다 */
+  imported?: boolean;
 }
 
 export interface EditorHomeHandlers {
@@ -105,36 +107,67 @@ export function showEditorHomeScreen(
   });
 }
 
-/** 커스텀 시나리오 보관함: 저장된 초안을 실제 게임으로 플레이한다. */
+/** 공식 전장 목록 항목(불변 콘텐츠 — 플레이·복제만 가능). */
+export interface OfficialScenarioItem {
+  id: string;
+  title: string;
+  description: string;
+  /** 권장 왕국·난이도·예상 시간 요약 문장 */
+  recommended: string;
+}
+
+/** 커스텀 시나리오 보관함: 공식 전장·내 전장·가져온 전장을 구분해 표시한다. */
 export function showCustomScenarioListScreen(
   overlay: OverlayHost,
-  drafts: EditorDraftItem[],
-  handlers: { onPlay: (id: string) => void; onBack: () => void },
+  data: { officials: OfficialScenarioItem[]; mine: EditorDraftItem[]; imported: EditorDraftItem[] },
+  handlers: {
+    onPlay: (id: string) => void;
+    onPlayOfficial: (id: string) => void;
+    onCloneOfficial: (id: string) => void;
+    onBack: () => void;
+  },
 ): void {
-  const rows = drafts
-    .map(
-      (d) => `
-      <div class="rp-item" data-id="${escapeHtml(d.id)}">
+  const draftRow = (d: EditorDraftItem) => `
+      <div class="rp-item" data-id="${escapeHtml(d.id)}" data-kind="draft">
         <button class="rp-main" data-act="play">
           <span class="rp-title"><b>${escapeHtml(d.title || '제목 없음')}</b></span>
           <span class="rp-sub">${escapeHtml(d.updatedAt.slice(0, 10))} · 탭하여 플레이</span>
         </button>
-      </div>`,
-    )
-    .join('');
+      </div>`;
+  const officialRow = (o: OfficialScenarioItem) => `
+      <div class="rp-item" data-id="${escapeHtml(o.id)}" data-kind="official">
+        <button class="rp-main" data-act="play-official">
+          <span class="rp-title"><b>${escapeHtml(o.title)}</b> <span class="hud-chip" style="font-size:11px;">공식</span></span>
+          <span class="rp-sub">${escapeHtml(o.description)}</span>
+          <span class="rp-sub">${escapeHtml(o.recommended)}</span>
+        </button>
+        <button class="rp-exit" data-act="clone" aria-label="${escapeHtml(o.title)} 복제 편집">복제</button>
+      </div>`;
+  const section = (title: string, body: string) =>
+    `<h2 style="font-size:15px;margin:14px 0 6px;">${title}</h2>${body}`;
   const root = overlay.show(`
       <h1 style="font-size:24px;">커스텀 시나리오</h1>
-      <p class="subtitle" style="font-size:12.5px;">제작실에서 만든 시나리오를 플레이합니다</p>
+      <p class="subtitle" style="font-size:12.5px;">공식 전장은 복제해서 편집할 수 있습니다</p>
+      ${section('공식 전장', `<div class="rp-list">${data.officials.map(officialRow).join('')}</div>`)}
+      ${section(
+        '내 전장',
+        data.mine.length > 0
+          ? `<div class="rp-list">${data.mine.map(draftRow).join('')}</div>`
+          : '<p class="subtitle" style="font-size:12px;">아직 없습니다 — 제작실에서 만들어 보세요</p>',
+      )}
       ${
-        drafts.length > 0
-          ? `<div class="rp-list">${rows}</div>`
-          : '<p class="subtitle">저장된 시나리오가 없습니다 — 제작실에서 만들어 보세요</p>'
+        data.imported.length > 0
+          ? section('가져온 전장', `<div class="rp-list">${data.imported.map(draftRow).join('')}</div>`)
+          : ''
       }
       <button class="sub-btn" id="btn-back">뒤로</button>`);
   for (const row of root.querySelectorAll<HTMLElement>('.rp-item')) {
+    const id = row.dataset.id!;
+    row.querySelector('[data-act="play"]')?.addEventListener('click', () => handlers.onPlay(id));
     row
-      .querySelector('[data-act="play"]')!
-      .addEventListener('click', () => handlers.onPlay(row.dataset.id!));
+      .querySelector('[data-act="play-official"]')
+      ?.addEventListener('click', () => handlers.onPlayOfficial(id));
+    row.querySelector('[data-act="clone"]')?.addEventListener('click', () => handlers.onCloneOfficial(id));
   }
   overlay.bind({ 'btn-back': handlers.onBack });
 }

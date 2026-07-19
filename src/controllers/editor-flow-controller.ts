@@ -142,12 +142,28 @@ export class EditorFlowController implements AppController, EditorFlow {
     this.openImportedDocument(doc);
   }
 
-  /** 가져온 문서는 새 ID로 초안이 된다(내장·기존 문서를 덮어쓰지 않는다). */
+  /** 가져온 문서는 새 ID로 초안이 된다(내장·기존 문서를 덮어쓰지 않고, 가져온 전장으로 분류된다). */
   openImportedDocument(doc: ScenarioDocumentV1): void {
     const imported = clone(doc);
     imported.id = newDocId('custom');
+    const tags = new Set(imported.metadata?.tags ?? []);
+    tags.delete('official');
+    tags.add('imported');
+    imported.metadata = { ...imported.metadata, tags: [...tags] };
     this.openEditorSession(imported);
     this.ctx.hud.toast('가져온 시나리오를 편집합니다 — 검증을 실행해 보세요');
+  }
+
+  /** 공식 전장 등 읽기 전용 문서의 복제본을 새 초안으로 연다(원본은 수정되지 않는다). */
+  openCloneOf(doc: ScenarioDocumentV1): void {
+    const copy = clone(doc);
+    copy.id = newDocId('custom');
+    copy.title = `${doc.title} 사본`.slice(0, SCENARIO_LIMITS.maxTitleLen);
+    if (copy.metadata?.tags) {
+      copy.metadata = { ...copy.metadata, tags: copy.metadata.tags.filter((t) => t !== 'official') };
+    }
+    this.openEditorSession(copy);
+    this.ctx.hud.toast('복제본을 편집합니다 — 원본 공식 전장은 그대로 유지됩니다');
   }
 
   // ---------------- 에디터 세션 ----------------

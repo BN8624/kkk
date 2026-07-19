@@ -53,6 +53,8 @@ export interface EditorFlow {
   showHome(): Promise<void>;
   /** 공유 URL로 받은 문서를 새 초안으로 연다. */
   openImportedDocument(doc: ScenarioDocumentV1): void;
+  /** 공식 전장 등 읽기 전용 문서의 복제본을 새 초안으로 연다. */
+  openCloneOf(doc: ScenarioDocumentV1): void;
   /** 테스트 플레이 진입 직전: 에디터 화면 요소만 걷어낸다(세션 유지). */
   suspendForTestPlay(): void;
   /** 세션·씬·패널 완전 정리(타이틀 등으로 나갈 때). */

@@ -11,7 +11,13 @@ export async function loadDraftItems(): Promise<EditorDraftItem[]> {
     for (const s of list) {
       const rec = await documentStore().get<ScenarioDocumentV1>('scenario-drafts', s.id);
       if (rec?.data) {
-        drafts.push({ id: s.id, title: rec.data.title, updatedAt: s.updatedAt, sizeBytes: s.size });
+        drafts.push({
+          id: s.id,
+          title: rec.data.title,
+          updatedAt: s.updatedAt,
+          sizeBytes: s.size,
+          imported: rec.data.metadata?.tags?.includes('imported') ?? false,
+        });
       }
     }
   } catch {

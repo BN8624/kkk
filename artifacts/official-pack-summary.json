@@ -1,0 +1,188 @@
+{
+  "generatedAt": "2026-07-19T13:19:14.228Z",
+  "elapsedSec": 1.7,
+  "pass": true,
+  "reports": [
+    {
+      "id": "official-lightning-duel",
+      "title": "번개 결투장",
+      "structureOk": true,
+      "qualityErrors": 0,
+      "qualityWarnings": 0,
+      "trial": {
+        "games": 8,
+        "unfinished": 0,
+        "invalidStates": 0,
+        "rejectedCommands": 0,
+        "stalledFactions": [],
+        "winners": {
+          "azure": 8
+        },
+        "avgEndTurn": 5.5,
+        "starHistogram": [
+          0,
+          6,
+          0,
+          2
+        ],
+        "policyWins": {
+          "aggressive": 1,
+          "defensive": 1,
+          "economic": 1,
+          "balanced": 1,
+          "noisy": 4
+        }
+      }
+    },
+    {
+      "id": "official-grand-continent",
+      "title": "대륙 회전",
+      "structureOk": true,
+      "qualityErrors": 0,
+      "qualityWarnings": 0,
+      "trial": {
+        "games": 8,
+        "unfinished": 0,
+        "invalidStates": 0,
+        "rejectedCommands": 0,
+        "stalledFactions": [],
+        "winners": {
+          "crimson": 2,
+          "violet": 2,
+          "azure": 4
+        },
+        "avgEndTurn": 27.8,
+        "starHistogram": [
+          0,
+          0,
+          0,
+          4
+        ],
+        "policyWins": {
+          "balanced": 1,
+          "noisy": 3
+        }
+      }
+    },
+    {
+      "id": "official-narrow-bridge",
+      "title": "외나무 다리",
+      "structureOk": true,
+      "qualityErrors": 0,
+      "qualityWarnings": 1,
+      "trial": {
+        "games": 8,
+        "unfinished": 0,
+        "invalidStates": 0,
+        "rejectedCommands": 0,
+        "stalledFactions": [],
+        "winners": {
+          "crimson": 3,
+          "azure": 5
+        },
+        "avgEndTurn": 13.6,
+        "starHistogram": [
+          0,
+          5,
+          0,
+          0
+        ],
+        "policyWins": {
+          "defensive": 1,
+          "balanced": 1,
+          "noisy": 3
+        }
+      }
+    },
+    {
+      "id": "official-ring-fortress",
+      "title": "원형 요새",
+      "structureOk": true,
+      "qualityErrors": 0,
+      "qualityWarnings": 0,
+      "trial": {
+        "games": 8,
+        "unfinished": 0,
+        "invalidStates": 0,
+        "rejectedCommands": 0,
+        "stalledFactions": [],
+        "winners": {
+          "azure": 1,
+          "crimson": 4,
+          "violet": 3
+        },
+        "avgEndTurn": 7.5,
+        "starHistogram": [
+          0,
+          0,
+          3,
+          0
+        ],
+        "policyWins": {
+          "balanced": 1,
+          "noisy": 2
+        }
+      }
+    },
+    {
+      "id": "official-golden-road",
+      "title": "황금 항로",
+      "structureOk": true,
+      "qualityErrors": 0,
+      "qualityWarnings": 0,
+      "trial": {
+        "games": 8,
+        "unfinished": 0,
+        "invalidStates": 0,
+        "rejectedCommands": 0,
+        "stalledFactions": [],
+        "winners": {
+          "violet": 8
+        },
+        "avgEndTurn": 5.6,
+        "starHistogram": [
+          0,
+          1,
+          4,
+          3
+        ],
+        "policyWins": {
+          "aggressive": 1,
+          "defensive": 1,
+          "economic": 1,
+          "balanced": 1,
+          "noisy": 4
+        }
+      }
+    },
+    {
+      "id": "official-kings-escort",
+      "title": "왕의 호위",
+      "structureOk": true,
+      "qualityErrors": 0,
+      "qualityWarnings": 0,
+      "trial": {
+        "games": 8,
+        "unfinished": 0,
+        "invalidStates": 0,
+        "rejectedCommands": 0,
+        "stalledFactions": [],
+        "winners": {
+          "azure": 5,
+          "crimson": 3
+        },
+        "avgEndTurn": 5,
+        "starHistogram": [
+          0,
+          0,
+          2,
+          3
+        ],
+        "policyWins": {
+          "aggressive": 1,
+          "noisy": 4
+        }
+      }
+    }
+  ]
+}

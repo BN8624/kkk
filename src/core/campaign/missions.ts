@@ -11,8 +11,8 @@ import type { CampaignDocument } from './types';
 
 // ---------------- 지도 제작 도구 ----------------
 
-/** 오프셋(col,row) 좌표로 고정 지도를 조립한다. 모든 칸은 평원으로 시작한다. */
-class BoardBuilder {
+/** 오프셋(col,row) 좌표로 고정 지도를 조립한다. 모든 칸은 평원으로 시작한다(공식 팩과 공용). */
+export class BoardBuilder {
   readonly tiles: ScenarioTile[] = [];
   private index = new Map<string, ScenarioTile>();
 
@@ -47,7 +47,7 @@ class BoardBuilder {
   }
 }
 
-function factions(
+export function factions(
   human: FactionId,
   ais: FactionId[],
   gold?: Partial<Record<FactionId, number>>,

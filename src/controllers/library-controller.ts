@@ -4,6 +4,7 @@ import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
 import { newGame, newGameFromScenario } from '../core/game';
 import { loadRecords } from '../core/records';
 import { normalizeScenario } from '../core/scenario/normalize';
+import { OFFICIAL_SCENARIOS, officialScenarioById } from '../core/scenario/official';
 import { isPlayable, validateScenario } from '../core/scenario/validate';
 import type { ScenarioDocumentV1 } from '../core/scenario/types';
 import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
@@ -87,16 +88,55 @@ export class LibraryController implements AppController, LibraryFlow {
     showRecordsScreen(this.ctx.overlay, lines, () => this.ctx.nav.toTitle());
   }
 
-  /** 커스텀 시나리오 보관함: 저장된 초안을 일반 게임으로 플레이한다. */
+  /** 커스텀 시나리오 보관함: 공식 전장·내 전장·가져온 전장을 구분해 표시하고 플레이한다. */
   async showCustomScenarios(): Promise<void> {
     const token = this.ctx.enterMode('scenarios');
     this.ctx.overlay.show('<p class="subtitle">불러오는 중…</p>');
     const drafts = await loadDraftItems();
     if (!token.alive) return;
-    showCustomScenarioListScreen(this.ctx.overlay, drafts, {
-      onPlay: (id) => void this.playCustomScenario(id),
-      onBack: () => this.ctx.nav.toTitle(),
-    });
+    const officials = OFFICIAL_SCENARIOS.map((s) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      recommended: `권장 ${FACTION_NAMES[s.metadata!.recommendedFaction!]} · ${DIFFICULTY_NAMES[s.metadata!.recommendedDifficulty!]} · 약 ${s.metadata!.estimatedMinutes}분`,
+    }));
+    showCustomScenarioListScreen(
+      this.ctx.overlay,
+      {
+        officials,
+        mine: drafts.filter((d) => !d.imported),
+        imported: drafts.filter((d) => d.imported),
+      },
+      {
+        onPlay: (id) => void this.playCustomScenario(id),
+        onPlayOfficial: (id) => this.playOfficialScenario(id),
+        onCloneOfficial: (id) => {
+          const doc = officialScenarioById(id);
+          if (doc) this.ctx.editorFlow.openCloneOf(doc);
+        },
+        onBack: () => this.ctx.nav.toTitle(),
+      },
+    );
+  }
+
+  /** 공식 전장을 일반 게임으로 플레이한다(문서는 코드에 내장된 검증 완료본이다). */
+  private playOfficialScenario(id: string): void {
+    const doc = officialScenarioById(id);
+    if (!doc) {
+      this.ctx.hud.toast('공식 전장을 찾지 못했습니다');
+      return;
+    }
+    let state: GameState;
+    try {
+      state = newGameFromScenario(Date.now() >>> 0, normalizeScenario(doc), {
+        mode: 'custom',
+        difficulty: doc.metadata?.recommendedDifficulty ?? 'normal',
+      });
+    } catch {
+      this.ctx.hud.toast('시나리오를 시작할 수 없습니다');
+      return;
+    }
+    this.ctx.nav.launch(state);
   }
 
   private async playCustomScenario(id: string): Promise<void> {
