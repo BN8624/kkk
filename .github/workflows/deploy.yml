@@ -1,4 +1,4 @@
-# 한 줄 목적: main 푸시 시 테스트·빌드 후 GitHub Pages로 자동 배포한다
+# 한 줄 목적: main 푸시 시 lint·타입·단위·E2E·빌드가 모두 성공해야 GitHub Pages로 배포한다
 name: Deploy to GitHub Pages
 
 on:
@@ -26,8 +26,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npx tsc --noEmit
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright test
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

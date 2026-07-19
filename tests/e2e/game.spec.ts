@@ -38,7 +38,9 @@ async function waitIdle(page: Page): Promise<void> {
 async function tapHex(page: Page, q: number, r: number): Promise<void> {
   const pos = await page.evaluate(([qq, rr]) => window.__tc!.screenPos(qq, rr), [q, r] as const);
   expect(pos).toBeTruthy();
-  await page.touchscreen.tap(pos!.x, pos!.y);
+  // 모바일 프로젝트는 실제 터치, PC smoke는 마우스 클릭으로 조작한다
+  if (test.info().project.use.hasTouch) await page.touchscreen.tap(pos!.x, pos!.y);
+  else await page.mouse.click(pos!.x, pos!.y);
 }
 
 async function startNewGame(page: Page, seed: number): Promise<void> {

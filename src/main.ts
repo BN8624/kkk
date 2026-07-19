@@ -119,23 +119,25 @@ class App {
 
     this.toTitle();
 
-    // E2E 테스트 브리지: 게임 로직·UI에 영향 없는 읽기 전용 조회 창구
-    (window as unknown as { __tc?: unknown }).__tc = {
-      state: () => this.state,
-      busy: () => this.busy,
-      screenPos: (q: number, r: number) => this.scene?.screenPos({ q, r }),
-      tap: (q: number, r: number) => this.onTileTap(q, r),
-      lastTap: () => this.lastTap,
-      game: () => this.game,
-      dests: () => this.moveDests,
-      human: () => (this.state ? humanFaction(this.state) : null),
-      targets: (id: number) => {
-        const u = this.state ? unitById(this.state, id) : null;
-        return u && this.state
-          ? attackTargets(this.state, u).map((t) => ({ id: t.id, q: t.q, r: t.r }))
-          : [];
-      },
-    };
+    // E2E 테스트 브리지: 개발 모드·테스트 빌드에서만 노출한다(일반 배포판 미노출)
+    if (import.meta.env.DEV || import.meta.env.VITE_TEST_BRIDGE === '1') {
+      (window as unknown as { __tc?: unknown }).__tc = {
+        state: () => this.state,
+        busy: () => this.busy,
+        screenPos: (q: number, r: number) => this.scene?.screenPos({ q, r }),
+        tap: (q: number, r: number) => this.onTileTap(q, r),
+        lastTap: () => this.lastTap,
+        game: () => this.game,
+        dests: () => this.moveDests,
+        human: () => (this.state ? humanFaction(this.state) : null),
+        targets: (id: number) => {
+          const u = this.state ? unitById(this.state, id) : null;
+          return u && this.state
+            ? attackTargets(this.state, u).map((t) => ({ id: t.id, q: t.q, r: t.r }))
+            : [];
+        },
+      };
+    }
   }
 
   private human(): FactionId {
