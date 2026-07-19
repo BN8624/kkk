@@ -67,6 +67,7 @@ export function normalizeScenario(doc: ScenarioDocumentV1): ScenarioRuntimeSnaps
       turnLimit: doc.rules.turnLimit,
       ...(doc.rules.modifier !== undefined ? { modifier: doc.rules.modifier } : {}),
       doctrines: doc.rules.doctrines ?? true,
+      ...(doc.rules.uniqueUnits !== undefined ? { uniqueUnits: doc.rules.uniqueUnits } : {}),
     },
     victoryConditions: doc.victoryConditions,
     defeatConditions: doc.defeatConditions,

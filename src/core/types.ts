@@ -12,7 +12,7 @@ export type BuiltinScenarioId = 'three-crowns' | 'broken-strait' | 'crown-heart'
 export type ScenarioId = string;
 export type TerrainId = 'plains' | 'forest' | 'mountain' | 'water';
 export type BuildingId = 'capital' | 'village' | 'crown';
-export type UnitTypeId = 'infantry' | 'archer' | 'cavalry';
+export type UnitTypeId = 'infantry' | 'archer' | 'cavalry' | 'guardian' | 'raider' | 'crossbow';
 
 export interface Axial {
   q: number;
@@ -118,6 +118,19 @@ export interface UnitStats {
   move: number;
   range: number;
   cost: number;
+}
+
+export type UnitTrait =
+  | { type: 'brace'; defenseBonus: number }
+  | { type: 'terrain-mobility'; forestCost: number; mountainCost: number }
+  | { type: 'plunder'; bonusGold: number }
+  | { type: 'armor-piercing'; amount: number };
+
+export interface UnitDefinition extends UnitStats {
+  id: UnitTypeId;
+  /** null = 공용 병종, FactionId = 해당 왕국 전용 */
+  faction: FactionId | null;
+  traits: UnitTrait[];
 }
 
 export interface TerrainRule {

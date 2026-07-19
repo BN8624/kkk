@@ -59,7 +59,7 @@ export function builtinScenarioSnapshot(
       useDoctrine: true,
     })),
     units,
-    rules: { maxTurns: def.maxTurns, turnLimit: 'score', doctrines: true },
+    rules: { maxTurns: def.maxTurns, turnLimit: 'score', doctrines: true, uniqueUnits: true },
     victoryConditions: victory,
     defeatConditions: defeat,
     starConditions: [],
@@ -73,5 +73,6 @@ export function objectivesFromSnapshot(s: ScenarioRuntimeSnapshot): GameObjectiv
     defeat: s.defeatConditions,
     stars: s.starConditions,
     turnLimit: s.rules.turnLimit,
+    ...(s.rules.uniqueUnits !== undefined ? { uniqueUnits: s.rules.uniqueUnits } : {}),
   };
 }

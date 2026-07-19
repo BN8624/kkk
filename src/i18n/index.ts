@@ -3,7 +3,7 @@ import { EN } from './en';
 import { KO } from './ko';
 import type { ModifierId } from '../core/daily';
 import type { CompatibilityDecision, ReplayCompatibility } from '../core/replay-compat';
-import type { BuiltinScenarioId, FactionId } from '../core/types';
+import type { BuiltinScenarioId, FactionId, UnitTypeId } from '../core/types';
 import type { VictoryCondition } from '../core/scenario/types';
 
 export type Locale = 'ko' | 'en';
@@ -79,7 +79,7 @@ export function factionName(f: 'azure' | 'crimson' | 'violet'): string {
   return t(`faction.${f}`);
 }
 
-export function unitName(u: 'infantry' | 'archer' | 'cavalry'): string {
+export function unitName(u: UnitTypeId): string {
   return t(`unit.${u}`);
 }
 

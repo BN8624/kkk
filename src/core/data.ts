@@ -1,11 +1,16 @@
 // 한 줄 목적: 유닛 능력치·지형 규칙·경제 상수 등 게임 밸런스 데이터를 정의한다
 import type { BuildingId, FactionId, TerrainId, TerrainRule, UnitStats, UnitTypeId } from './types';
+import { UNIT_DEFS, UNIT_TYPE_IDS } from './units';
 
-export const UNIT_STATS: Record<UnitTypeId, UnitStats> = {
-  infantry: { hp: 12, atk: 5, def: 2, move: 3, range: 1, cost: 30 },
-  archer: { hp: 10, atk: 5, def: 0, move: 2, range: 2, cost: 35 },
-  cavalry: { hp: 14, atk: 7, def: 1, move: 5, range: 1, cost: 50 },
-};
+function statsFromDef(type: UnitTypeId): UnitStats {
+  const d = UNIT_DEFS[type];
+  return { hp: d.hp, atk: d.atk, def: d.def, move: d.move, range: d.range, cost: d.cost };
+}
+
+/** UNIT_DEFS에서 파생 — 능력치 정본은 units.ts 한곳만 관리한다 */
+export const UNIT_STATS: Record<UnitTypeId, UnitStats> = Object.fromEntries(
+  UNIT_TYPE_IDS.map((id) => [id, statsFromDef(id)]),
+) as Record<UnitTypeId, UnitStats>;
 
 export const TERRAIN_RULES: Record<TerrainId, TerrainRule> = {
   plains: { cost: 1, def: 0 },
@@ -51,6 +56,9 @@ export const UNIT_NAMES: Record<UnitTypeId, string> = {
   infantry: '보병',
   archer: '궁병',
   cavalry: '기병',
+  guardian: '수호대',
+  raider: '약탈대',
+  crossbow: '쇠뇌대',
 };
 
 export const TERRAIN_NAMES: Record<TerrainId, string> = {

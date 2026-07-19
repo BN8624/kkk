@@ -1,6 +1,6 @@
 // 한 줄 목적: 게임 상태를 육각 보드로 그리고 터치 입력·카메라·전투 연출을 담당하는 Phaser 씬
 import Phaser from 'phaser';
-import type { Axial, GameState } from '../core/types';
+import type { Axial, GameState, UnitTypeId } from '../core/types';
 import { UNIT_STATS } from '../core/data';
 import { axialToPixel } from '../core/hex';
 import {
@@ -182,7 +182,7 @@ export class BoardScene extends Phaser.Scene {
 
   animateAttack(o: {
     attackerId: number;
-    attackerType: 'infantry' | 'archer' | 'cavalry';
+    attackerType: UnitTypeId;
     defenderId: number;
     defenderPos: Axial;
     damage: number;

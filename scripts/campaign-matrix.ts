@@ -74,7 +74,7 @@ for (const campaign of CAMPAIGNS) {
       starHistogram: [0, 0, 0, 0],
       defeatCauses: {},
       victoryPaths: {},
-      unitUsage: { infantry: 0, archer: 0, cavalry: 0 },
+      unitUsage: { infantry: 0, archer: 0, cavalry: 0, guardian: 0, raider: 0, crossbow: 0 },
       idleHumanTurns: 0,
       autoWins: 0,
       perPolicy: EVAL_POLICY_IDS.map((p) => ({ policy: p, games: 0, wins: 0, stars: [0, 0, 0, 0] })),

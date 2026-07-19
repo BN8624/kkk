@@ -39,7 +39,7 @@ interface GameOutcome {
 }
 
 function zeroByType(): Record<UnitTypeId, number> {
-  return { infantry: 0, archer: 0, cavalry: 0 };
+  return { infantry: 0, archer: 0, cavalry: 0, guardian: 0, raider: 0, crossbow: 0 };
 }
 
 /** 상태 불변식 검사: 위반 사유 문자열을 수집한다. */

@@ -84,6 +84,8 @@ export interface ScenarioRules {
   modifier?: string;
   /** 교리(왕국 고유 능력) 전역 활성화. 생략 시 true */
   doctrines?: boolean;
+  /** 왕국 고유 병종 생산 허용. 생략 시 false(기존 문서·저장 의미 유지) */
+  uniqueUnits?: boolean;
 }
 
 /** 지도 생성 방식: fixed = 문서의 타일 그대로, procedural = 내장 생성기 + 시드 */
@@ -173,6 +175,11 @@ export interface GameObjectives {
   defeat: DefeatCondition[];
   stars: StarCondition[];
   turnLimit: 'score' | 'defeat';
+  /**
+   * 왕국 고유 병종 생산 허용(시나리오 rules.uniqueUnits에서 복사).
+   * 생략 시 false — 내장 시나리오는 스냅샷에 넣지 않으므로 상태에도 실어 둔다.
+   */
+  uniqueUnits?: boolean;
 }
 
 // ---------------- 검증 ----------------

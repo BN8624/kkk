@@ -38,6 +38,7 @@ import type {
   Unit,
   UnitTypeId,
 } from './types';
+import { producibleUnits } from './units';
 
 export const DEFAULT_CONFIG: GameConfig = {
   mode: 'quick',
@@ -380,6 +381,7 @@ export function produceUnit(
   type: UnitTypeId,
 ): ProduceResult {
   if (state.over) return { ok: false, reason: 'over' };
+  if (!producibleUnits(state, faction).includes(type)) return { ok: false, reason: 'invalid' };
   const tile = tileAt(state, at.q, at.r);
   if (!tile || !tile.building || tile.owner !== faction) return { ok: false, reason: 'not-owned' };
   if (unitAt(state, at.q, at.r)) return { ok: false, reason: 'occupied' };
