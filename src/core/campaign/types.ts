@@ -35,6 +35,8 @@ export interface MissionProgress {
   bestSurvivors: number;
   /** 마지막 플레이 시각(ISO) */
   lastPlayed: string;
+  /** 누적 도전 횟수(v1.5 이전 기록에는 없을 수 있음) */
+  attempts?: number;
 }
 
 export interface CampaignProgressV1 {

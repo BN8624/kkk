@@ -22,6 +22,7 @@ export interface AppNavigation {
   toCustomScenarios(): void;
   toEditorHome(): void;
   toReplayArchive(): void;
+  toAnalysis(): void;
   launch(state: GameState, opts?: LaunchOptions): void;
   openPlayback(doc: ReplayDocumentV1): void;
 }
@@ -65,7 +66,9 @@ export interface EditorFlow {
 /** ReplayController 공개 계약. */
 export interface ReplayArchiveFlow {
   showArchive(): Promise<void>;
-  openPlayback(doc: ReplayDocumentV1): void;
+  openPlayback(doc: ReplayDocumentV1, opts?: { unverified?: boolean }): void;
+  /** 분석 화면에서 특정 턴으로 바로 이동해 재생을 연다. */
+  openPlaybackAtTurn(doc: ReplayDocumentV1, turn: number): void;
   /** 재생 UI 정리(다른 화면으로 나갈 때). */
   stopPlaybackUi(): void;
   /** 게임 종료 시 리플레이 자동 보관(실패 무시). */

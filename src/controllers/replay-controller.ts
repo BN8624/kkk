@@ -181,6 +181,16 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     this.updateControls();
   }
 
+  /** 분석 화면에서 특정 턴으로 바로 이동해 재생을 연다. */
+  openPlaybackAtTurn(doc: ReplayDocumentV1, turn: number): void {
+    this.openPlayback(doc);
+    const pb = this.playback;
+    if (!pb) return; // 검증 실패로 열리지 않은 경우
+    pb.seekTurn(turn);
+    this.ctx.boardScene?.setState(pb.state);
+    this.updateControls();
+  }
+
   /** 재생 UI를 정리한다(보관함·타이틀로 나갈 때). */
   stopPlaybackUi(): void {
     this.playing = false;

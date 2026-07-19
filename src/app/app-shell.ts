@@ -13,6 +13,7 @@ import { Hud } from '../ui/game/hud';
 import { OverlayHost } from '../ui/shared/overlay';
 import { injectSharedStyles } from '../ui/shared/styles';
 import { showTitleScreen } from '../ui/title';
+import { AnalysisController } from '../controllers/analysis-controller';
 import { CampaignController } from '../controllers/campaign-controller';
 import { EditorFlowController } from '../controllers/editor-flow-controller';
 import { LibraryController } from '../controllers/library-controller';
@@ -71,6 +72,7 @@ export class AppShell implements AppContext, AppNavigation {
   private editorCtrl: EditorFlowController;
   private replayCtrl: ReplayController;
   private libraryCtrl: LibraryController;
+  private analysisCtrl: AnalysisController;
 
   constructor() {
     this.settings = loadSettings();
@@ -104,6 +106,7 @@ export class AppShell implements AppContext, AppNavigation {
     this.editorCtrl = new EditorFlowController(this);
     this.replayCtrl = new ReplayController(this);
     this.libraryCtrl = new LibraryController(this);
+    this.analysisCtrl = new AnalysisController(this);
 
     window.addEventListener('pagehide', () => this.playCtrl.persistOnExit());
   }
@@ -204,7 +207,7 @@ export class AppShell implements AppContext, AppNavigation {
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
       saveSummary: summary,
-      features: { campaign: true, scenarios: true, editor: true, replays: true },
+      features: { campaign: true, scenarios: true, editor: true, replays: true, analysis: true },
       handlers: {
         onContinue: () => this.continueGame(),
         onNewGame: () => this.toSetup(),
@@ -213,6 +216,7 @@ export class AppShell implements AppContext, AppNavigation {
         onScenarios: () => this.toCustomScenarios(),
         onEditor: () => this.toEditorHome(),
         onReplays: () => this.toReplayArchive(),
+        onAnalysis: () => this.toAnalysis(),
         onRecords: () => this.toRecords(),
       },
     });
@@ -248,6 +252,10 @@ export class AppShell implements AppContext, AppNavigation {
 
   toReplayArchive(): void {
     void this.replayCtrl.showArchive();
+  }
+
+  toAnalysis(): void {
+    void this.analysisCtrl.showLab();
   }
 
   launch(state: GameState, opts?: { testPlay?: boolean; spectate?: boolean }): void {

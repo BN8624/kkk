@@ -184,6 +184,23 @@ export function injectSharedStyles(): void {
 .rp-sub { font-size: 12px; color: #a9b4cc; }
 .rp-compat { color: #7fae7a; }
 .rp-compat.warn { color: #d9a441; }
+.an-filters { width: min(430px, 92vw); display: flex; flex-wrap: wrap; gap: 6px; }
+.an-filters select {
+  flex: 1; min-width: 96px; padding: 6px 8px; border-radius: 10px; font-size: 12.5px;
+  border: 1px solid #6b7894; background: rgba(20,28,48,.9); color: #d8deeb;
+}
+.an-check { display: flex; align-items: center; padding: 0 2px; }
+.an-check input { width: 18px; height: 18px; accent-color: #c9a227; }
+.an-block { width: min(430px, 92vw); display: flex; flex-direction: column; gap: 6px; }
+.an-block h2 { color: #e8c95a; font-size: 15px; letter-spacing: 1px; margin: 4px 0 0; }
+.an-line { color: #d8deeb; font-size: 13px; line-height: 1.5; margin: 0; }
+.an-ev { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.an-ev-turn { color: #a9b4cc; min-width: 38px; }
+.an-ev-text { flex: 1; color: #d8deeb; }
+.an-ev-open {
+  border: 1px solid #6b7894; background: rgba(242,234,216,.08); color: #d8deeb;
+  border-radius: 8px; padding: 2px 10px; font-size: 12px;
+}
 .rp-actions { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
 .rp-actions button {
   width: 34px; height: 26px; border-radius: 8px; font-size: 14px;

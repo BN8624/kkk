@@ -88,6 +88,7 @@ export function recordMissionResult(
       : (prev?.bestTurns ?? null),
     bestSurvivors: Math.max(prev?.bestSurvivors ?? 0, result.survivors),
     lastPlayed: result.playedAt,
+    attempts: (prev?.attempts ?? 0) + 1,
   };
   if (next.bestTurns === Number.POSITIVE_INFINITY) next.bestTurns = null;
   return { version: 1, missions: { ...progress.missions, [missionId]: next } };

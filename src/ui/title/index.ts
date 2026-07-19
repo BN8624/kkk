@@ -10,6 +10,7 @@ export interface TitleMenuHandlers {
   onScenarios: () => void;
   onEditor: () => void;
   onReplays: () => void;
+  onAnalysis: () => void;
   onRecords: () => void;
 }
 
@@ -20,7 +21,13 @@ export function showTitleScreen(
     hasSave: boolean;
     saveSummary?: string;
     /** 아직 열리지 않은 메뉴는 렌더링하지 않는다(단계별 수직 완성 원칙) */
-    features: { campaign: boolean; scenarios: boolean; editor: boolean; replays: boolean };
+    features: {
+      campaign: boolean;
+      scenarios: boolean;
+      editor: boolean;
+      replays: boolean;
+      analysis: boolean;
+    };
     handlers: TitleMenuHandlers;
   },
 ): void {
@@ -41,6 +48,7 @@ export function showTitleScreen(
       ${features.scenarios ? '<button class="sub-btn" id="btn-scenarios">커스텀 시나리오</button>' : ''}
       ${features.editor ? '<button class="sub-btn" id="btn-editor">시나리오 제작</button>' : ''}
       ${features.replays ? '<button class="sub-btn" id="btn-replays">리플레이</button>' : ''}
+      ${features.analysis ? '<button class="sub-btn" id="btn-analysis">플레이 분석</button>' : ''}
       <button class="sub-btn" id="btn-records">기록</button>`);
   overlay.bind({
     'btn-continue': handlers.onContinue,
@@ -50,6 +58,7 @@ export function showTitleScreen(
     'btn-scenarios': handlers.onScenarios,
     'btn-editor': handlers.onEditor,
     'btn-replays': handlers.onReplays,
+    'btn-analysis': handlers.onAnalysis,
     'btn-records': handlers.onRecords,
   });
 }

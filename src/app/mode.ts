@@ -9,5 +9,6 @@ export type AppMode =
   | 'editor' // 시나리오 제작실
   | 'replays' // 리플레이 보관함
   | 'replay' // 리플레이 재생
+  | 'analysis' // 플레이 분석(기록실)
   | 'records' // 기록
   | 'settings'; // 설정(일시정지 포함)
