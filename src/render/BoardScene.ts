@@ -1,8 +1,8 @@
 // 한 줄 목적: 게임 상태를 육각 보드로 그리고 터치 입력·카메라·전투 연출을 담당하는 Phaser 씬
 import Phaser from 'phaser';
-import type { Axial, GameState, Unit } from '../core/types';
+import type { Axial, GameState } from '../core/types';
 import { UNIT_STATS } from '../core/data';
-import { axialToPixel, hexKey } from '../core/hex';
+import { axialToPixel } from '../core/hex';
 import {
   ensureGeneratedTextures,
   HEX_SIZE,
@@ -10,25 +10,23 @@ import {
   textureKey,
   type AssetId,
 } from './assets';
+import {
+  BoardView,
+  fitCameraToTiles,
+  pixelToHex,
+  UNIT_Y_OFFSET,
+  type ViewUnit,
+} from './board-view';
 
 export interface BoardCallbacks {
   onTileTap: (q: number, r: number) => void;
   onReady: () => void;
 }
 
-interface UnitView {
-  container: Phaser.GameObjects.Container;
-  token: Phaser.GameObjects.Image;
-  hpBar: Phaser.GameObjects.Graphics;
-}
-
-const UNIT_Y_OFFSET = -8;
-
 export class BoardScene extends Phaser.Scene {
   private state!: GameState;
   private callbacks!: BoardCallbacks;
-  private buildingSprites = new Map<string, Phaser.GameObjects.Image>();
-  private unitViews = new Map<number, UnitView>();
+  private view!: BoardView;
   private highlightPool: Phaser.GameObjects.Image[] = [];
   private selectRing!: Phaser.GameObjects.Image;
   private ringTween?: Phaser.Tweens.Tween;
@@ -52,8 +50,9 @@ export class BoardScene extends Phaser.Scene {
   create(): void {
     ensureGeneratedTextures(this);
     this.cameras.main.setBackgroundColor('#1d2a44');
+    this.view = new BoardView(this);
     this.buildBoard();
-    this.setupCamera();
+    fitCameraToTiles(this, this.state.tiles);
     this.setupInput();
     this.callbacks.onReady();
   }
@@ -62,11 +61,10 @@ export class BoardScene extends Phaser.Scene {
   setState(state: GameState): void {
     this.state = state;
     this.children.removeAll(true);
-    this.buildingSprites.clear();
-    this.unitViews.clear();
+    this.view.resetRefs();
     this.highlightPool = [];
     this.buildBoard();
-    this.setupCamera();
+    fitCameraToTiles(this, this.state.tiles);
   }
 
   private pos(h: Axial): { x: number; y: number } {
@@ -74,12 +72,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private buildBoard(): void {
-    for (const tile of this.state.tiles) {
-      const { x, y } = this.pos(tile);
-      const img = this.add.image(x, y, textureKey(`terrain.${tile.terrain}` as AssetId));
-      img.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
-      img.setDepth(0);
-    }
+    this.view.buildTerrain(this.state.tiles);
     this.selectRing = this.add.image(0, 0, textureKey('ui.ring.select'));
     this.selectRing.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
     this.selectRing.setDepth(2);
@@ -89,68 +82,20 @@ export class BoardScene extends Phaser.Scene {
 
   /** 상태와 화면을 동기화한다(건물 소유·유닛 위치·체력·사망). */
   refresh(): void {
-    for (const tile of this.state.tiles) {
-      if (!tile.building) continue;
-      const key = hexKey(tile.q, tile.r);
-      const owner = tile.owner ?? 'neutral';
-      const assetId = `building.${tile.building}.${owner}` as AssetId;
-      let sprite = this.buildingSprites.get(key);
-      const { x, y } = this.pos(tile);
-      if (!sprite) {
-        sprite = this.add.image(x, y - 4, textureKey(assetId));
-        sprite.setDepth(1 + y / 10000);
-        this.buildingSprites.set(key, sprite);
-      } else if (sprite.texture.key !== textureKey(assetId)) {
-        sprite.setTexture(textureKey(assetId));
-      }
-      const size = tile.building === 'village' ? 54 : 62;
-      sprite.setDisplaySize(size, size);
-    }
-
-    const alive = new Set(this.state.units.map((u) => u.id));
-    for (const [id, view] of this.unitViews) {
-      if (!alive.has(id)) {
-        view.container.destroy();
-        this.unitViews.delete(id);
-      }
-    }
-    for (const unit of this.state.units) {
-      let view = this.unitViews.get(unit.id);
-      if (!view) view = this.createUnitView(unit);
-      const { x, y } = this.pos(unit);
-      view.container.setPosition(x, y + UNIT_Y_OFFSET);
-      view.container.setDepth(3 + y / 10000);
-      this.drawHpBar(view.hpBar, unit);
-      const done = unit.moved && unit.attacked;
-      const humanTurn = this.state.controllers[this.state.current] === 'human';
-      view.container.setAlpha(done && unit.faction === this.state.current && humanTurn ? 0.55 : 1);
-    }
+    this.view.syncBuildings(this.state.tiles);
+    const humanTurn = this.state.controllers[this.state.current] === 'human';
+    const units: ViewUnit[] = this.state.units.map((u) => ({
+      key: u.id,
+      type: u.type,
+      faction: u.faction,
+      q: u.q,
+      r: u.r,
+      hpRatio: u.hp / UNIT_STATS[u.type].hp,
+      dim: u.moved && u.attacked && u.faction === this.state.current && humanTurn,
+    }));
+    this.view.syncUnits(units);
   }
 
-  private createUnitView(unit: Unit): UnitView {
-    const token = this.add.image(0, 0, textureKey(`unit.${unit.type}.${unit.faction}` as AssetId));
-    token.setDisplaySize(46, 51);
-    const hpBar = this.add.graphics();
-    const container = this.add.container(0, 0, [token, hpBar]);
-    const view = { container, token, hpBar };
-    this.unitViews.set(unit.id, view);
-    return view;
-  }
-
-  private drawHpBar(g: Phaser.GameObjects.Graphics, unit: Unit): void {
-    const max = UNIT_STATS[unit.type].hp;
-    const ratio = Phaser.Math.Clamp(unit.hp / max, 0, 1);
-    g.clear();
-    const w = 34;
-    const h = 5;
-    const x = -w / 2;
-    const y = 27;
-    g.fillStyle(0x1d1a14, 0.85);
-    g.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
-    const color = ratio > 0.55 ? 0x64a05a : ratio > 0.28 ? 0xc9a227 : 0xa33636;
-    g.fillStyle(color, 1);
-    g.fillRoundedRect(x, y, w * ratio, h, 2);
-  }
 
   // ---------------- 하이라이트 ----------------
 
@@ -201,7 +146,7 @@ export class BoardScene extends Phaser.Scene {
 
   animateMove(unitId: number, path: Axial[]): Promise<void> {
     return new Promise((resolve) => {
-      const view = this.unitViews.get(unitId);
+      const view = this.view.unitView(unitId);
       if (!view || path.length < 2) {
         this.refresh();
         resolve();
@@ -243,7 +188,7 @@ export class BoardScene extends Phaser.Scene {
     attackerPos?: Axial;
   }): Promise<void> {
     return new Promise((resolve) => {
-      const view = this.unitViews.get(o.attackerId);
+      const view = this.view.unitView(o.attackerId);
       const target = this.pos(o.defenderPos);
       if (!view) {
         this.refresh();
@@ -253,10 +198,10 @@ export class BoardScene extends Phaser.Scene {
       // 전투 종료 처리: 사망 유닛 페이드 후 화면 동기화
       const finish = () => {
         const deadIds = [o.attackerId, o.defenderId].filter(
-          (id) => !this.state.units.some((u) => u.id === id) && this.unitViews.has(id),
+          (id) => !this.state.units.some((u) => u.id === id) && this.view.unitView(id) !== undefined,
         );
         for (const id of deadIds) {
-          const v = this.unitViews.get(id)!;
+          const v = this.view.unitView(id)!;
           this.tweens.add({ targets: v.container, alpha: 0, scale: 0.5, duration: 200 });
         }
         this.time.delayedCall(deadIds.length > 0 ? 220 : 0, () => {
@@ -317,7 +262,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** 피격 흔들림 */
   private hitShake(unitId: number): void {
-    const view = this.unitViews.get(unitId);
+    const view = this.view.unitView(unitId);
     if (!view) return;
     const x = view.container.x;
     this.tweens.add({
@@ -333,7 +278,7 @@ export class BoardScene extends Phaser.Scene {
   animateSpawn(unitId: number): Promise<void> {
     return new Promise((resolve) => {
       this.refresh();
-      const view = this.unitViews.get(unitId);
+      const view = this.view.unitView(unitId);
       if (!view) {
         resolve();
         return;
@@ -407,32 +352,7 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.pan(x, y, duration, 'Sine.easeInOut');
   }
 
-  // ---------------- 카메라·입력 ----------------
-
-  private setupCamera(): void {
-    const xs = this.state.tiles.map((t) => this.pos(t).x);
-    const ys = this.state.tiles.map((t) => this.pos(t).y);
-    const pad = HEX_SIZE * 3;
-    const minX = Math.min(...xs) - pad;
-    const maxX = Math.max(...xs) + pad;
-    const minY = Math.min(...ys) - pad;
-    const maxY = Math.max(...ys) + pad * 1.6;
-    const cam = this.cameras.main;
-    const fit = () => {
-      cam.setBounds(minX, minY, maxX - minX, maxY - minY);
-      const zoom = Math.min(
-        this.scale.width / (maxX - minX),
-        this.scale.height / (maxY - minY),
-      );
-      cam.setZoom(Phaser.Math.Clamp(zoom * 1.05, 0.45, 1.4));
-      cam.centerOn((minX + maxX) / 2, (minY + maxY) / 2);
-    };
-    fit();
-
-    // 화면 회전·Safari 주소창 변화 시 지도가 다시 화면에 맞도록 재조정
-    this.scale.off('resize');
-    this.scale.on('resize', fit);
-  }
+  // ---------------- 입력(플레이 정책: 탭 = 행동, 드래그 = 팬) ----------------
 
   private setupInput(): void {
     this.input.addPointer(1); // 두 손가락 핀치 지원
@@ -479,7 +399,7 @@ export class BoardScene extends Phaser.Scene {
       if (wasPinch || this.dragging) return;
       if (this.time.now - this.downAt.t > 500) return;
       const world = this.cameras.main.getWorldPoint(p.x, p.y);
-      const hex = this.pixelToHex(world.x, world.y);
+      const hex = pixelToHex(world.x, world.y);
       this.callbacks.onTileTap(hex.q, hex.r);
     });
   }
@@ -487,21 +407,5 @@ export class BoardScene extends Phaser.Scene {
   zoomBy(factor: number): void {
     const cam = this.cameras.main;
     cam.setZoom(Phaser.Math.Clamp(cam.zoom * factor, 0.4, 2.2));
-  }
-
-  private pixelToHex(x: number, y: number): Axial {
-    const q = ((Math.sqrt(3) / 3) * x - (1 / 3) * y) / HEX_SIZE;
-    const r = ((2 / 3) * y) / HEX_SIZE;
-    // cube round
-    const s = -q - r;
-    let rq = Math.round(q);
-    let rr = Math.round(r);
-    const rs = Math.round(s);
-    const dq = Math.abs(rq - q);
-    const dr = Math.abs(rr - r);
-    const ds = Math.abs(rs - s);
-    if (dq > dr && dq > ds) rq = -rr - rs;
-    else if (dr > ds) rr = -rq - rs;
-    return { q: rq, r: rr };
   }
 }
