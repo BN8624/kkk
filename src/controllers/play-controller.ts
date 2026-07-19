@@ -14,11 +14,13 @@ import {
   difficultyName,
   doctrineText,
   factionName,
+  getLocale,
   localizedScenarioName,
   modifierName,
   resultShareText,
   scenarioDescription,
   scenarioName,
+  setLocale,
   t,
   unitName,
 } from '../i18n';
@@ -120,6 +122,7 @@ export class PlayController implements AppController, PlaySession {
     showPauseScreen(this.ctx.overlay, {
       soundOn: settings.soundOn,
       aiSpeedLabel: aiSpeedLabel(settings.aiSpeed),
+      languageLabel: t(`locale.${getLocale()}`),
       onResume: () => {
         this.ctx.enterMode('play');
         this.ctx.overlay.hide();
@@ -134,6 +137,10 @@ export class PlayController implements AppController, PlaySession {
         settings.aiSpeed = settings.aiSpeed === 1 ? 2 : settings.aiSpeed === 2 ? 0 : 1;
         saveSettings(settings);
         return aiSpeedLabel(settings.aiSpeed);
+      },
+      onToggleLanguage: () => {
+        setLocale(getLocale() === 'ko' ? 'en' : 'ko');
+        this.showPause();
       },
       onReplayTutorial: () => {
         this.ctx.enterMode('play');

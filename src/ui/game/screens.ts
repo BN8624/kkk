@@ -10,9 +10,11 @@ export function showPauseScreen(
   opts: {
     soundOn: boolean;
     aiSpeedLabel: string;
+    languageLabel: string;
     onResume: () => void;
     onToggleSound: () => boolean;
     onCycleAiSpeed: () => string;
+    onToggleLanguage: () => void;
     onReplayTutorial: () => void;
     onNewGame: () => void;
     onToTitle: () => void;
@@ -24,6 +26,7 @@ export function showPauseScreen(
       <button class="big-btn" id="btn-resume">${escapeHtml(t('pause.resume'))}</button>
       <button class="sub-btn" id="btn-sound">${escapeHtml(soundLabel(opts.soundOn))}</button>
       <button class="sub-btn" id="btn-ai-speed">${escapeHtml(t('pause.aiSpeed', { label: opts.aiSpeedLabel }))}</button>
+      <button class="sub-btn" id="btn-language">${escapeHtml(t('pause.language', { language: opts.languageLabel }))}</button>
       <button class="sub-btn" id="btn-tutorial">${escapeHtml(t('pause.tutorial'))}</button>
       <button class="sub-btn" id="btn-restart">${escapeHtml(t('pause.newGame'))}</button>
       <button class="sub-btn" id="btn-title">${escapeHtml(t('pause.toTitle'))}</button>`);
@@ -37,6 +40,7 @@ export function showPauseScreen(
   });
   overlay.bind({
     'btn-resume': opts.onResume,
+    'btn-language': opts.onToggleLanguage,
     'btn-tutorial': opts.onReplayTutorial,
     'btn-restart': opts.onNewGame,
     'btn-title': opts.onToTitle,

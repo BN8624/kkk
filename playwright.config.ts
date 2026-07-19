@@ -7,6 +7,7 @@ export default defineConfig({
   retries: 1,
   use: {
     baseURL: 'http://localhost:5199',
+    locale: 'ko-KR',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

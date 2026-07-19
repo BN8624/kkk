@@ -21,8 +21,18 @@ function storedLocale(): Locale | null {
   }
 }
 
-// 시스템 언어 자동 감지는 전 화면 커버리지가 끝난 뒤에 켠다 — 부분 번역 상태를 기본값으로 내보내지 않는다
-let current: Locale = typeof localStorage !== 'undefined' ? (storedLocale() ?? 'ko') : 'ko';
+/** 브라우저 언어 목록에서 최초 언어를 고른다. 한국어 외 언어는 영어 UI로 제공한다. */
+export function preferredLocale(languages: readonly string[]): Locale {
+  return languages[0]?.toLowerCase().startsWith('ko') ? 'ko' : 'en';
+}
+
+function systemLocale(): Locale {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'ko';
+  const languages = navigator.languages.length > 0 ? navigator.languages : [navigator.language];
+  return preferredLocale(languages);
+}
+
+let current: Locale = typeof localStorage !== 'undefined' ? (storedLocale() ?? systemLocale()) : 'ko';
 const listeners = new Set<() => void>();
 
 /** 현재 언어의 메시지를 돌려준다. {name} 자리 표시자를 params로 치환한다. */

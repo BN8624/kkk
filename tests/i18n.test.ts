@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   getLocale,
   onLocaleChange,
+  preferredLocale,
   resultShareText,
   setLocale,
   t,
@@ -39,6 +40,12 @@ describe('i18n 사전', () => {
 });
 
 describe('언어 전환', () => {
+  it('최초 시스템 언어는 한국어면 ko, 그 외에는 en을 선택한다', () => {
+    expect(preferredLocale(['ko-KR', 'en-US'])).toBe('ko');
+    expect(preferredLocale(['en-US'])).toBe('en');
+    expect(preferredLocale(['ja-JP'])).toBe('en');
+  });
+
   it('t()가 현재 언어의 문자열과 파라미터 치환을 돌려준다', () => {
     expect(getLocale()).toBe('ko');
     expect(t('title.quickBattle')).toBe('빠른 전투');

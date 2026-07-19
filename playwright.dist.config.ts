@@ -10,6 +10,7 @@ export default defineConfig({
   retries: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
+    locale: 'ko-KR',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

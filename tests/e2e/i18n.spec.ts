@@ -27,7 +27,11 @@ test('영어 모바일 설정·HUD·일시정지', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'AI speed: Normal' })).toBeVisible();
-  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Language: English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
+  await expect(page.getByRole('heading', { name: '일시정지' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '언어: 한국어' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('three-crowns-locale'))).toBe('ko');
 });
 
 test('영어 모바일 캠페인 목록·미션 도입', async ({ page }) => {
@@ -131,4 +135,14 @@ test('영어 모바일 시나리오 제작실 홈·편집 메뉴', async ({ page
   await expect(page.getByRole('heading', { name: /Validation Results/ })).toBeVisible();
   await expect(page.getByText('The conquest objective has no capitals.')).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+});
+
+test.describe('최초 시스템 언어', () => {
+  test.use({ locale: 'en-US' });
+
+  test('저장된 선택이 없으면 영어로 시작한다', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('button', { name: 'Quick Battle' })).toBeVisible();
+  });
 });
