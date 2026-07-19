@@ -1,5 +1,6 @@
 // 한 줄 목적: 여러 리플레이 분석을 합산해 승률·평균 턴·왕국/시나리오별 기록·추세 비교를 계산한다
 import type { UnitTypeId } from '../types';
+import { UNIT_TYPE_IDS } from '../units';
 import type { ReplayAnalysis } from './replay-metrics';
 import { difficultyName, factionName, t } from '../../i18n';
 
@@ -36,13 +37,18 @@ export interface AggregateAnalysis {
   byDifficulty: GroupRecord[];
   /** 병과별 생산 비율(생산 총합 대비) */
   productionShare: Record<UnitTypeId, number>;
+  /** 고유 병종 합산 지표 */
+  braceActivations: number;
+  plunderGold: number;
+  armorPiercingAttacks: number;
+  armorPiercingIgnored: number;
   /** 반복 패배 원인(빈도순) */
   commonLossReasons: { reason: string; count: number }[];
   /** 최근 5판 vs 이전 5판(생성 시각순, 10판 이상일 때) */
   trend: TrendComparison | null;
 }
 
-const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
+const UNIT_TYPES: UnitTypeId[] = [...UNIT_TYPE_IDS];
 
 function groupBy(
   list: ReplayAnalysis[],
@@ -87,12 +93,36 @@ export function aggregateAnalyses(list: ReplayAnalysis[]): AggregateAnalysis {
   const losses = list.filter((a) => a.outcome === 'lose').length;
   const draws = list.filter((a) => a.outcome === 'draw').length;
 
-  const prodTotal = { infantry: 0, archer: 0, cavalry: 0 } as Record<UnitTypeId, number>;
-  for (const a of list) for (const t of UNIT_TYPES) prodTotal[t] += a.productionByClass[t];
+  const prodTotal = {} as Record<UnitTypeId, number>;
+  for (const t of UNIT_TYPES) prodTotal[t] = 0;
+  let braceActivations = 0;
+  let plunderGold = 0;
+  let armorPiercingAttacks = 0;
+  let armorPiercingIgnored = 0;
+  for (const a of list) {
+    for (const t of UNIT_TYPES) prodTotal[t] += a.productionByClass[t] ?? 0;
+    braceActivations += a.braceActivations;
+    plunderGold += a.plunderGold;
+    armorPiercingAttacks += a.armorPiercingAttacks;
+    armorPiercingIgnored += a.armorPiercingIgnored;
+  }
   const prodSum = UNIT_TYPES.reduce((n, t) => n + prodTotal[t], 0);
   const productionShare = {} as Record<UnitTypeId, number>;
+  // 반올림 오차로 합이 100을 넘지 않도록 마지막 비영 병종에 잔여를 맞춘다
+  let assigned = 0;
+  let lastNonZero: UnitTypeId | null = null;
   for (const t of UNIT_TYPES) {
-    productionShare[t] = prodSum > 0 ? Math.round((prodTotal[t] / prodSum) * 100) : 0;
+    if (prodSum <= 0) {
+      productionShare[t] = 0;
+      continue;
+    }
+    const pct = Math.round((prodTotal[t] / prodSum) * 100);
+    productionShare[t] = pct;
+    assigned += pct;
+    if (prodTotal[t] > 0) lastNonZero = t;
+  }
+  if (prodSum > 0 && lastNonZero && assigned !== 100) {
+    productionShare[lastNonZero] = Math.max(0, productionShare[lastNonZero] + (100 - assigned));
   }
 
   const reasonCounts = new Map<string, number>();
@@ -143,6 +173,10 @@ export function aggregateAnalyses(list: ReplayAnalysis[]): AggregateAnalysis {
       (a) => difficultyName(a.config.difficulty),
     ),
     productionShare,
+    braceActivations,
+    plunderGold,
+    armorPiercingAttacks,
+    armorPiercingIgnored,
     commonLossReasons: [...reasonCounts.entries()]
       .map(([reason, count]) => ({ reason, count }))
       .sort((a, b) => b.count - a.count),

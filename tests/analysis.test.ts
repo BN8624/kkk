@@ -100,7 +100,7 @@ describe('다중 리플레이 합산', () => {
     expect(agg.wins + agg.losses + agg.draws).toBe(analyses.length);
     const byFactionGames = agg.byFaction.reduce((n, g) => n + g.games, 0);
     expect(byFactionGames).toBe(analyses.length);
-    const shareSum = agg.productionShare.infantry + agg.productionShare.archer + agg.productionShare.cavalry;
+    const shareSum = Object.values(agg.productionShare).reduce((a, b) => a + b, 0);
     expect(shareSum === 0 || Math.abs(shareSum - 100) <= 1).toBe(true);
   });
 

@@ -1,13 +1,14 @@
 // 한 줄 목적: 리플레이 한 판을 재실행하며 전체·전투·지도·경제·별점 지표와 턴별 주요 사건을 계산한다
 import { executeCommand } from '../command';
-import { unitAt, unitsOf } from '../board';
-import { MAX_UNITS_PER_FACTION } from '../data';
+import { unitAt, unitById, unitsOf } from '../board';
+import { MAX_UNITS_PER_FACTION, UNIT_STATS } from '../data';
 import { attackTargets, forecastAttack, unitCost } from '../game';
 import { hexDistance } from '../hex';
 import { replayInitialState, type PlaytestEvaluation, type ReplayDocument } from '../replay';
 import { starsEarned } from '../scenario/objectives';
 import type { StarCondition } from '../scenario/types';
 import type { Axial, FactionId, GameConfig, GameState, UnitTypeId } from '../types';
+import { producibleUnits, UNIT_TYPE_IDS, unitArmorPiercing, unitTrait } from '../units';
 import { buildingName, factionName, localizedScenarioName, t, unitName } from '../../i18n';
 
 // ---------------- 결과 타입 ----------------
@@ -99,6 +100,16 @@ export interface ReplayAnalysis {
   idleProductionGold: number;
   productionByClass: Record<UnitTypeId, number>;
 
+  // 고유 병종 지표(2.2)
+  /** 수호 태세 상태에서 피격·방어 판정이 적용된 횟수 */
+  braceActivations: number;
+  /** 약탈로 획득한 금 */
+  plunderGold: number;
+  /** 방어 관통 공격 횟수 */
+  armorPiercingAttacks: number;
+  /** 관통으로 무시된 기본 방어 합 */
+  armorPiercingIgnored: number;
+
   // 사건
   timeline: TurnEventNote[];
 }
@@ -107,7 +118,7 @@ export type AnalyzeResult =
   | { ok: true; analysis: ReplayAnalysis }
   | { ok: false; reason: string };
 
-const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
+const UNIT_TYPES: UnitTypeId[] = [...UNIT_TYPE_IDS];
 
 function emptyClassStats(): Record<UnitTypeId, UnitClassStats> {
   const out = {} as Record<UnitTypeId, UnitClassStats>;
@@ -115,9 +126,16 @@ function emptyClassStats(): Record<UnitTypeId, UnitClassStats> {
   return out;
 }
 
-/** 최소 병과 비용(생산 기회 판단용). */
+function emptyProduction(): Record<UnitTypeId, number> {
+  const out = {} as Record<UnitTypeId, number>;
+  for (const t of UNIT_TYPES) out[t] = 0;
+  return out;
+}
+
+/** 최소 병과 비용(생산 기회 판단용) — 현재 로스터 기준. */
 function minUnitCost(state: GameState, faction: FactionId): number {
-  return Math.min(...UNIT_TYPES.map((t) => unitCost(faction, t, state.config.modifier)));
+  const roster = producibleUnits(state, faction);
+  return Math.min(...roster.map((t) => unitCost(faction, t, state.config.modifier)));
 }
 
 /** 인간 소유 생산 가능 거점(빈 타일) 수. */
@@ -207,7 +225,7 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
     const me = doc.initialConfig.humanFaction;
 
     const byClass = emptyClassStats();
-    const productionByClass = { infantry: 0, archer: 0, cavalry: 0 } as Record<UnitTypeId, number>;
+    const productionByClass = emptyProduction();
     const timeline: TurnEventNote[] = [];
     const missedKills: MissedKillNote[] = [];
     const captures: { turn: number; building: string }[] = [];
@@ -216,6 +234,10 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
     const unitTypeById = new Map<number, UnitTypeId>();
     const unitFactionById = new Map<number, FactionId>();
     const lastMovedTurn = new Map<number, number>();
+    let braceActivations = 0;
+    let plunderGold = 0;
+    let armorPiercingAttacks = 0;
+    let armorPiercingIgnored = 0;
 
     for (const u of state.units) {
       unitTypeById.set(u.id, u.type);
@@ -292,6 +314,19 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
       if (command.type === 'end-phase' && isHumanCmd) collectPhaseEnd();
       if (command.type === 'attack-unit' && isHumanCmd) {
         attackContext = { attackerId: command.attackerId, defenderId: command.defenderId };
+        // 고유 능력 지표: 명령 실행 전 상태 기준
+        const attacker = unitById(state, command.attackerId);
+        const defender = unitById(state, command.defenderId);
+        if (attacker && defender) {
+          const pierce = unitArmorPiercing(attacker.type);
+          if (pierce > 0) {
+            armorPiercingAttacks++;
+            armorPiercingIgnored += Math.min(pierce, UNIT_STATS[defender.type].def);
+          }
+          if (unitTrait(defender.type, 'brace') && !defender.movedThisTurn) {
+            braceActivations++;
+          }
+        }
       } else {
         attackContext = null;
       }
@@ -398,6 +433,9 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
             break;
           case 'income-granted':
             if (ev.faction === me) totalIncome += ev.amount;
+            break;
+          case 'gold-changed':
+            if (ev.faction === me && ev.reason === 'plunder') plunderGold += ev.delta;
             break;
           case 'crown-hold-changed':
             crownChanges.push({ turn: state.turn, owner: ev.owner ?? null });
@@ -518,6 +556,10 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
       idleProductionTurns,
       idleProductionGold,
       productionByClass,
+      braceActivations,
+      plunderGold,
+      armorPiercingAttacks,
+      armorPiercingIgnored,
       timeline,
     };
     return { ok: true, analysis };

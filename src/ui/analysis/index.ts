@@ -3,11 +3,12 @@ import type { UnitTypeId } from '../../core/types';
 import type { AggregateAnalysis } from '../../core/analysis/aggregate';
 import type { CoachingNote } from '../../core/analysis/coaching';
 import type { ReplayAnalysis, TurnEventNote } from '../../core/analysis/replay-metrics';
+import { UNIT_TYPE_IDS } from '../../core/units';
 import { factionName, t, unitName } from '../../i18n';
 import { escapeHtml, resultTableHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
-const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
+const UNIT_TYPES: UnitTypeId[] = [...UNIT_TYPE_IDS];
 
 // ---------------- 대상 선택 화면 ----------------
 
@@ -248,7 +249,15 @@ export function showMultiAnalysisScreen(
     ...(agg.starTotal > 0 ? [{ label: t('analysis.starsEarned'), value: `${agg.totalStars}/${agg.starTotal}` }] : []),
     {
       label: t('analysis.productionShare'),
-      value: UNIT_TYPES.map((type) => `${unitName(type)} ${agg.productionShare[type]}%`).join(' · '),
+      value: UNIT_TYPES.map((type) => `${unitName(type)} ${agg.productionShare[type] ?? 0}%`).join(' · '),
+    },
+    {
+      label: t('analysis.uniqueTraits'),
+      value: t('analysis.uniqueTraitsValue', {
+        brace: agg.braceActivations,
+        plunder: agg.plunderGold,
+        pierce: agg.armorPiercingAttacks,
+      }),
     },
   ]);
   const groups = (title: string, rows: { label: string; games: number; wins: number; avgTurns: number }[]): string =>

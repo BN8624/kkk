@@ -1,6 +1,7 @@
 // 한 줄 목적: 플레이 분석 결과를 JSON·Markdown·CSV 보고서 텍스트로 만든다(개인 식별 정보 없음)
 import { GAME_VERSION } from '../replay';
 import type { UnitTypeId } from '../types';
+import { UNIT_TYPE_IDS } from '../units';
 import { t, unitName } from '../../i18n';
 import { aggregateAnalyses, lossReason, type AggregateAnalysis } from './aggregate';
 import { coachAggregate, coachSingleGame } from './coaching';
@@ -11,7 +12,7 @@ export interface ReportFilters {
   description: string;
 }
 
-const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
+const UNIT_TYPES: UnitTypeId[] = [...UNIT_TYPE_IDS];
 
 function outcomeWord(o: 'win' | 'lose' | 'draw'): string {
   return o === 'win' ? t('result.win') : o === 'lose' ? t('result.lose') : t('result.draw');
@@ -119,9 +120,16 @@ export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): 
 
   lines.push(`## ${t('report.unitUsage')}`);
   lines.push('');
-  for (const t of UNIT_TYPES) {
-    lines.push(`- ${unitName(t)}: ${agg.productionShare[t]}%`);
+  for (const ut of UNIT_TYPES) {
+    lines.push(`- ${unitName(ut)}: ${agg.productionShare[ut]}%`);
   }
+  lines.push('');
+  lines.push(`## ${t('report.uniqueTraits')}`);
+  lines.push('');
+  lines.push(`- ${t('report.braceActivations')}: ${agg.braceActivations}`);
+  lines.push(`- ${t('report.plunderGold')}: ${agg.plunderGold}`);
+  lines.push(`- ${t('report.armorPiercingAttacks')}: ${agg.armorPiercingAttacks}`);
+  lines.push(`- ${t('report.armorPiercingIgnored')}: ${agg.armorPiercingIgnored}`);
   lines.push('');
 
   if (agg.commonLossReasons.length > 0) {

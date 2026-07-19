@@ -59,7 +59,10 @@ export function parseVersion(version: string): [number, number, number] | null {
 export const REPLAY_RULE_VERSIONS: ReplayRuleVersion[] = [
   { versionRange: '1.5.x', compatibility: 'exact' },
   { versionRange: '2.0.x', compatibility: 'exact' },
+  // 2.1.x: 공용 3병종 exact. 2.2에서 고유 병종 추가 — 공용 리플레이 digest는 유지
   { versionRange: '2.1.x', compatibility: 'exact' },
+  // 2.2.x: 고유 병종 생산·능력 exact
+  { versionRange: '2.2.x', compatibility: 'exact' },
 ];
 
 /** 리플레이가 도입된 최초 버전 — 이보다 낮은 표기는 존재할 수 없는 기록이다. */
