@@ -104,6 +104,18 @@ export class Hud {
     this.endTurnBtn.disabled = !on;
   }
 
+  /** 리플레이 재생 등 비플레이 화면에서 플레이 전용 HUD를 숨긴다(줌 버튼은 공유). */
+  setPlayControlsVisible(on: boolean): void {
+    this.topBar.style.display = on ? '' : 'none';
+    this.endTurnBtn.style.display = on ? '' : 'none';
+    if (!on) {
+      this.bottomPanel.classList.remove('show');
+      this.aiChip.classList.remove('show');
+      this.hideProduction();
+      this.hideTutorial();
+    }
+  }
+
   // ---------------- 하단 유닛 패널 ----------------
 
   showUnitPanel(unit: Unit | null, tile: Tile | null, hint: string): void {

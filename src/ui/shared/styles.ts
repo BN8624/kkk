@@ -169,6 +169,53 @@ export function injectSharedStyles(): void {
 }
 .opt-chip.selected { border-color: #c9a227; background: rgba(201,162,39,.14); color: #f2ead8; }
 .opt-desc { width: min(430px, 92vw); color: #a9b4cc; font-size: 12.5px; line-height: 1.45; min-height: 18px; }
+.rp-list { width: min(430px, 92vw); display: flex; flex-direction: column; gap: 10px; max-height: 52vh; overflow-y: auto; }
+.rp-item {
+  display: flex; gap: 8px; align-items: stretch;
+  background: rgba(242,234,216,.06); border: 1px solid rgba(201,162,39,.5);
+  border-radius: 12px; padding: 8px;
+}
+.rp-main { flex: 1; text-align: left; background: none; border: none; color: #d8deeb;
+  display: flex; flex-direction: column; gap: 3px; padding: 2px 4px; }
+.rp-title { font-size: 15px; color: #f2ead8; display: flex; gap: 8px; align-items: center; }
+.rp-outcome { font-size: 12.5px; border: 1px solid rgba(242,234,216,.35); border-radius: 8px; padding: 1px 7px; }
+.rp-outcome.win { color: #e8c95a; border-color: #e8c95a; }
+.rp-outcome.lose { color: #b95c66; border-color: #b95c66; }
+.rp-sub { font-size: 12px; color: #a9b4cc; }
+.rp-actions { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+.rp-actions button {
+  width: 34px; height: 26px; border-radius: 8px; font-size: 14px;
+  border: 1px solid #6b7894; background: rgba(242,234,216,.08); color: #d8deeb;
+}
+.rp-topbar {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+}
+.rp-topbar .hud-chip { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
+.rp-exit {
+  height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9a227;
+  background: rgba(29,26,20,.82); color: #e8d9a0; font-size: 14px; pointer-events: auto;
+}
+.rp-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 0;
+  width: min(560px, 100vw);
+  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  display: flex; flex-direction: column; gap: 7px; pointer-events: none;
+}
+.rp-desc {
+  min-height: 20px; text-align: center; font-size: 13.5px; color: #f2ead8;
+  background: rgba(29,26,20,.82); border: 1px solid rgba(201,162,39,.6);
+  border-radius: 10px; padding: 4px 10px; pointer-events: none;
+}
+.rp-desc:empty { visibility: hidden; }
+.rp-desc.final { color: #e8c95a; font-weight: bold; }
+.rp-controls { display: flex; gap: 6px; justify-content: center; }
+.rp-controls button {
+  min-width: 44px; height: 44px; border-radius: 12px; border: 1px solid #c9a227;
+  background: rgba(29,26,20,.85); color: #e8d9a0; font-size: 15px; pointer-events: auto;
+}
+.rp-controls .rp-play { min-width: 54px; background: linear-gradient(#d9b544, #c9a227); color: #2b2416; font-weight: bold; }
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }

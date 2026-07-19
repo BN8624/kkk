@@ -7,10 +7,24 @@ import { BUILDING_NAMES, DIFFICULTY_NAMES, FACTION_NAMES, UNIT_NAMES } from './c
 import { dailyChallenge, MODIFIERS, shareText, todayKey, type ModifierId } from './core/daily';
 import { DOCTRINES } from './core/doctrines';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from './core/records';
-import { attackTargets, forecastAttack, newGame, unitCost } from './core/game';
-import { buildReplayDocument, verifyReplay } from './core/replay';
+import { attackTargets, factionScore, forecastAttack, newGame, unitCost } from './core/game';
+import {
+  buildReplayDocument,
+  parseReplayDocument,
+  REPLAY_MAX_IMPORT_BYTES,
+  verifyReplay,
+  type ReplayDocumentV1,
+} from './core/replay';
+import { ReplayPlayback } from './replay/playback';
 import { newDocId } from './storage/docstore';
 import { documentStore } from './storage/idb';
+import {
+  describeResult,
+  describeStep,
+  ReplayControls,
+  showReplayArchiveScreen,
+  type ReplayListItem,
+} from './ui/replay';
 import { reachableDestinations } from './core/pathfind';
 import { SCENARIO_IDS, SCENARIOS, scenarioDisplayName } from './core/scenarios';
 import {
@@ -70,6 +84,12 @@ class App {
   private lastTap: { q: number; r: number } | null = null;
   private lastSetup: GameSetup | null = null;
   private pendingAttackId: number | null = null;
+  private playback: ReplayPlayback | null = null;
+  private playbackPlaying = false;
+  private playbackSpeed: 1 | 2 | 4 = 1;
+  private playbackBusy = false;
+  private replayControls: ReplayControls | null = null;
+  private lastReplay: ReplayDocumentV1 | null = null;
 
   constructor() {
     this.settings = loadSettings();
@@ -134,6 +154,7 @@ class App {
 
   private toTitle(): void {
     this.mode = 'title';
+    this.exitPlaybackUi();
     const saved = loadGame();
     const summary = saved
       ? `${FACTION_NAMES[saved.config.humanFaction]} · ${scenarioDisplayName(saved.config.scenario, saved)} · ${
@@ -143,8 +164,8 @@ class App {
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
       saveSummary: summary,
-      // 캠페인·보관함·제작실·리플레이 메뉴는 해당 단계가 실제로 완성되면 켠다
-      features: { campaign: false, scenarios: false, editor: false, replays: false },
+      // 캠페인·보관함·제작실 메뉴는 해당 단계가 실제로 완성되면 켠다
+      features: { campaign: false, scenarios: false, editor: false, replays: true },
       handlers: {
         onContinue: () => this.continueGame(),
         onNewGame: () => this.startNewGame(),
@@ -152,7 +173,7 @@ class App {
         onCampaign: () => {},
         onScenarios: () => {},
         onEditor: () => {},
-        onReplays: () => {},
+        onReplays: () => void this.showReplayArchive(),
         onRecords: () => this.showRecords(),
       },
     });
@@ -387,6 +408,7 @@ class App {
 
   private onTileTap(q: number, r: number): void {
     this.lastTap = { q, r };
+    if (this.mode !== 'play') return; // 리플레이 재생 등에서는 보드 탭이 행동이 되지 않는다
     const state = this.state;
     if (!state || this.busy || state.over || !isHumanTurn(state)) return;
     if (this.productionTile) {
@@ -645,7 +667,7 @@ class App {
       // 연출 중 이탈해도 저장본은 항상 "다음 세력이 아직 행동하지 않은" 경계 상태라 중복 실행이 없다.
       const result = runAiTurn(state, fid);
       if (!state.over) saveGame(state);
-      await this.playEvents(result.events);
+      await this.playEvents(result.events, this.settings.aiSpeed === 0);
       this.hud.updateTop(state);
     }
     this.hud.setAiThinking(null);
@@ -673,10 +695,10 @@ class App {
   }
 
   /** 정본 이벤트를 순서대로 연출한다. 이벤트가 공격·사망 시점 좌표를 보존하므로 연출 생략이 없다. */
-  private async playEvents(events: GameEvent[]): Promise<void> {
+  private async playEvents(events: GameEvent[], skip = false): Promise<void> {
     if (!this.scene) return;
     // 건너뛰기: 연출 없이 결과만 반영
-    if (this.settings.aiSpeed === 0) {
+    if (skip) {
       this.scene.refresh();
       await delay(120);
       return;
@@ -730,6 +752,297 @@ class App {
     this.scene.refresh();
   }
 
+  // ---------------- 리플레이 보관함·재생 ----------------
+
+  private replayFavorites(): Set<string> {
+    try {
+      const raw = localStorage.getItem('three-crowns-replay-favs');
+      const arr: unknown = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  private saveReplayFavorites(favs: Set<string>): void {
+    try {
+      localStorage.setItem('three-crowns-replay-favs', JSON.stringify([...favs]));
+    } catch {
+      /* 저장 실패 시 즐겨찾기만 유지되지 않는다 */
+    }
+  }
+
+  private async showReplayArchive(): Promise<void> {
+    this.mode = 'replays';
+    this.exitPlaybackUi();
+    const favs = this.replayFavorites();
+    const items: ReplayListItem[] = [];
+    try {
+      const summaries = await documentStore().list('replays');
+      for (const s of summaries) {
+        const rec = await documentStore().get<ReplayDocumentV1>('replays', s.id);
+        const doc = rec?.data;
+        if (!doc || doc.schemaVersion !== 1) continue;
+        const me = doc.initialConfig.humanFaction;
+        items.push({
+          id: s.id,
+          createdAt: doc.createdAt || rec!.updatedAt,
+          scenarioTitle: doc.scenario.title || doc.initialConfig.scenario,
+          factionName: FACTION_NAMES[me],
+          difficultyName: DIFFICULTY_NAMES[doc.initialConfig.difficulty],
+          daily: doc.initialConfig.mode === 'daily',
+          outcome:
+            doc.result.winner === me ? '승리' : doc.result.winner === 'draw' ? '무승부' : '패배',
+          turns: doc.result.turns,
+          score: doc.result.score,
+          favorite: favs.has(s.id),
+          sizeBytes: s.size,
+        });
+      }
+    } catch {
+      /* 저장소 접근 실패: 빈 목록으로 표시 */
+    }
+    items.sort(
+      (a, b) => Number(b.favorite) - Number(a.favorite) || (a.createdAt < b.createdAt ? 1 : -1),
+    );
+    if (this.mode !== 'replays') return; // 목록 로딩 중 다른 화면으로 이동한 경우
+    showReplayArchiveScreen(this.overlay, items, {
+      onOpen: (id) => void this.openReplayById(id),
+      onExport: (id) => void this.exportReplay(id),
+      onShare: (id) => void this.shareReplay(id),
+      onToggleFavorite: (id) => {
+        const f = this.replayFavorites();
+        if (f.has(id)) f.delete(id);
+        else f.add(id);
+        this.saveReplayFavorites(f);
+        void this.showReplayArchive();
+      },
+      onDelete: (id) => {
+        if (!window.confirm('이 리플레이를 삭제할까요?')) return;
+        documentStore()
+          .remove('replays', id)
+          .then(() => this.showReplayArchive())
+          .catch(() => this.hud.toast('삭제하지 못했습니다'));
+      },
+      onImport: (file) => void this.importReplay(file),
+      onBack: () => this.toTitle(),
+    });
+  }
+
+  private async openReplayById(id: string): Promise<void> {
+    const rec = await documentStore()
+      .get<ReplayDocumentV1>('replays', id)
+      .catch(() => null);
+    if (!rec?.data) {
+      this.hud.toast('리플레이를 불러오지 못했습니다');
+      return;
+    }
+    this.openPlayback(rec.data);
+  }
+
+  /** 리플레이 재생 화면을 연다. 열기 전에 전체 재생 검증으로 재생 가능성을 보장한다. */
+  private openPlayback(doc: ReplayDocumentV1): void {
+    if (!verifyReplay(doc).ok) {
+      this.hud.toast('재생할 수 없는 리플레이입니다');
+      return;
+    }
+    this.mode = 'replay';
+    this.overlay.hide();
+    this.hud.setPlayControlsVisible(false);
+    this.playback = new ReplayPlayback(doc);
+    this.playbackPlaying = false;
+    this.playbackSpeed = 1;
+    const pbState = this.playback.state;
+    if (!this.boardStarted) {
+      this.game.scene.add('board', BoardScene, true, {
+        state: pbState,
+        callbacks: {
+          onTileTap: (q: number, r: number) => this.onTileTap(q, r),
+          onReady: () => {},
+        },
+      });
+      this.scene = this.game.scene.getScene('board') as BoardScene;
+      this.boardStarted = true;
+    } else {
+      this.scene!.setState(pbState);
+      this.scene!.clearHighlights();
+      this.scene!.showSelection(null);
+    }
+    this.replayControls?.destroy();
+    this.replayControls = new ReplayControls(document.getElementById('hud')!, {
+      onPlayPause: () => this.togglePlaybackPlaying(),
+      onStepBack: () => this.playbackJump((pb) => pb.stepBack()),
+      onStepForward: () => void this.playbackStepForward(),
+      onPrevTurn: () => this.playbackJump((pb) => pb.prevTurn()),
+      onNextTurn: () => this.playbackJump((pb) => pb.nextTurn()),
+      onFirst: () => this.playbackJump((pb) => pb.toStart()),
+      onLast: () => this.playbackJump((pb) => pb.toEnd()),
+      onCycleSpeed: () => {
+        this.playbackSpeed = this.playbackSpeed === 1 ? 2 : this.playbackSpeed === 2 ? 4 : 1;
+        if (this.playbackPlaying) this.scene?.setSpeed(this.playbackSpeed);
+        this.updateReplayControls();
+      },
+      onExit: () => void this.showReplayArchive(),
+    });
+    this.updateReplayControls();
+  }
+
+  /** 재생 UI를 정리한다(보관함·타이틀로 나갈 때). */
+  private exitPlaybackUi(): void {
+    this.playbackPlaying = false;
+    this.playback = null;
+    this.replayControls?.destroy();
+    this.replayControls = null;
+    this.scene?.setSpeed(1);
+    this.hud.setPlayControlsVisible(true);
+  }
+
+  private togglePlaybackPlaying(): void {
+    const pb = this.playback;
+    if (!pb) return;
+    if (this.playbackPlaying) {
+      this.playbackPlaying = false;
+      this.updateReplayControls();
+      return;
+    }
+    if (pb.atEnd) this.playbackJump((p) => p.toStart());
+    this.playbackPlaying = true;
+    this.updateReplayControls();
+    void this.runPlaybackLoop();
+  }
+
+  private async runPlaybackLoop(): Promise<void> {
+    const pb = this.playback;
+    if (!pb || this.playbackBusy) return;
+    this.playbackBusy = true;
+    this.scene?.setSpeed(this.playbackSpeed);
+    while (this.playbackPlaying && this.playback === pb && !pb.atEnd) {
+      const events = pb.stepForward();
+      if (!events) break;
+      await this.playEvents(events);
+      this.updateReplayControls();
+    }
+    this.playbackPlaying = false;
+    this.playbackBusy = false;
+    this.scene?.setSpeed(1);
+    this.updateReplayControls();
+  }
+
+  /** 한 명령만 연출과 함께 앞으로 재생한다. */
+  private async playbackStepForward(): Promise<void> {
+    const pb = this.playback;
+    if (!pb || pb.atEnd || this.playbackBusy) return;
+    this.playbackPlaying = false;
+    const events = pb.stepForward();
+    if (!events) return;
+    this.playbackBusy = true;
+    this.scene?.setSpeed(this.playbackSpeed);
+    await this.playEvents(events);
+    this.scene?.setSpeed(1);
+    this.playbackBusy = false;
+    this.updateReplayControls();
+  }
+
+  /** 위치 이동(뒤로·턴 이동·처음·마지막): 재생을 멈추고 상태를 다시 그린다. */
+  private playbackJump(fn: (pb: ReplayPlayback) => void): void {
+    const pb = this.playback;
+    if (!pb || this.playbackBusy) return;
+    this.playbackPlaying = false;
+    fn(pb);
+    this.scene?.setState(pb.state);
+    this.updateReplayControls();
+  }
+
+  private updateReplayControls(): void {
+    const pb = this.playback;
+    if (!pb || !this.replayControls) return;
+    const st = pb.state;
+    this.replayControls.update({
+      playing: this.playbackPlaying,
+      speed: this.playbackSpeed,
+      turn: Math.min(st.turn, st.maxTurns),
+      maxTurns: st.maxTurns,
+      index: pb.index,
+      length: pb.length,
+      factionName: FACTION_NAMES[st.current],
+      gold: st.factions[st.config.humanFaction].gold,
+      score: factionScore(st, st.config.humanFaction),
+      description: describeStep(pb.lastEvents),
+      resultText: pb.atEnd
+        ? describeResult(pb.doc.result.winner, pb.doc.result.turns)
+        : undefined,
+    });
+  }
+
+  private async exportReplay(id: string): Promise<void> {
+    const rec = await documentStore()
+      .get<ReplayDocumentV1>('replays', id)
+      .catch(() => null);
+    if (!rec?.data) {
+      this.hud.toast('리플레이를 불러오지 못했습니다');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(rec.data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private async shareReplay(id: string): Promise<void> {
+    const rec = await documentStore()
+      .get<ReplayDocumentV1>('replays', id)
+      .catch(() => null);
+    if (!rec?.data) {
+      this.hud.toast('리플레이를 불러오지 못했습니다');
+      return;
+    }
+    const json = JSON.stringify(rec.data);
+    try {
+      const file = new File([json], `${id}.json`, { type: 'application/json' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+    } catch {
+      /* 사용자가 공유 시트를 닫은 경우 등 — 클립보드로 폴백 */
+    }
+    try {
+      await navigator.clipboard.writeText(json);
+      this.hud.toast('리플레이 JSON을 클립보드에 복사했습니다');
+    } catch {
+      this.hud.toast('공유를 지원하지 않는 환경입니다');
+    }
+  }
+
+  private async importReplay(file: File): Promise<void> {
+    if (file.size > REPLAY_MAX_IMPORT_BYTES) {
+      this.hud.toast('파일이 너무 큽니다');
+      return;
+    }
+    const text = await file.text().catch(() => null);
+    const doc = text ? parseReplayDocument(text) : null;
+    if (!doc) {
+      this.hud.toast('리플레이 형식이 아니거나 지원하지 않는 버전입니다');
+      return;
+    }
+    if (!verifyReplay(doc).ok) {
+      this.hud.toast('재생 검증에 실패한 리플레이입니다');
+      return;
+    }
+    const id = newDocId('replay');
+    try {
+      await documentStore().put('replays', id, { ...doc, replayId: id });
+    } catch {
+      this.hud.toast('저장 공간이 부족하거나 저장하지 못했습니다');
+      return;
+    }
+    this.hud.toast('리플레이를 가져왔습니다');
+    void this.showReplayArchive();
+  }
+
   // ---------------- 종료 ----------------
 
   private finishGame(): void {
@@ -755,15 +1068,31 @@ class App {
 
   /** 게임 종료 시 리플레이를 자동 저장한다. 실패해도 결과 화면에는 영향을 주지 않는다. */
   private saveReplay(state: GameState): void {
+    this.lastReplay = null;
     try {
       const doc = buildReplayDocument(state, { replayId: newDocId('replay') });
       if (!doc) return; // 구버전 저장 이어하기 등으로 명령 기록이 불완전한 게임
       if (!verifyReplay(doc).ok) return; // 재생 불가능한 기록은 저장하지 않는다
+      this.lastReplay = doc;
       void documentStore()
         .put('replays', doc.replayId, doc)
+        .then(() => this.pruneReplays())
         .catch(() => {});
     } catch {
       /* 리플레이 생성·저장 실패는 무시하고 결과 화면을 유지한다 */
+    }
+  }
+
+  /** 즐겨찾기가 아닌 오래된 리플레이를 정리한다(최신 30개 유지). */
+  private async pruneReplays(): Promise<void> {
+    try {
+      const favs = this.replayFavorites();
+      const list = await documentStore().list('replays');
+      for (const s of list.filter((x) => !favs.has(x.id)).slice(30)) {
+        await documentStore().remove('replays', s.id);
+      }
+    } catch {
+      /* 정리 실패는 무시 */
     }
   }
 
@@ -775,6 +1104,9 @@ class App {
       modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
       prevBest: outcome.prevBestScore,
       isNewBest: outcome.isNewBest,
+      onOpenReplay: this.lastReplay
+        ? () => this.openPlayback(this.lastReplay!)
+        : undefined,
       onShare: () => void this.shareResult(outcome),
       onReplaySameSetup: () => {
         const seed = state.config.mode === 'daily' ? state.seed : Date.now() >>> 0;

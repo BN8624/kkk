@@ -41,6 +41,21 @@ test('한 판이 제한 턴 안에 끝나고 결과 화면이 표시된다', asy
   // 게임 종료 시 저장은 초기화된다
   const saved = await page.evaluate(() => localStorage.getItem('three-crowns-save'));
   expect(saved).toBeNull();
+
+  // 결과 화면 → 리플레이 보기: 자동 저장된 리플레이가 재생 화면으로 열린다
+  await page.getByRole('button', { name: '리플레이 보기' }).click();
+  await expect(page.locator('.rp-bar')).toBeVisible();
+  // 한 명령 앞으로 → 명령 설명이 표시된다
+  await page.locator('#rp-fwd').click();
+  await expect(page.locator('#rp-desc')).not.toBeEmpty();
+  // 마지막으로 → 최종 결과 문구가 표시된다
+  await page.locator('#rp-last').click();
+  await expect(page.locator('#rp-desc')).toHaveClass(/final/, { timeout: 30_000 });
+  // 종료 → 보관함에 이 판의 리플레이가 목록으로 보인다
+  await page.locator('#rp-exit').click();
+  await expect(page.locator('.rp-list .rp-item')).toHaveCount(1);
+  await page.getByRole('button', { name: '뒤로' }).click();
+  await expect(page.locator('.overlay h1')).toHaveText('세 왕관의 섬');
 });
 
 interface MinState {
