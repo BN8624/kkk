@@ -2,6 +2,7 @@
 import { factionScore } from '../../core/game';
 import type { GameState } from '../../core/types';
 import { factionName, t } from '../../i18n';
+import { BACKUP_CATEGORIES, type BackupCategory, type BackupPreview } from '../../storage/backup';
 import { CROWN_SVG, escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -18,6 +19,7 @@ export function showPauseScreen(
     onReplayTutorial: () => void;
     onNewGame: () => void;
     onToTitle: () => void;
+    onDataManagement: () => void;
   },
 ): void {
   const soundLabel = (on: boolean) => t('pause.sound', { state: on ? t('pause.on') : t('pause.off') });
@@ -28,6 +30,7 @@ export function showPauseScreen(
       <button class="sub-btn" id="btn-ai-speed">${escapeHtml(t('pause.aiSpeed', { label: opts.aiSpeedLabel }))}</button>
       <button class="sub-btn" id="btn-language">${escapeHtml(t('pause.language', { language: opts.languageLabel }))}</button>
       <button class="sub-btn" id="btn-tutorial">${escapeHtml(t('pause.tutorial'))}</button>
+      <button class="sub-btn" id="btn-data">${escapeHtml(t('pause.dataManagement'))}</button>
       <button class="sub-btn" id="btn-restart">${escapeHtml(t('pause.newGame'))}</button>
       <button class="sub-btn" id="btn-title">${escapeHtml(t('pause.toTitle'))}</button>`);
   root.querySelector('#btn-sound')!.addEventListener('click', (e) => {
@@ -42,8 +45,64 @@ export function showPauseScreen(
     'btn-resume': opts.onResume,
     'btn-language': opts.onToggleLanguage,
     'btn-tutorial': opts.onReplayTutorial,
+    'btn-data': opts.onDataManagement,
     'btn-restart': opts.onNewGame,
     'btn-title': opts.onToTitle,
+  });
+}
+
+export function showDataManagementScreen(
+  overlay: OverlayHost,
+  opts: {
+    onExport: (categories: BackupCategory[]) => void;
+    onImport: (file: File) => void;
+    onBack: () => void;
+  },
+): void {
+  const root = overlay.show(`
+      <h1 style="font-size:24px;">${escapeHtml(t('backup.title'))}</h1>
+      <p class="subtitle">${escapeHtml(t('backup.hint'))}</p>
+      <div class="backup-categories">
+        ${BACKUP_CATEGORIES.map((category) => `<label><input type="checkbox" data-backup-category="${category}" checked> ${escapeHtml(t(`backup.category.${category}`))}</label>`).join('')}
+      </div>
+      <button class="big-btn" id="backup-export">${escapeHtml(t('backup.export'))}</button>
+      <input type="file" id="backup-file" accept=".json,application/json" hidden>
+      <button class="sub-btn" id="backup-import">${escapeHtml(t('backup.import'))}</button>
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
+  const selected = () => [...root.querySelectorAll<HTMLInputElement>('[data-backup-category]:checked')]
+    .map((input) => input.dataset.backupCategory as BackupCategory);
+  const fileInput = root.querySelector<HTMLInputElement>('#backup-file')!;
+  overlay.bind({
+    'backup-export': () => opts.onExport(selected()),
+    'backup-import': () => fileInput.click(),
+    'btn-back': opts.onBack,
+  });
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) opts.onImport(file);
+  });
+}
+
+export function showBackupPreviewScreen(
+  overlay: OverlayHost,
+  preview: BackupPreview,
+  opts: { onMerge: () => void; onReplace: () => void; onBack: () => void },
+): void {
+  overlay.show(`
+      <h1 style="font-size:24px;">${escapeHtml(t('backup.previewTitle'))}</h1>
+      <p class="subtitle">${escapeHtml(t('backup.createdAt', { date: preview.createdAt.slice(0, 19).replace('T', ' ') }))}</p>
+      <div class="backup-categories">
+        ${preview.categories.map((category) => `<div>✓ ${escapeHtml(t(`backup.category.${category}`))}</div>`).join('')}
+      </div>
+      <p class="subtitle">${escapeHtml(t('backup.previewCounts', { local: preview.localEntries, documents: preview.documents }))}</p>
+      <p class="subtitle backup-warning">${escapeHtml(t('backup.restoreWarning'))}</p>
+      <button class="big-btn" id="backup-merge">${escapeHtml(t('backup.merge'))}</button>
+      <button class="sub-btn" id="backup-replace">${escapeHtml(t('backup.replace'))}</button>
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
+  overlay.bind({
+    'backup-merge': opts.onMerge,
+    'backup-replace': opts.onReplace,
+    'btn-back': opts.onBack,
   });
 }
 

@@ -13,6 +13,7 @@ export interface TitleMenuHandlers {
   onReplays: () => void;
   onAnalysis: () => void;
   onRecords: () => void;
+  onDataManagement: () => void;
   onUpdate: () => void;
 }
 
@@ -53,7 +54,8 @@ export function showTitleScreen(
       ${features.editor ? `<button class="sub-btn" id="btn-editor">${escapeHtml(t('title.editor'))}</button>` : ''}
       ${features.replays ? `<button class="sub-btn" id="btn-replays">${escapeHtml(t('title.replays'))}</button>` : ''}
       ${features.analysis ? `<button class="sub-btn" id="btn-analysis">${escapeHtml(t('title.analysis'))}</button>` : ''}
-      <button class="sub-btn" id="btn-records">${escapeHtml(t('title.records'))}</button>`);
+      <button class="sub-btn" id="btn-records">${escapeHtml(t('title.records'))}</button>
+      <button class="sub-btn" id="btn-data">${escapeHtml(t('pause.dataManagement'))}</button>`);
   overlay.bind({
     'btn-continue': handlers.onContinue,
     'btn-new': handlers.onNewGame,
@@ -64,6 +66,7 @@ export function showTitleScreen(
     'btn-replays': handlers.onReplays,
     'btn-analysis': handlers.onAnalysis,
     'btn-records': handlers.onRecords,
+    'btn-data': handlers.onDataManagement,
     'btn-update': handlers.onUpdate,
   });
 }

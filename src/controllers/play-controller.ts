@@ -27,8 +27,22 @@ import {
 import { playEvents } from '../render/event-player';
 import { setSoundEnabled, sfx } from '../render/sound';
 import { ObservationTracker } from '../replay/observation';
+import {
+  BACKUP_MAX_BYTES,
+  createBackup,
+  parseBackup,
+  restoreBackup,
+  type BackupCategory,
+  type BackupDocumentV1,
+  type RestoreMode,
+} from '../storage/backup';
 import { TestPlayBar } from '../ui/editor/testplay';
-import { showPauseScreen, showResultScreen } from '../ui/game/screens';
+import {
+  showBackupPreviewScreen,
+  showDataManagementScreen,
+  showPauseScreen,
+  showResultScreen,
+} from '../ui/game/screens';
 import { escapeHtml } from '../ui/shared/dom';
 import { showSetupScreen, type GameSetup } from '../ui/setup';
 import type { AppContext } from '../app/app-shell';
@@ -147,9 +161,74 @@ export class PlayController implements AppController, PlaySession {
         this.ctx.overlay.hide();
         this.startTutorial();
       },
+      onDataManagement: () => this.showDataManagement(),
       onNewGame: () => this.showSetup(),
       onToTitle: () => this.ctx.nav.toTitle(),
     });
+  }
+
+  showDataManagement(): void {
+    this.ctx.enterMode('settings');
+    showDataManagementScreen(this.ctx.overlay, {
+      onExport: (categories) => void this.exportBackup(categories),
+      onImport: (file) => void this.importBackup(file),
+      onBack: () => this.showPause(),
+    });
+  }
+
+  private async exportBackup(categories: BackupCategory[]): Promise<void> {
+    try {
+      const backup = await createBackup(categories);
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `three-crowns-backup-${backup.createdAt.slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      this.ctx.hud.toast(t('backup.exported'));
+    } catch {
+      this.ctx.hud.toast(t('backup.exportFailed'));
+    }
+  }
+
+  private async importBackup(file: File): Promise<void> {
+    if (file.size > BACKUP_MAX_BYTES) {
+      this.ctx.hud.toast(t('backup.tooLarge'));
+      return;
+    }
+    const text = await file.text().catch(() => '');
+    const result = parseBackup(text);
+    if (!result.ok) {
+      const key = result.code === 'future-version'
+        ? 'backup.futureVersion'
+        : result.code === 'too-large'
+          ? 'backup.tooLarge'
+          : 'backup.invalid';
+      this.ctx.hud.toast(t(key));
+      return;
+    }
+    this.showBackupPreview(result.backup);
+  }
+
+  private showBackupPreview(backup: BackupDocumentV1): void {
+    const result = parseBackup(JSON.stringify(backup));
+    if (!result.ok) return;
+    showBackupPreviewScreen(this.ctx.overlay, result.preview, {
+      onMerge: () => void this.applyBackupRestore(backup, 'merge'),
+      onReplace: () => void this.applyBackupRestore(backup, 'replace'),
+      onBack: () => this.showDataManagement(),
+    });
+  }
+
+  private async applyBackupRestore(backup: BackupDocumentV1, mode: RestoreMode): Promise<void> {
+    try {
+      await restoreBackup(backup, mode);
+      location.reload();
+    } catch {
+      this.showDataManagement();
+      this.ctx.hud.toast(t('backup.restoreFailed'));
+    }
   }
 
   showSetup(): void {

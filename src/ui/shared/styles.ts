@@ -316,6 +316,13 @@ export function injectSharedStyles(): void {
   width: min(300px, 82vw); border: 1.5px solid #8a6d14; border-radius: 11px; padding: 9px 11px;
   font-size: 13px; font-family: ui-monospace, monospace; background: #faf5e8; color: #2b2416; resize: vertical;
 }
+.backup-categories {
+  width: min(430px, 92vw); display: flex; flex-direction: column; gap: 8px;
+  color: #d8deeb; font-size: 14px; line-height: 1.4;
+}
+.backup-categories label { display: flex; align-items: flex-start; gap: 8px; }
+.backup-categories input { width: 20px; height: 20px; flex: none; accent-color: #c9a227; }
+.backup-warning { color: #e8c95a !important; max-width: min(430px, 92vw); }
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }
