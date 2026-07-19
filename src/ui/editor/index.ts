@@ -15,7 +15,7 @@ import {
   type VictoryCondition,
 } from '../../core/scenario/types';
 import type { Axial, BuildingId, FactionId, UnitTypeId } from '../../core/types';
-import { t } from '../../i18n';
+import { factionName, t, unitName } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -54,35 +54,35 @@ export function showEditorHomeScreen(
       (d) => `
       <div class="rp-item" data-id="${escapeHtml(d.id)}">
         <button class="rp-main" data-act="open">
-          <span class="rp-title"><b>${escapeHtml(d.title || '제목 없음')}</b></span>
+          <span class="rp-title"><b>${escapeHtml(d.title || t('scenarios.untitled'))}</b></span>
           <span class="rp-sub">${escapeHtml(d.updatedAt.slice(0, 10))} · ${Math.max(1, Math.round(d.sizeBytes / 1024))}KB</span>
         </button>
-        <div class="rp-actions"><button data-act="del" aria-label="삭제">✕</button></div>
+        <div class="rp-actions"><button data-act="del" aria-label="${escapeHtml(t('editor.delete'))}">✕</button></div>
       </div>`,
     )
     .join('');
   const root = overlay.show(`
-      <h1 style="font-size:24px;">시나리오 제작</h1>
-      <p class="subtitle" style="font-size:12.5px;">나만의 전장을 만들고 검증하고 플레이합니다</p>
+      <h1 style="font-size:24px;">${escapeHtml(t('editor.title'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('editor.subtitle'))}</p>
       <div style="display:flex; gap:8px; width:min(300px,82vw);">
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-new-empty">빈 지도</button>
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-new-random">랜덤 지도</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-new-empty">${escapeHtml(t('editor.emptyMap'))}</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-new-random">${escapeHtml(t('editor.randomMap'))}</button>
       </div>
       <div style="display:flex; gap:8px; width:min(300px,82vw);">
         ${builtins
           .map(
             (b) =>
-              `<button class="sub-btn" style="width:auto;flex:1;font-size:13px;" data-builtin="${b.id}">${escapeHtml(b.name)} 복제</button>`,
+              `<button class="sub-btn" style="width:auto;flex:1;font-size:13px;" data-builtin="${b.id}">${escapeHtml(t('editor.clone', { name: b.name }))}</button>`,
           )
           .join('')}
       </div>
-      ${drafts.length > 0 ? `<p class="subtitle" style="font-size:13px;margin-bottom:-6px;">초안</p><div class="rp-list">${draftRows}</div>` : ''}
+      ${drafts.length > 0 ? `<p class="subtitle" style="font-size:13px;margin-bottom:-6px;">${escapeHtml(t('editor.drafts'))}</p><div class="rp-list">${draftRows}</div>` : ''}
       <input type="file" id="ed-import-file" accept=".json,application/json" style="display:none">
       <div style="display:flex; gap:8px; width:min(300px,82vw);">
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import">JSON 가져오기</button>
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import-text">코드 가져오기</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import">${escapeHtml(t('editor.importJson'))}</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import-text">${escapeHtml(t('editor.importCode'))}</button>
       </div>
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   for (const btn of root.querySelectorAll<HTMLButtonElement>('[data-builtin]')) {
     btn.addEventListener('click', () =>
       handlers.onCloneBuiltin(btn.dataset.builtin as 'three-crowns' | 'broken-strait' | 'crown-heart'),
@@ -179,12 +179,12 @@ export function showImportTextScreen(
   handlers: { onSubmit: (text: string) => void; onBack: () => void },
 ): void {
   const root = overlay.show(`
-      <h1 style="font-size:22px;">코드로 가져오기</h1>
-      <p class="subtitle" style="font-size:12.5px;">공유 코드(TCS1…)나 공유 URL, 시나리오 JSON을 붙여 넣으세요</p>
+      <h1 style="font-size:22px;">${escapeHtml(t('editor.importTitle'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('editor.importHelp'))}</p>
       <textarea id="ed-import-text" class="ed-import-text" rows="6" spellcheck="false"
         placeholder="TCS1.… 또는 { &quot;schemaVersion&quot;: 1, … }"></textarea>
-      <button class="big-btn" id="btn-import-go">가져오기</button>
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="big-btn" id="btn-import-go">${escapeHtml(t('editor.import'))}</button>
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   const area = root.querySelector<HTMLTextAreaElement>('#ed-import-text')!;
   overlay.bind({
     'btn-import-go': () => handlers.onSubmit(area.value),
@@ -225,17 +225,17 @@ export interface EditorPanelHandlers {
   requestTilePick: (label: string) => Promise<Axial | null>;
 }
 
-const TOOLS: { id: EditorTool; label: string }[] = [
-  { id: 'select', label: '선택' },
-  { id: 'plains', label: '평원' },
-  { id: 'forest', label: '숲' },
-  { id: 'mountain', label: '산' },
-  { id: 'water', label: '물' },
-  { id: 'capital', label: '수도' },
-  { id: 'village', label: '마을' },
-  { id: 'crown', label: '왕관' },
-  { id: 'unit', label: '유닛' },
-  { id: 'erase', label: '지우개' },
+const TOOLS: EditorTool[] = [
+  'select',
+  'plains',
+  'forest',
+  'mountain',
+  'water',
+  'capital',
+  'village',
+  'crown',
+  'unit',
+  'erase',
 ];
 
 const FACTIONS: FactionId[] = ['azure', 'crimson', 'violet'];
@@ -256,13 +256,13 @@ export class EditorPanel {
     this.top = document.createElement('div');
     this.top.className = 'ed-topbar';
     this.top.innerHTML = `
-      <button id="ed-exit" class="rp-exit">✕</button>
+      <button id="ed-exit" class="rp-exit" aria-label="${escapeHtml(t('editor.exit'))}">✕</button>
       <span class="hud-chip" id="ed-title"></span>
       <span style="flex:1"></span>
-      <button id="ed-undo" class="rp-exit" aria-label="실행 취소">↶</button>
-      <button id="ed-redo" class="rp-exit" aria-label="다시 실행">↷</button>
-      <button id="ed-check" class="rp-exit">검증</button>
-      <button id="ed-menu" class="rp-exit">⋯</button>`;
+      <button id="ed-undo" class="rp-exit" aria-label="${escapeHtml(t('editor.undo'))}">↶</button>
+      <button id="ed-redo" class="rp-exit" aria-label="${escapeHtml(t('editor.redo'))}">↷</button>
+      <button id="ed-check" class="rp-exit">${escapeHtml(t('editor.validate'))}</button>
+      <button id="ed-menu" class="rp-exit" aria-label="${escapeHtml(t('editor.openMenu'))}">⋯</button>`;
     root.appendChild(this.top);
 
     this.palette = document.createElement('div');
@@ -289,7 +289,7 @@ export class EditorPanel {
   /** 상단 제목·도구 상태를 다시 그린다. */
   update(tool: EditorTool, options: EditorToolOptions, canUndo: boolean, canRedo: boolean): void {
     const doc = this.getDoc();
-    this.top.querySelector('#ed-title')!.textContent = doc.title || '제목 없음';
+    this.top.querySelector('#ed-title')!.textContent = doc.title || t('scenarios.untitled');
     (this.top.querySelector('#ed-undo') as HTMLButtonElement).disabled = !canUndo;
     (this.top.querySelector('#ed-redo') as HTMLButtonElement).disabled = !canRedo;
 
@@ -297,20 +297,20 @@ export class EditorPanel {
       `<button class="ed-chip ${on ? 'on' : ''}" data-${data}="${id}">${label}</button>`;
     let sub = '';
     if (['plains', 'forest', 'mountain', 'water', 'erase'].includes(tool)) {
-      sub = `<span class="ed-sub-label">브러시</span>
-        ${chip('1', '1칸', options.brush === 1, 'brush')}
-        ${chip('7', '7칸', options.brush === 7, 'brush')}`;
+      sub = `<span class="ed-sub-label">${escapeHtml(t('editor.brush'))}</span>
+        ${chip('1', t('editor.oneTile'), options.brush === 1, 'brush')}
+        ${chip('7', t('editor.sevenTiles'), options.brush === 7, 'brush')}`;
     } else if (['capital', 'village', 'crown'].includes(tool)) {
-      sub = `<span class="ed-sub-label">소유</span>
-        ${chip('none', '중립', options.owner === null, 'owner')}
-        ${FACTIONS.map((f) => chip(f, FACTION_NAMES[f].slice(0, 2), options.owner === f, 'owner')).join('')}`;
+      sub = `<span class="ed-sub-label">${escapeHtml(t('editor.owner'))}</span>
+        ${chip('none', t('editor.neutral'), options.owner === null, 'owner')}
+        ${FACTIONS.map((f) => chip(f, factionName(f).split(' ')[0], options.owner === f, 'owner')).join('')}`;
     } else if (tool === 'unit') {
-      sub = `${FACTIONS.map((f) => chip(f, FACTION_NAMES[f].slice(0, 2), options.unitFaction === f, 'uf')).join('')}
+      sub = `${FACTIONS.map((f) => chip(f, factionName(f).split(' ')[0], options.unitFaction === f, 'uf')).join('')}
         <span class="ed-sub-label">·</span>
-        ${UNIT_TYPES.map((t) => chip(t, UNIT_NAMES[t], options.unitType === t, 'ut')).join('')}`;
+        ${UNIT_TYPES.map((type) => chip(type, unitName(type), options.unitType === type, 'ut')).join('')}`;
     }
     this.palette.innerHTML = `
-      <div class="ed-tool-row">${TOOLS.map((t) => chip(t.id, t.label, tool === t.id, 'tool')).join('')}</div>
+      <div class="ed-tool-row">${TOOLS.map((id) => chip(id, t(`editor.tool.${id}`), tool === id, 'tool')).join('')}</div>
       ${sub ? `<div class="ed-tool-row ed-sub-row">${sub}</div>` : ''}`;
     for (const btn of this.palette.querySelectorAll<HTMLButtonElement>('[data-tool]')) {
       btn.addEventListener('click', () => this.handlers.onTool(btn.dataset.tool as EditorTool));
@@ -351,21 +351,21 @@ export class EditorPanel {
 
   private openMenu(): void {
     const s = this.openSheet(`
-      <h3>메뉴</h3>
+      <h3>${escapeHtml(t('editor.menu'))}</h3>
       <div class="ed-menu-grid">
-        <button data-m="save">초안 저장</button>
-        <button data-m="test">테스트 플레이</button>
-        <button data-m="spectate">AI 관전 테스트</button>
-        <button data-m="quality">품질 보고서</button>
-        <button data-m="trial">AI 품질 시험</button>
-        <button data-m="info">문서 정보</button>
-        <button data-m="rules">규칙</button>
-        <button data-m="factions">세력</button>
-        <button data-m="objectives">목표</button>
-        <button data-m="resize">지도 크기</button>
-        <button data-m="export">내보내기</button>
+        <button data-m="save">${escapeHtml(t('editor.saveDraft'))}</button>
+        <button data-m="test">${escapeHtml(t('editor.testPlay'))}</button>
+        <button data-m="spectate">${escapeHtml(t('editor.aiSpectate'))}</button>
+        <button data-m="quality">${escapeHtml(t('editor.qualityReport'))}</button>
+        <button data-m="trial">${escapeHtml(t('editor.qualityTrial'))}</button>
+        <button data-m="info">${escapeHtml(t('editor.documentInfo'))}</button>
+        <button data-m="rules">${escapeHtml(t('editor.rules'))}</button>
+        <button data-m="factions">${escapeHtml(t('editor.factions'))}</button>
+        <button data-m="objectives">${escapeHtml(t('editor.objectives'))}</button>
+        <button data-m="resize">${escapeHtml(t('editor.resize'))}</button>
+        <button data-m="export">${escapeHtml(t('editor.export'))}</button>
       </div>
-      <button class="close-btn">닫기</button>`);
+      <button class="close-btn">${escapeHtml(t('common.close'))}</button>`);
     s.querySelector('[data-m="save"]')!.addEventListener('click', () => {
       this.closeSheet();
       this.handlers.onSave();

@@ -83,3 +83,23 @@ test('영어 모바일 일일 도전·기록·공식 전장', async ({ page }) =
   await expect(page.getByText('No replays match these filters.')).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
 });
+
+test('영어 모바일 시나리오 제작실 홈·편집 메뉴', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('three-crowns-locale', 'en'));
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Scenario Studio' }).click();
+  await expect(page.getByRole('heading', { name: 'Scenario Studio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Empty Map' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Random Map' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import JSON' })).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+
+  await page.getByRole('button', { name: 'Empty Map' }).click();
+  await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await expect(page.getByRole('button', { name: 'Save Draft' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Test Play' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Quality Report' })).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+});

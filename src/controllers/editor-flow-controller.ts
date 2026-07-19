@@ -1,5 +1,5 @@
 // 한 줄 목적: 제작실 홈·초안·에디터 씬/패널 수명주기·가져오기/내보내기·테스트 플레이 진입·복귀를 담당한다
-import { UNIT_STATS, FACTION_NAMES } from '../core/data';
+import { UNIT_STATS } from '../core/data';
 import { factionScore, newGameFromScenario } from '../core/game';
 import { decodeScenarioInput } from '../core/decode';
 import { runQualityTrial } from '../core/eval/quality-trial';
@@ -7,7 +7,7 @@ import { normalizeScenario } from '../core/scenario/normalize';
 import { scenarioQualityReport } from '../core/scenario/quality';
 import { isPlayable } from '../core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from '../core/scenario/types';
-import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
+import { SCENARIO_IDS } from '../core/scenarios';
 import type { Axial, GameState } from '../core/types';
 import { EditorController, type EditorTool } from '../editor/controller';
 import { loadDraftItems } from '../editor/drafts';
@@ -17,7 +17,9 @@ import { decodeShareCode, encodeShareCode, shareUrlFromCode } from '../editor/sh
 import { EditorScene, type EditorSceneCallbacks } from '../render/EditorScene';
 import { newDocId } from '../storage/docstore';
 import { documentStore } from '../storage/idb';
+import { factionName, scenarioName, t } from '../i18n';
 import { EditorPanel, showEditorHomeScreen, showImportTextScreen } from '../ui/editor';
+import { escapeHtml } from '../ui/shared/dom';
 import type { AppContext } from '../app/app-shell';
 import type { AppController } from '../app/lifecycle';
 import type { EditorFlow } from '../app/navigation';
@@ -52,23 +54,28 @@ export class EditorFlowController implements AppController, EditorFlow {
     showEditorHomeScreen(
       this.ctx.overlay,
       drafts,
-      SCENARIO_IDS.map((id) => ({ id, name: SCENARIOS[id].name })),
+      SCENARIO_IDS.map((id) => ({ id, name: scenarioName(id) })),
       {
         onNewEmpty: () => this.openEditorSession(emptyDocument(newDocId('custom'))),
         onNewRandom: () =>
           this.openEditorSession(randomDocument(newDocId('custom'), Date.now() >>> 0)),
         onCloneBuiltin: (id) =>
           this.openEditorSession(
-            cloneBuiltinDocument(id, newDocId('custom'), Date.now() >>> 0, `${SCENARIOS[id].name} 사본`),
+            cloneBuiltinDocument(
+              id,
+              newDocId('custom'),
+              Date.now() >>> 0,
+              t('editor.copySuffix', { title: scenarioName(id) }),
+            ),
           ),
         onOpenDraft: (id) => void this.openDraft(id),
         onDeleteDraft: (id) => {
-          if (!window.confirm('이 초안을 삭제할까요?')) return;
+          if (!window.confirm(t('editor.confirmDelete'))) return;
           documentStore()
             .remove('scenario-drafts', id)
             .then(() => documentStore().remove('editor-autosave', id))
             .then(() => this.showHome())
-            .catch(() => this.ctx.hud.toast('삭제하지 못했습니다'));
+            .catch(() => this.ctx.hud.toast(t('editor.deleteFailed')));
         },
         onImportFile: (file) => void this.importScenarioFile(file),
         onImportText: () =>
@@ -89,12 +96,12 @@ export class EditorFlowController implements AppController, EditorFlow {
     if (!token.alive) return;
     let doc = draft?.data ?? null;
     if (auto?.data && (!draft || auto.updatedAt > draft.updatedAt)) {
-      if (!doc || window.confirm('저장하지 않은 자동 저장본이 있습니다. 이어서 편집할까요?')) {
+      if (!doc || window.confirm(t('editor.confirmAutosave'))) {
         doc = auto.data;
       }
     }
     if (!doc) {
-      this.ctx.hud.toast('초안을 불러오지 못했습니다');
+      this.ctx.hud.toast(t('editor.loadFailed'));
       return;
     }
     this.openEditorSession(doc);
@@ -104,7 +111,7 @@ export class EditorFlowController implements AppController, EditorFlow {
 
   private async importScenarioFile(file: File): Promise<void> {
     if (file.size > SCENARIO_LIMITS.maxImportBytes) {
-      this.ctx.hud.toast('파일이 너무 큽니다');
+      this.ctx.hud.toast(t('editor.fileTooLarge'));
       return;
     }
     const token = this.ctx.currentToken();
@@ -112,7 +119,7 @@ export class EditorFlowController implements AppController, EditorFlow {
     if (!token.alive) return;
     const result = decodeScenarioInput(text ?? '');
     if (!result.ok) {
-      this.ctx.hud.toast(result.issues[0]?.message ?? '시나리오 형식이 아닙니다');
+      this.ctx.hud.toast(t('editor.invalidFormat'));
       return;
     }
     this.openImportedDocument(result.value);
@@ -120,23 +127,20 @@ export class EditorFlowController implements AppController, EditorFlow {
 
   /** 붙여넣기 가져오기: JSON 텍스트 또는 공유 코드(TCS1)·공유 URL을 판별해 처리한다. */
   private async importScenarioText(text: string): Promise<void> {
-    const t = text.trim();
-    if (!t) return;
+    const input = text.trim();
+    if (!input) return;
     const token = this.ctx.currentToken();
     let doc: ScenarioDocumentV1 | null = null;
-    let firstMessage: string | undefined;
-    if (t.startsWith('{')) {
-      const result = decodeScenarioInput(t);
+    if (input.startsWith('{')) {
+      const result = decodeScenarioInput(input);
       doc = result.ok ? result.value : null;
-      if (!result.ok) firstMessage = result.issues[0]?.message;
     } else {
-      const result = await decodeShareCode(t);
+      const result = await decodeShareCode(input);
       doc = result.doc;
-      if (!doc) firstMessage = result.issues[0]?.message;
     }
     if (!token.alive) return;
     if (!doc) {
-      this.ctx.hud.toast(firstMessage ?? '가져올 수 없습니다');
+      this.ctx.hud.toast(t('editor.importFailed'));
       return;
     }
     this.openImportedDocument(doc);
@@ -151,19 +155,19 @@ export class EditorFlowController implements AppController, EditorFlow {
     tags.add('imported');
     imported.metadata = { ...imported.metadata, tags: [...tags] };
     this.openEditorSession(imported);
-    this.ctx.hud.toast('가져온 시나리오를 편집합니다 — 검증을 실행해 보세요');
+    this.ctx.hud.toast(t('editor.importedNotice'));
   }
 
   /** 공식 전장 등 읽기 전용 문서의 복제본을 새 초안으로 연다(원본은 수정되지 않는다). */
   openCloneOf(doc: ScenarioDocumentV1): void {
     const copy = clone(doc);
     copy.id = newDocId('custom');
-    copy.title = `${doc.title} 사본`.slice(0, SCENARIO_LIMITS.maxTitleLen);
+    copy.title = t('editor.copySuffix', { title: doc.title }).slice(0, SCENARIO_LIMITS.maxTitleLen);
     if (copy.metadata?.tags) {
       copy.metadata = { ...copy.metadata, tags: copy.metadata.tags.filter((t) => t !== 'official') };
     }
     this.openEditorSession(copy);
-    this.ctx.hud.toast('복제본을 편집합니다 — 원본 공식 전장은 그대로 유지됩니다');
+    this.ctx.hud.toast(t('editor.cloneNotice'));
   }
 
   // ---------------- 에디터 세션 ----------------
@@ -224,7 +228,7 @@ export class EditorFlowController implements AppController, EditorFlow {
         onAiTrial: () => void this.runAiQualityTrial(),
         onSave: () => {
           void this.editor!.saveDraft().then((ok) =>
-            this.ctx.hud.toast(ok ? '초안을 저장했습니다' : '저장하지 못했습니다'),
+            this.ctx.hud.toast(ok ? t('editor.saved') : t('editor.saveFailed')),
           );
         },
         onTestPlay: () => this.startTestPlay(false),
@@ -254,7 +258,7 @@ export class EditorFlowController implements AppController, EditorFlow {
             this.editorScene?.setDoc(this.editor!.doc);
             this.updatePanel();
           } else {
-            this.ctx.hud.toast('허용 범위 밖의 크기입니다');
+            this.ctx.hud.toast(t('editor.sizeOutOfRange'));
           }
         },
         onConditionsChange: (next) => {
@@ -313,7 +317,7 @@ export class EditorFlowController implements AppController, EditorFlow {
     }
     if (ed.tool === 'unit') {
       const result = ed.placeUnitAt(q, r);
-      if (result === 'blocked') this.ctx.hud.toast('여기에는 유닛을 배치할 수 없습니다');
+      if (result === 'blocked') this.ctx.hud.toast(t('editor.unitBlocked'));
       this.editorScene?.refresh();
       this.updatePanel();
       return;
@@ -348,7 +352,7 @@ export class EditorFlowController implements AppController, EditorFlow {
     this.endTilePick();
     const banner = document.createElement('div');
     banner.className = 'ed-pick-banner';
-    banner.innerHTML = `<span>${label}</span><button>취소</button>`;
+    banner.innerHTML = `<span>${escapeHtml(label)}</span><button>${escapeHtml(t('editor.pickCancel'))}</button>`;
     this.ctx.hudRoot.appendChild(banner);
     this.pickBanner = banner;
     return new Promise<Axial | null>((resolve) => {
@@ -381,13 +385,13 @@ export class EditorFlowController implements AppController, EditorFlow {
     if (!ed) return;
     const overlay = this.ctx.overlay;
     overlay.show(`
-      <h1 style="font-size:22px;">내보내기·공유</h1>
-      <p class="subtitle" style="font-size:12.5px;">받는 사람은 제작실의 "코드 가져오기"나 공유 URL로 엽니다</p>
-      <button class="big-btn" id="ex-file">JSON 파일 저장</button>
-      <button class="sub-btn" id="ex-copy-json">JSON 텍스트 복사</button>
-      <button class="sub-btn" id="ex-copy-code">공유 코드 복사</button>
-      <button class="sub-btn" id="ex-copy-url">공유 URL 복사</button>
-      <button class="sub-btn" id="ex-close">닫기</button>`);
+      <h1 style="font-size:22px;">${escapeHtml(t('editor.exportTitle'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('editor.exportHelp'))}</p>
+      <button class="big-btn" id="ex-file">${escapeHtml(t('editor.saveJson'))}</button>
+      <button class="sub-btn" id="ex-copy-json">${escapeHtml(t('editor.copyJson'))}</button>
+      <button class="sub-btn" id="ex-copy-code">${escapeHtml(t('editor.copyCode'))}</button>
+      <button class="sub-btn" id="ex-copy-url">${escapeHtml(t('editor.copyUrl'))}</button>
+      <button class="sub-btn" id="ex-close">${escapeHtml(t('common.close'))}</button>`);
     overlay.bind({
       'ex-file': () => {
         const blob = new Blob([JSON.stringify(ed.doc, null, 1)], { type: 'application/json' });
@@ -399,20 +403,20 @@ export class EditorFlowController implements AppController, EditorFlow {
         URL.revokeObjectURL(url);
       },
       'ex-copy-json': () =>
-        void this.copyShareText(JSON.stringify(ed.doc, null, 1), 'JSON을 복사했습니다'),
+        void this.copyShareText(JSON.stringify(ed.doc, null, 1), t('editor.jsonCopied')),
       'ex-copy-code': () =>
         void encodeShareCode(ed.doc).then((code) =>
-          this.copyShareText(code, '공유 코드를 복사했습니다'),
+          this.copyShareText(code, t('editor.codeCopied')),
         ),
       'ex-copy-url': () =>
         void encodeShareCode(ed.doc).then((code) => {
           const base = `${window.location.origin}${window.location.pathname}${window.location.search}`;
           const url = shareUrlFromCode(code, base);
           if (!url) {
-            this.ctx.hud.toast('문서가 커서 URL 공유가 어렵습니다 — 공유 코드를 사용하세요');
+            this.ctx.hud.toast(t('editor.urlTooLong'));
             return;
           }
-          return this.copyShareText(url, '공유 URL을 복사했습니다');
+          return this.copyShareText(url, t('editor.urlCopied'));
         }),
       'ex-close': () => overlay.hide(),
     });
@@ -426,9 +430,9 @@ export class EditorFlowController implements AppController, EditorFlow {
       this.ctx.hud.toast(okMessage);
     } catch {
       const root = this.ctx.overlay.show(`
-        <h1 style="font-size:20px;">직접 복사하세요</h1>
+        <h1 style="font-size:20px;">${escapeHtml(t('editor.copyManually'))}</h1>
         <textarea class="ed-import-text" rows="6" readonly></textarea>
-        <button class="sub-btn" id="ex-close">닫기</button>`);
+        <button class="sub-btn" id="ex-close">${escapeHtml(t('common.close'))}</button>`);
       root.querySelector<HTMLTextAreaElement>('textarea')!.value = text;
       this.ctx.overlay.bind({ 'ex-close': () => this.ctx.overlay.hide() });
     }
@@ -439,7 +443,7 @@ export class EditorFlowController implements AppController, EditorFlow {
     const ed = this.editor;
     if (ed?.dirty) {
       await ed.autosaveNow();
-      if (window.confirm('저장하지 않은 변경이 있습니다. 초안으로 저장할까요?')) {
+      if (window.confirm(t('editor.confirmSaveChanges'))) {
         await ed.saveDraft();
       }
     }
@@ -468,12 +472,12 @@ export class EditorFlowController implements AppController, EditorFlow {
         difficulty: 'normal',
       });
     } catch {
-      this.ctx.hud.toast('시나리오를 시작할 수 없습니다 — 검증을 확인하세요');
+      this.ctx.hud.toast(t('editor.startFailed'));
       return;
     }
     void ed.autosaveNow();
     this.ctx.nav.launch(state, { testPlay: true, spectate });
-    this.ctx.hud.toast(spectate ? 'AI 관전 테스트 — 목표 버튼으로 상태를 확인하세요' : '테스트 플레이 — 에디터로 버튼으로 돌아갑니다');
+    this.ctx.hud.toast(spectate ? t('editor.spectateNotice') : t('editor.testNotice'));
   }
 
   // ---------------- 품질 보고서·AI 품질 시험 ----------------
@@ -506,7 +510,7 @@ export class EditorFlowController implements AppController, EditorFlow {
     try {
       snapshot = normalizeScenario(ed.doc);
     } catch {
-      this.ctx.hud.toast('시나리오를 시작할 수 없습니다 — 검증을 확인하세요');
+      this.ctx.hud.toast(t('editor.startFailed'));
       return;
     }
     const token = this.ctx.currentToken();
@@ -543,18 +547,17 @@ export class EditorFlowController implements AppController, EditorFlow {
   /** 테스트 플레이 종료 결과: 간단한 요약과 재테스트·에디터 복귀만 제공한다. */
   handleTestPlayEnd(state: GameState): void {
     const me = state.config.humanFaction;
-    const word = state.winner === 'draw' ? '무승부' : state.winner === me ? '승리' : '패배';
-    const winnerName = state.winner && state.winner !== 'draw' ? FACTION_NAMES[state.winner] : null;
+    const word = state.winner === 'draw' ? t('result.draw') : state.winner === me ? t('result.win') : t('result.lose');
+    const winnerName = state.winner && state.winner !== 'draw' ? factionName(state.winner) : null;
+    const winner = winnerName ? t('testplay.winner', { winner: winnerName }) : '';
     const overlay = this.ctx.overlay;
     overlay.show(`
-      <h1 class="result-word ${state.winner === me ? 'win' : 'lose'}" style="font-size:34px;">${word}</h1>
-      <p class="subtitle">테스트 플레이 종료 · ${Math.min(state.turn, state.maxTurns)}턴${
-        winnerName ? ` · 승자: ${winnerName}` : ''
-      } · 점수 ${factionScore(state, me)}점</p>
-      <button class="big-btn" id="tp-again">다시 테스트</button>
-      <button class="sub-btn" id="tp-spectate">AI 관전으로 다시</button>
-      <button class="sub-btn" id="tp-save-replay">리플레이 저장</button>
-      <button class="sub-btn" id="tp-editor">에디터로 돌아가기</button>`);
+      <h1 class="result-word ${state.winner === me ? 'win' : 'lose'}" style="font-size:34px;">${escapeHtml(word)}</h1>
+      <p class="subtitle">${escapeHtml(t('testplay.ended', { turns: Math.min(state.turn, state.maxTurns), winner, score: factionScore(state, me) }))}</p>
+      <button class="big-btn" id="tp-again">${escapeHtml(t('testplay.again'))}</button>
+      <button class="sub-btn" id="tp-spectate">${escapeHtml(t('testplay.spectateAgain'))}</button>
+      <button class="sub-btn" id="tp-save-replay">${escapeHtml(t('testplay.saveReplay'))}</button>
+      <button class="sub-btn" id="tp-editor">${escapeHtml(t('testplay.back'))}</button>`);
     overlay.bind({
       'tp-again': () => this.startTestPlay(false),
       'tp-spectate': () => this.startTestPlay(true),
@@ -564,10 +567,10 @@ export class EditorFlowController implements AppController, EditorFlow {
         if (btn.disabled) return;
         if (this.ctx.replays.captureReplayOnDemand(state)) {
           btn.disabled = true;
-          btn.textContent = '리플레이 저장됨';
-          this.ctx.hud.toast('리플레이를 보관함에 저장했습니다');
+          btn.textContent = t('testplay.replaySaved');
+          this.ctx.hud.toast(t('testplay.replayStored'));
         } else {
-          this.ctx.hud.toast('이 게임은 리플레이로 저장할 수 없습니다');
+          this.ctx.hud.toast(t('testplay.replayUnavailable'));
         }
       },
       'tp-editor': () => this.returnFromTestPlay(),

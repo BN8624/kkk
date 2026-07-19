@@ -10,6 +10,7 @@ import type {
   ScenarioTile,
 } from '../core/scenario/types';
 import type { BuiltinScenarioId } from '../core/types';
+import { t } from '../i18n';
 
 function defaultFactions(): ScenarioFactionSetup[] {
   return FACTION_IDS.map((id, i) => ({
@@ -44,7 +45,7 @@ export function emptyDocument(id: string, cols = 9, rows = 12): ScenarioDocument
     }
   }
   return {
-    ...baseDocument(id, '새 시나리오'),
+    ...baseDocument(id, t('editor.newScenarioTitle')),
     board: { cols, rows, tiles, source: { kind: 'fixed' } },
   };
 }
@@ -53,7 +54,7 @@ export function emptyDocument(id: string, cols = 9, rows = 12): ScenarioDocument
 export function randomDocument(id: string, seed: number): ScenarioDocumentV1 {
   const map = generateMap(seed);
   return {
-    ...baseDocument(id, '랜덤 전장'),
+    ...baseDocument(id, t('editor.randomScenarioTitle')),
     board: { cols: 9, rows: 12, tiles: map.tiles.map((t) => ({ ...t })), source: { kind: 'fixed' } },
   };
 }

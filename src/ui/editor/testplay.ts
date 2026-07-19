@@ -2,6 +2,8 @@
 import { factionScore } from '../../core/game';
 import { defeatMet, starsEarned, victoryMet } from '../../core/scenario/objectives';
 import type { GameState } from '../../core/types';
+import { t } from '../../i18n';
+import { escapeHtml } from '../shared/dom';
 import { describeDefeat, describeStar, describeVictory } from './index';
 
 export interface TestPlayHandlers {
@@ -19,9 +21,9 @@ export class TestPlayBar {
     this.bar = document.createElement('div');
     this.bar.className = 'ed-pick-banner tp-bar';
     this.bar.innerHTML = `
-      <span>테스트 플레이</span>
-      <button id="tp-objectives">목표</button>
-      <button id="tp-exit">에디터로</button>`;
+      <span>${escapeHtml(t('testplay.label'))}</span>
+      <button id="tp-objectives">${escapeHtml(t('testplay.objectives'))}</button>
+      <button id="tp-exit">${escapeHtml(t('testplay.toEditor'))}</button>`;
     root.appendChild(this.bar);
 
     this.sheet = document.createElement('div');
@@ -41,25 +43,25 @@ export class TestPlayBar {
     if (!state) return;
     const mark = (met: boolean) => (met ? '✓' : '·');
     const rows: string[] = [];
-    rows.push('<b>승리 조건</b>');
+    rows.push(`<b>${escapeHtml(t('testplay.victory'))}</b>`);
     for (const c of state.objectives.victory) {
-      rows.push(`<div class="tp-line">${mark(victoryMet(state, c, factionScore))} ${describeVictory(c)}</div>`);
+      rows.push(`<div class="tp-line">${mark(victoryMet(state, c, factionScore))} ${escapeHtml(describeVictory(c))}</div>`);
     }
-    rows.push('<b>패배 조건</b>');
+    rows.push(`<b>${escapeHtml(t('testplay.defeat'))}</b>`);
     for (const c of state.objectives.defeat) {
-      rows.push(`<div class="tp-line">${mark(defeatMet(state, c))} ${describeDefeat(c)}</div>`);
+      rows.push(`<div class="tp-line">${mark(defeatMet(state, c))} ${escapeHtml(describeDefeat(c))}</div>`);
     }
     if (state.objectives.stars.length > 0) {
-      rows.push('<b>별점 조건</b>');
+      rows.push(`<b>${escapeHtml(t('testplay.stars'))}</b>`);
       const earned = starsEarned(state);
       state.objectives.stars.forEach((c, i) => {
-        rows.push(`<div class="tp-line">${mark(earned[i])} ${describeStar(c)}</div>`);
+        rows.push(`<div class="tp-line">${mark(earned[i])} ${escapeHtml(describeStar(c))}</div>`);
       });
     }
     this.sheet.innerHTML = `
-      <h3>목표 상태 <span style="font-size:12.5px;color:#6b6250;">(검증 정보 — 테스트 플레이 전용)</span></h3>
+      <h3>${escapeHtml(t('testplay.status'))} <span style="font-size:12.5px;color:#6b6250;">${escapeHtml(t('testplay.statusHint'))}</span></h3>
       <div class="ed-cond-list">${rows.join('')}</div>
-      <button class="close-btn">닫기</button>`;
+      <button class="close-btn">${escapeHtml(t('common.close'))}</button>`;
     this.sheet.querySelector('.close-btn')!.addEventListener('click', () => this.sheet.classList.remove('show'));
     this.sheet.classList.add('show');
   }
