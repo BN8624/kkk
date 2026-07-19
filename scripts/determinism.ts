@@ -3,8 +3,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runAiTurn } from '../src/core/ai';
+import { CAMPAIGNS } from '../src/core/campaign/missions';
 import { FACTION_IDS } from '../src/core/data';
-import { newGame } from '../src/core/game';
+import { newGame, newGameFromScenario } from '../src/core/game';
+import { randomDocument } from '../src/editor/new-doc';
+import { normalizeScenario } from '../src/core/scenario/normalize';
 import {
   buildReplayDocument,
   verifyReplay,
@@ -108,6 +111,28 @@ for (const modifier of MODIFIER_IDS) {
     const state = newGame(seed, { mode: 'daily', modifier, difficulty: 'normal' });
     checkGame(`daily-${modifier}-${seed}`, state);
   }
+}
+
+// 캠페인 9개 미션(난이도 3종 × 시드 2개 — 고정 지도라 시드보다 난이도가 궤적을 바꾼다)
+for (const campaign of CAMPAIGNS) {
+  for (const mission of campaign.missions) {
+    const snapshot = normalizeScenario(mission.scenario);
+    for (const difficulty of DIFFICULTIES) {
+      for (let i = 0; i < 2; i++) {
+        const seed = SEED_BASE + 95000 + i;
+        const state = newGameFromScenario(seed, snapshot, { mode: 'campaign', difficulty });
+        checkGame(`campaign-${mission.id}-${difficulty}-${seed}`, state);
+      }
+    }
+  }
+}
+
+// 커스텀 시나리오(제작실 랜덤 지도 문서 경유, 시드 6개)
+for (let i = 0; i < 6; i++) {
+  const seed = SEED_BASE + 97000 + i;
+  const doc = randomDocument(`custom-det-${i}`, seed);
+  const state = newGameFromScenario(seed, normalizeScenario(doc), { mode: 'custom' });
+  checkGame(`custom-random-${seed}`, state);
 }
 
 const elapsedSec = (Date.now() - startedAt) / 1000;

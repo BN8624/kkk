@@ -252,6 +252,8 @@ function azureMission2(): ScenarioDocumentV1 {
     .set(6, 6, { terrain: 'forest' })
     .set(3, 8, { terrain: 'forest' })
     .set(5, 9, { terrain: 'forest' })
+    .set(4, 9, { terrain: 'forest' })
+    .set(3, 10, { terrain: 'forest' })
     .set(1, 6, { terrain: 'mountain' })
     .set(7, 7, { terrain: 'mountain' })
     .set(0, 2, { terrain: 'water' })
@@ -265,12 +267,13 @@ function azureMission2(): ScenarioDocumentV1 {
     { faction: 'azure', type: 'infantry', ...b.at(3, 5) },
     { faction: 'azure', type: 'infantry', ...b.at(5, 5) },
     { faction: 'azure', type: 'archer', ...b.at(4, 4) },
-    { faction: 'azure', type: 'cavalry', ...b.at(4, 6) },
+    { faction: 'azure', type: 'infantry', ...b.at(4, 6) },
+    { faction: 'azure', type: 'cavalry', ...b.at(4, 3) },
     { faction: 'crimson', type: 'cavalry', ...b.at(3, 2) },
     { faction: 'crimson', type: 'infantry', ...b.at(4, 2) },
-    { faction: 'crimson', type: 'infantry', ...b.at(5, 2) },
     { faction: 'violet', type: 'archer', ...b.at(7, 4) },
-    { faction: 'violet', type: 'infantry', ...b.at(7, 5) },
+    // 목표 마을 주둔군: 빠른 유닛의 무혈 점령을 막되, 소모된 병력이라 집중 공격이면 뚫린다
+    { faction: 'violet', type: 'infantry', ...b.at(4, 11), hp: 6 },
   ];
 
   return {
@@ -279,15 +282,12 @@ function azureMission2(): ScenarioDocumentV1 {
     title: '포위망 돌파',
     description: '포위를 뚫고 남쪽 보급 마을을 확보하라.',
     board: { cols: 9, rows: 12, tiles: b.tiles, source: { kind: 'fixed' } },
-    factions: factions('azure', ['crimson', 'violet'], { crimson: 30, violet: 25 }),
+    factions: factions('azure', ['crimson', 'violet'], { crimson: 15, violet: 15 }),
     units,
     rules: { maxTurns: 12, turnLimit: 'defeat' },
     victoryConditions: [{ type: 'capture-building', at: b.at(4, 11) }],
-    defeatConditions: [
-      { type: 'lose-building', at: b.at(4, 5) },
-      { type: 'human-eliminated' },
-      { type: 'turn-limit' },
-    ],
+    // 돌파전: 본진을 버리고서라도 남쪽으로 뚫으면 이긴다(수도 상실은 패배가 아니다)
+    defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
     starConditions: [
       { type: 'win' },
       { type: 'win-within-turns', turns: 9 },

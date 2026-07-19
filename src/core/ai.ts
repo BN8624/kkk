@@ -82,7 +82,7 @@ const PROFILES: Record<Difficulty, AiProfile> = {
   },
 };
 
-type Role = 'defend' | 'garrison' | 'attack' | 'protect';
+type Role = 'defend' | 'garrison' | 'attack' | 'protect' | 'hold';
 
 interface Objective {
   q: number;
@@ -101,6 +101,8 @@ interface Analysis {
   objectives: Objective[];
   /** 사망이 패배(또는 생존이 승리 필수)인 유닛 태그 — 보호 역할을 받는다 */
   protectedTags: Set<string>;
+  /** 상실이 패배인 아군 거점 — 사수 역할을 받는다 */
+  holdTiles: Tile[];
   turnsLeft: number;
 }
 
@@ -139,13 +141,13 @@ export function runAiTurn(
   const profile = PROFILES[difficultyOverride ?? state.config.difficulty] ?? PROFILES.normal;
 
   const analysis = analyze(state, faction);
-  const roles = assignRoles(state, faction, analysis, profile);
+  const { roles, holdTargets } = assignRoles(state, faction, analysis, profile);
 
   const unitIds = unitsOf(state, faction).map((u) => u.id);
   for (const uid of unitIds) {
     const unit = unitById(state, uid);
     if (!unit || state.over) break;
-    actUnit(state, unit, roles.get(uid) ?? 'attack', analysis, profile, issue);
+    actUnit(state, unit, roles.get(uid) ?? 'attack', analysis, profile, issue, holdTargets.get(uid));
   }
   if (!state.over) produceUnits(state, faction, analysis, profile, issue);
   if (!state.over) issue({ type: 'end-phase' });
@@ -203,6 +205,15 @@ function analyze(state: GameState, faction: FactionId): Analysis {
       if (c.type === 'unit-dies') protectedTags.add(c.tag);
     }
   }
+  const holdTiles: Tile[] = [];
+  if (state.config.humanFaction === faction) {
+    for (const c of state.objectives.defeat) {
+      if (c.type === 'lose-building') {
+        const t = tileAt(state, c.at.q, c.at.r);
+        if (t && t.owner === faction) holdTiles.push(t);
+      }
+    }
+  }
 
   return {
     enemies,
@@ -212,6 +223,7 @@ function analyze(state: GameState, faction: FactionId): Analysis {
     crownScenario: isCrownScenario,
     objectives,
     protectedTags,
+    holdTiles,
     turnsLeft: state.maxTurns - state.turn,
   };
 }
@@ -223,13 +235,35 @@ function assignRoles(
   faction: FactionId,
   an: Analysis,
   profile: AiProfile,
-): Map<number, Role> {
+): { roles: Map<number, Role>; holdTargets: Map<number, Tile> } {
   const roles = new Map<number, Role>();
+  const holdTargets = new Map<number, Tile>();
   const units = unitsOf(state, faction);
 
   // 보호 대상 유닛(사망 = 패배)은 항상 보호 역할이 최우선이다
   for (const u of units) {
     if (u.tag !== undefined && an.protectedTags.has(u.tag)) roles.set(u.id, 'protect');
+  }
+
+  // 상실 = 패배인 거점 사수: 위에 선 유닛은 고정하고, 비어 있으면 가장 가까운 유닛을 보낸다
+  for (const t of an.holdTiles) {
+    const occupant = units.find((u) => u.q === t.q && u.r === t.r);
+    if (occupant) {
+      if (!roles.has(occupant.id)) {
+        roles.set(occupant.id, 'hold');
+        holdTargets.set(occupant.id, t);
+      }
+      continue;
+    }
+    if (!unitAt(state, t.q, t.r)) {
+      const candidate = units
+        .filter((u) => !roles.has(u.id))
+        .sort((a, b) => hexDistance(a, t) - hexDistance(b, t))[0];
+      if (candidate) {
+        roles.set(candidate.id, 'hold');
+        holdTargets.set(candidate.id, t);
+      }
+    }
   }
 
   if (profile.defend && an.myCapital && an.capitalThreats.length > 0) {
@@ -254,7 +288,25 @@ function assignRoles(
       .sort((a, b) => hexDistance(a, crown) - hexDistance(b, crown))[0];
     if (candidate) roles.set(candidate.id, 'garrison');
   }
-  return roles;
+  return { roles, holdTargets };
+}
+
+/** 제자리에서 사거리 안 적을 공격한다(이동 없음). requireSafe면 반격 사망이 예상될 때 쏘지 않는다. */
+function attackInPlace(
+  state: GameState,
+  unit: Unit,
+  an: Analysis,
+  issue: IssueFn,
+  requireSafe: boolean,
+): boolean {
+  if (unit.attacked) return false;
+  const range = unitRange(unit);
+  const target = an.enemies
+    .filter((e) => unitById(state, e.id) && hexDistance(unit, e) <= range)
+    .sort((a, b) => a.hp - b.hp)[0];
+  if (!target) return false;
+  if (requireSafe && forecastAttack(state, unit, target).attackerDies) return false;
+  return issue({ type: 'attack-unit', attackerId: unit.id, defenderId: target.id }).ok;
 }
 
 // ---------------- 유닛 행동 ----------------
@@ -266,7 +318,18 @@ function actUnit(
   an: Analysis,
   profile: AiProfile,
   issue: IssueFn,
+  holdTarget?: Tile,
 ): void {
+  if (role === 'hold' && holdTarget) {
+    // 사수: 거점 위(또는 거점으로 이동)에서만 싸운다. 절대 거점을 버리고 진격하지 않는다
+    if (unit.q !== holdTarget.q || unit.r !== holdTarget.r) {
+      if (!tryOccupy(state, unit, holdTarget, issue)) {
+        moveToward(state, unit, holdTarget, profile, issue);
+      }
+    }
+    attackInPlace(state, unit, an, issue, false);
+    return;
+  }
   if (role === 'defend') {
     // 방어: 위협 공격 우선, 수도가 비어 있으면 주둔, 아니면 수도 쪽으로 물러난다
     if (tryAttack(state, unit, an, profile, issue)) return;
@@ -287,16 +350,7 @@ function actUnit(
   }
   if (role === 'protect') {
     // 보호 대상(사망 = 패배): 제자리 사격만 하고, 적 위협권 밖 안전 타일로 물러난다
-    if (!unit.attacked) {
-      const range = unitRange(unit);
-      const target = an.enemies
-        .filter((e) => unitById(state, e.id) && hexDistance(unit, e) <= range)
-        .sort((a, b) => a.hp - b.hp)[0];
-      if (target) {
-        const fc = forecastAttack(state, unit, target);
-        if (!fc.attackerDies) issue({ type: 'attack-unit', attackerId: unit.id, defenderId: target.id });
-      }
-    }
+    attackInPlace(state, unit, an, issue, true);
     retreatToSafety(state, unit, an, issue);
     return;
   }
@@ -497,6 +551,14 @@ function tryAdvance(
       goal = { q: e.q, r: e.r };
       chosen = null;
     }
+  }
+  // 지평 안에 아무 목표도 없으면 완전히 멈추는 대신 가장 가까운 거점으로 느리게 전진한다
+  if (!goal && an.objectives.length > 0) {
+    const nearest = an.objectives
+      .slice()
+      .sort((a, b) => hexDistance(unit, a) - hexDistance(unit, b))[0];
+    goal = nearest;
+    chosen = nearest;
   }
   if (!goal) return;
   if (chosen) chosen.claimed++;
