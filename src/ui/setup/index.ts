@@ -1,6 +1,6 @@
 // 한 줄 목적: 빠른 전투 설정 화면(왕국·시나리오·난이도 선택)을 렌더링한다
 import type { Difficulty, FactionId } from '../../core/types';
-import { FACTION_NAMES, DIFFICULTY_NAMES } from '../../core/data';
+import { difficultyName, factionName, t } from '../../i18n';
 import { EMBLEM_SVG, FACTION_CSS, escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -28,13 +28,13 @@ export function showSetupScreen(
     difficulty: opts.initial?.difficulty ?? 'normal',
   };
   const root = overlay.show(`
-      <h1 style="font-size:22px;">새 게임</h1>
+      <h1 style="font-size:22px;">${escapeHtml(t('setup.title'))}</h1>
       <div class="fac-cards">
         ${(['azure', 'crimson', 'violet'] as FactionId[])
           .map(
             (f) => `<button class="fac-card" data-f="${f}">
               <span class="crest" style="background:${FACTION_CSS[f]}">${EMBLEM_SVG[f]}</span>
-              <b>${FACTION_NAMES[f]}</b>
+              <b>${escapeHtml(factionName(f))}</b>
             </button>`,
           )
           .join('')}
@@ -48,11 +48,11 @@ export function showSetupScreen(
       <div class="opt-desc" id="scn-desc"></div>
       <div class="opt-row" id="dif-row">
         ${(['easy', 'normal', 'hard'] as Difficulty[])
-          .map((d) => `<button class="opt-chip" data-d="${d}">${DIFFICULTY_NAMES[d]}</button>`)
+          .map((d) => `<button class="opt-chip" data-d="${d}">${escapeHtml(difficultyName(d))}</button>`)
           .join('')}
       </div>
-      <button class="big-btn" id="btn-start">이 왕국으로 시작</button>
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="big-btn" id="btn-start">${escapeHtml(t('setup.start'))}</button>
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   const facDesc = root.querySelector('#fac-desc')!;
   const scnDesc = root.querySelector('#scn-desc')!;
   const render = () => {

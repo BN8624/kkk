@@ -1,8 +1,9 @@
 // 한 줄 목적: 플레이 중 게임 HUD(상단 정보·유닛 패널·생산 시트·튜토리얼·토스트)를 관리한다
-import { FACTION_NAMES, TERRAIN_NAMES, UNIT_NAMES, UNIT_STATS } from '../../core/data';
+import { UNIT_STATS } from '../../core/data';
 import { factionScore } from '../../core/game';
 import type { FactionId, GameState, Tile, Unit, UnitTypeId } from '../../core/types';
-import { COIN_SVG, EMBLEM_SVG, FACTION_CSS, GEAR_SVG, el, button } from '../shared/dom';
+import { factionName, t, terrainName, unitName } from '../../i18n';
+import { COIN_SVG, EMBLEM_SVG, FACTION_CSS, GEAR_SVG, el, button, escapeHtml } from '../shared/dom';
 
 export interface HudHandlers {
   onEndTurn: () => void;
@@ -35,20 +36,25 @@ export class Hud {
     this.root.appendChild(this.topBar);
 
     this.aiChip = el('div', 'ai-chip');
+    this.aiChip.setAttribute('role', 'status');
+    this.aiChip.setAttribute('aria-live', 'polite');
     this.root.appendChild(this.aiChip);
 
     this.tutorialBar = el('div', 'tutorial-bar');
+    this.tutorialBar.setAttribute('role', 'status');
     this.root.appendChild(this.tutorialBar);
 
     const zoomCol = el('div', 'zoom-col');
     const zoomIn = button('icon-btn', '+', () => this.handlers.onZoom(1.25));
     const zoomOut = button('icon-btn', '−', () => this.handlers.onZoom(0.8));
+    zoomIn.setAttribute('aria-label', t('hud.zoomIn'));
+    zoomOut.setAttribute('aria-label', t('hud.zoomOut'));
     zoomCol.append(zoomIn, zoomOut);
     this.root.appendChild(zoomCol);
 
     const bottom = el('div', 'hud-bottom');
     this.bottomPanel = el('div', 'unit-panel');
-    this.endTurnBtn = button('end-turn', '턴 종료', () => this.handlers.onEndTurn());
+    this.endTurnBtn = button('end-turn', t('hud.endTurn'), () => this.handlers.onEndTurn());
     bottom.append(this.bottomPanel, this.endTurnBtn);
     this.root.appendChild(bottom);
 
@@ -56,6 +62,8 @@ export class Hud {
     this.root.appendChild(this.productionSheet);
 
     this.toastEl = el('div', 'toast');
+    this.toastEl.setAttribute('role', 'status');
+    this.toastEl.setAttribute('aria-live', 'polite');
     this.root.appendChild(this.toastEl);
   }
 
@@ -77,16 +85,16 @@ export class Hud {
       const need = holdCond?.turns ?? 0;
       const owner = state.crownHold.owner;
       crownChip = `<span class="hud-chip" style="border-color:${owner ? FACTION_CSS[owner] : '#c9a227'}">👑 ${
-        owner ? `${state.crownHold.turns}/${need}` : '무주'
+        owner ? `${state.crownHold.turns}/${need}` : escapeHtml(t('hud.crownUnclaimed'))
       }</span>`;
     }
     this.topBar.innerHTML = `
-      <span class="hud-chip">${state.turn > state.maxTurns ? state.maxTurns : state.turn}/${state.maxTurns}턴</span>
+      <span class="hud-chip">${escapeHtml(t('hud.turn', { current: state.turn > state.maxTurns ? state.maxTurns : state.turn, max: state.maxTurns }))}</span>
       ${crownChip}
       <span class="hud-scores">${scores}</span>
       <span style="display:flex;gap:7px;align-items:center;">
         <span class="hud-chip">${COIN_SVG}${state.factions[state.config.humanFaction].gold}</span>
-        <button class="icon-btn" id="hud-gear" aria-label="설정">${GEAR_SVG}</button>
+        <button class="icon-btn" id="hud-gear" aria-label="${escapeHtml(t('hud.settings'))}">${GEAR_SVG}</button>
       </span>`;
     this.topBar.querySelector('#hud-gear')!.addEventListener('click', () => this.handlers.onPause());
   }
@@ -96,7 +104,7 @@ export class Hud {
       this.aiChip.classList.remove('show');
       return;
     }
-    this.aiChip.textContent = `${FACTION_NAMES[faction]}의 턴...`;
+    this.aiChip.textContent = t('hud.aiTurn', { faction: factionName(faction) });
     this.aiChip.classList.add('show');
   }
 
@@ -127,15 +135,15 @@ export class Hud {
     if (unit) {
       const s = UNIT_STATS[unit.type];
       html = `<h3><span class="dot" style="background:${FACTION_CSS[unit.faction]}"></span>
-        ${FACTION_NAMES[unit.faction]} ${UNIT_NAMES[unit.type]}</h3>
+        ${escapeHtml(factionName(unit.faction))} ${escapeHtml(unitName(unit.type))}</h3>
         <div class="stats">
-          <span>체력 ${unit.hp}/${s.hp}</span><span>공격 ${s.atk}</span>
-          <span>방어 ${s.def}</span><span>이동 ${s.move}</span><span>사거리 ${s.range}</span>
+          <span>${escapeHtml(t('hud.hp', { current: unit.hp, max: s.hp }))}</span><span>${escapeHtml(t('hud.attackStat', { n: s.atk }))}</span>
+          <span>${escapeHtml(t('hud.defenseStat', { n: s.def }))}</span><span>${escapeHtml(t('hud.moveStat', { n: s.move }))}</span><span>${escapeHtml(t('hud.rangeStat', { n: s.range }))}</span>
         </div>`;
     } else if (tile) {
-      html = `<h3>${TERRAIN_NAMES[tile.terrain]}</h3>`;
+      html = `<h3>${escapeHtml(terrainName(tile.terrain))}</h3>`;
     }
-    if (hint) html += `<div class="hint">${hint}</div>`;
+    if (hint) html += `<div class="hint">${escapeHtml(hint)}</div>`;
     this.bottomPanel.innerHTML = html;
     this.bottomPanel.classList.add('show');
   }
@@ -152,22 +160,22 @@ export class Hud {
     onConfirm: () => void;
   }): void {
     const counterLine = o.kill
-      ? '<span style="color:#4f7a3a">반격 없음(처치)</span>'
+      ? `<span style="color:#4f7a3a">${escapeHtml(t('hud.noCounterKill'))}</span>`
       : o.counter !== null
-        ? `반격 예상 <b style="color:#8a4a1f">-${o.counter}</b>${o.die ? ' <b style="color:#a33636">(아군 전멸!)</b>' : ''}`
-        : '<span style="color:#4f7a3a">반격 없음</span>';
+        ? `${escapeHtml(t('hud.counterExpected'))} <b style="color:#8a4a1f">-${o.counter}</b>${o.die ? ` <b style="color:#a33636">${escapeHtml(t('hud.allyDestroyed'))}</b>` : ''}`
+        : `<span style="color:#4f7a3a">${escapeHtml(t('hud.noCounter'))}</span>`;
     this.bottomPanel.innerHTML = `
-      <h3>⚔ ${o.attackerName} → ${o.defenderName}</h3>
+      <h3>⚔ ${escapeHtml(o.attackerName)} → ${escapeHtml(o.defenderName)}</h3>
       <div class="stats">
-        <span>예상 피해 <b style="color:#a33636">-${o.damage}</b>${o.kill ? ' <b style="color:#a33636">(처치!)</b>' : ''}</span>
+        <span>${escapeHtml(t('hud.damageExpected'))} <b style="color:#a33636">-${o.damage}</b>${o.kill ? ` <b style="color:#a33636">${escapeHtml(t('hud.kill'))}</b>` : ''}</span>
         <span>${counterLine}</span>
       </div>
-      ${o.notes.length > 0 ? `<div class="stats">${o.notes.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
+      ${o.notes.length > 0 ? `<div class="stats">${o.notes.map((n) => `<span>${escapeHtml(n)}</span>`).join('')}</div>` : ''}
       <div style="display:flex; gap:8px; margin-top:8px;">
-        <button id="fc-attack" style="flex:1;height:42px;border-radius:10px;border:1.5px solid #8a6d14;background:#c9a227;font-weight:bold;font-size:15px;color:#2b2416;">공격</button>
-        <button id="fc-cancel" style="flex:1;height:42px;border-radius:10px;border:1.5px solid #8a6d14;background:#e5dbc2;font-size:15px;color:#2b2416;">취소</button>
+        <button id="fc-attack" style="flex:1;height:42px;border-radius:10px;border:1.5px solid #8a6d14;background:#c9a227;font-weight:bold;font-size:15px;color:#2b2416;">${escapeHtml(t('hud.attack'))}</button>
+        <button id="fc-cancel" style="flex:1;height:42px;border-radius:10px;border:1.5px solid #8a6d14;background:#e5dbc2;font-size:15px;color:#2b2416;">${escapeHtml(t('common.cancel'))}</button>
       </div>
-      <div class="hint">공격하면 이 유닛의 이번 턴 행동이 끝납니다</div>`;
+      <div class="hint">${escapeHtml(t('hud.attackEndsAction'))}</div>`;
     this.bottomPanel.querySelector('#fc-attack')!.addEventListener('click', o.onConfirm);
     this.bottomPanel
       .querySelector('#fc-cancel')!
@@ -181,15 +189,15 @@ export class Hud {
     const card = (type: UnitTypeId) => {
       const s = UNIT_STATS[type];
       return `<button class="prod-card" data-type="${type}" ${gold >= costFor(type) ? '' : 'disabled'}>
-        <b>${UNIT_NAMES[type]}</b>
+        <b>${escapeHtml(unitName(type))}</b>
         <span class="cost">${COIN_SVG}${costFor(type)}</span>
-        <span class="mini">공격 ${s.atk} · 방어 ${s.def}<br>이동 ${s.move} · 사거리 ${s.range}</span>
+        <span class="mini">${escapeHtml(t('hud.attackStat', { n: s.atk }))} · ${escapeHtml(t('hud.defenseStat', { n: s.def }))}<br>${escapeHtml(t('hud.moveStat', { n: s.move }))} · ${escapeHtml(t('hud.rangeStat', { n: s.range }))}</span>
       </button>`;
     };
     this.productionSheet.innerHTML = `
-      <h3>${buildingName} — 유닛 생산 <span class="gold">${COIN_SVG}${gold}</span></h3>
+      <h3>${escapeHtml(t('hud.production', { building: buildingName }))} <span class="gold">${COIN_SVG}${gold}</span></h3>
       <div class="prod-cards">${card('infantry')}${card('archer')}${card('cavalry')}</div>
-      <button class="close-btn">닫기</button>`;
+      <button class="close-btn">${escapeHtml(t('common.close'))}</button>`;
     for (const btn of this.productionSheet.querySelectorAll<HTMLButtonElement>('.prod-card')) {
       btn.addEventListener('click', () => this.handlers.onProduce(btn.dataset.type as UnitTypeId));
     }
@@ -213,9 +221,9 @@ export class Hud {
     onConfirm?: () => void,
   ): void {
     this.tutorialBar.innerHTML = `
-      <div class="step-label">튜토리얼 ${step}/${total}</div>
-      <p>${text}</p>
-      ${confirmLabel ? `<button id="tut-ok">${confirmLabel}</button>` : ''}`;
+      <div class="step-label">${escapeHtml(t('hud.tutorial', { step, total }))}</div>
+      <p>${escapeHtml(text)}</p>
+      ${confirmLabel ? `<button id="tut-ok">${escapeHtml(confirmLabel)}</button>` : ''}`;
     if (confirmLabel && onConfirm) {
       this.tutorialBar.querySelector('#tut-ok')!.addEventListener('click', onConfirm);
     }

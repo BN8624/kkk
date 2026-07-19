@@ -1,6 +1,8 @@
 // 한 줄 목적: 타입 안전 번역 t()·언어 저장·전환 알림·<html lang> 갱신을 제공한다(서버·외부 서비스 없음)
 import { EN } from './en';
 import { KO } from './ko';
+import type { ModifierId } from '../core/daily';
+import type { BuiltinScenarioId, FactionId } from '../core/types';
 
 export type Locale = 'ko' | 'en';
 export type MessageKey = keyof typeof KO;
@@ -57,4 +59,87 @@ export function onLocaleChange(fn: () => void): () => void {
 /** 부팅 시 현재 언어를 <html lang>에 반영한다. */
 export function applyDocumentLanguage(): void {
   if (typeof document !== 'undefined') document.documentElement.lang = current;
+}
+
+// ---------------- 정본 이름 헬퍼(FACTION_NAMES 등 정적 테이블의 언어 인식 대체) ----------------
+
+export function factionName(f: 'azure' | 'crimson' | 'violet'): string {
+  return t(`faction.${f}`);
+}
+
+export function unitName(u: 'infantry' | 'archer' | 'cavalry'): string {
+  return t(`unit.${u}`);
+}
+
+export function terrainName(x: 'plains' | 'forest' | 'mountain' | 'water'): string {
+  return t(`terrain.${x}`);
+}
+
+export function buildingName(b: 'capital' | 'village' | 'crown'): string {
+  return t(`building.${b}`);
+}
+
+export function difficultyName(d: 'easy' | 'normal' | 'hard'): string {
+  return t(`difficulty.${d}`);
+}
+
+export function scenarioName(id: BuiltinScenarioId): string {
+  return t(`scenario.${id}.name`);
+}
+
+export function scenarioDescription(id: BuiltinScenarioId): string {
+  return t(`scenario.${id}.description`);
+}
+
+export type DoctrineTextField =
+  | 'title'
+  | 'style'
+  | 'abilityName'
+  | 'abilityDesc'
+  | 'bonusDesc'
+  | 'startDesc'
+  | 'recommended';
+
+export function doctrineText(faction: FactionId, field: DoctrineTextField): string {
+  return t(`doctrine.${faction}.${field}`);
+}
+
+export function modifierName(id: ModifierId): string {
+  return t(`modifier.${id}.name`);
+}
+
+/** 현재 언어의 결과 공유 텍스트를 만든다. */
+export function resultShareText(opts: {
+  scenarioName: string;
+  difficultyName: string;
+  factionName: string;
+  outcome: 'win' | 'lose' | 'draw';
+  turns: number;
+  score: number;
+  captured: number;
+  kills: number;
+  seed: number;
+  daily?: boolean;
+  modifierName?: string;
+}): string {
+  const result =
+    opts.outcome === 'win'
+      ? t('share.win', { turns: opts.turns })
+      : t(opts.outcome === 'draw' ? 'share.draw' : 'share.lose');
+  return [
+    t('share.heading', {
+      scenario: opts.scenarioName,
+      difficulty: opts.difficultyName,
+      daily: opts.daily ? t('share.dailySuffix') : '',
+    }),
+    t('share.outcome', { faction: opts.factionName, result }),
+    t('share.stats', { score: opts.score, captured: opts.captured, kills: opts.kills }),
+    t('share.seed', {
+      modifier: opts.modifierName
+        ? t('share.modifierPrefix', { modifier: opts.modifierName })
+        : '',
+      seed: opts.seed,
+    }),
+    'https://bn8624.github.io/kkk/',
+  ].join('\n');
 }

@@ -1,6 +1,7 @@
 // 한 줄 목적: 일일 도전 결정론·수정자 효과·로컬 기록 집계를 검증한다
 import { describe, expect, it } from 'vitest';
-import { dailyChallenge, shareText, todayKey } from '../src/core/daily';
+import { dailyChallenge, todayKey } from '../src/core/daily';
+import { resultShareText } from '../src/i18n';
 import { advancePhase, newGame, unitCost, damageBreakdown } from '../src/core/game';
 import { emptyRecords, recordGame } from '../src/core/records';
 import { SCENARIOS } from '../src/core/scenarios';
@@ -84,7 +85,7 @@ describe('로컬 기록', () => {
   });
 
   it('공유 텍스트에 핵심 정보가 담긴다', () => {
-    const text = shareText({
+    const text = resultShareText({
       scenarioName: '갈라진 해협',
       difficultyName: '어려움',
       factionName: '진홍 공국',

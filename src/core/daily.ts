@@ -66,29 +66,3 @@ export function dailyChallenge(dateKey: string): DailyChallenge {
   const seed = (Math.floor(rng() * 0xffffffff) ^ base) >>> 0;
   return { dateKey, seed, scenario, faction, difficulty, modifier };
 }
-
-/** 결과 공유용 텍스트를 만든다. */
-export function shareText(opts: {
-  scenarioName: string;
-  difficultyName: string;
-  factionName: string;
-  outcome: 'win' | 'lose' | 'draw';
-  turns: number;
-  score: number;
-  captured: number;
-  kills: number;
-  seed: number;
-  daily?: boolean;
-  modifierName?: string;
-}): string {
-  const result =
-    opts.outcome === 'win' ? `${opts.turns}턴 승리` : opts.outcome === 'draw' ? '무승부' : '패배';
-  const lines = [
-    `세 왕관의 섬 — ${opts.scenarioName} / ${opts.difficultyName}${opts.daily ? ' / 일일 도전' : ''}`,
-    `${opts.factionName}으로 ${result}`,
-    `점수 ${opts.score} · 거점 ${opts.captured} · 처치 ${opts.kills}`,
-    `${opts.modifierName ? `수정자: ${opts.modifierName} · ` : ''}도전 시드: ${opts.seed}`,
-    'https://bn8624.github.io/kkk/',
-  ];
-  return lines.join('\n');
-}

@@ -2,43 +2,55 @@
 import { runAiTurn } from '../core/ai';
 import { humanFaction, isHumanTurn, tileAt, unitAt, unitById } from '../core/board';
 import { findEvent, issueCommand } from '../core/command';
-import { BUILDING_NAMES, DIFFICULTY_NAMES, FACTION_NAMES, UNIT_NAMES } from '../core/data';
-import { MODIFIERS, shareText, todayKey, type ModifierId } from '../core/daily';
-import { DOCTRINES } from '../core/doctrines';
+import { todayKey, type ModifierId } from '../core/daily';
 import { attackTargets, forecastAttack, newGame, unitCost } from '../core/game';
 import { reachableDestinations } from '../core/pathfind';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from '../core/records';
 import { clearSave, loadGame, saveGame, saveSettings } from '../core/save';
-import { SCENARIO_IDS, SCENARIOS, scenarioDisplayName } from '../core/scenarios';
+import { isBuiltinScenarioId, SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
 import type { Axial, FactionId, GameState, ScenarioId, Tile, Unit, UnitTypeId } from '../core/types';
+import {
+  buildingName,
+  difficultyName,
+  doctrineText,
+  factionName,
+  modifierName,
+  resultShareText,
+  scenarioDescription,
+  scenarioName,
+  t,
+  unitName,
+} from '../i18n';
 import { playEvents } from '../render/event-player';
 import { setSoundEnabled, sfx } from '../render/sound';
 import { ObservationTracker } from '../replay/observation';
 import { TestPlayBar } from '../ui/editor/testplay';
 import { showPauseScreen, showResultScreen } from '../ui/game/screens';
+import { escapeHtml } from '../ui/shared/dom';
 import { showSetupScreen, type GameSetup } from '../ui/setup';
 import type { AppContext } from '../app/app-shell';
 import type { AppController } from '../app/lifecycle';
 import type { LaunchOptions, PlaySession } from '../app/navigation';
 
-const FACTION_TOKEN_DESC: Record<FactionId, string> = {
-  azure: '남색',
-  crimson: '진홍색',
-  violet: '보라색',
-};
-
 function aiSpeedLabel(speed: number): string {
-  return speed === 2 ? '2배속' : speed === 0 ? '건너뛰기' : '기본';
+  return speed === 2
+    ? t('pause.aiSpeedDouble')
+    : speed === 0
+      ? t('pause.aiSpeedSkip')
+      : t('pause.aiSpeedNormal');
 }
 
 function describeFaction(f: FactionId): string {
-  const d = DOCTRINES[f];
   return (
-    `<b>${d.title}</b> — ${d.style}<br>` +
-    `⚔ <b>${d.abilityName}</b> · ${d.abilityDesc}<br>` +
-    `✦ ${d.bonusDesc} · ${d.startDesc}<br>` +
-    `<span style="opacity:.75">${d.recommended}</span>`
+    `<b>${escapeHtml(doctrineText(f, 'title'))}</b> — ${escapeHtml(doctrineText(f, 'style'))}<br>` +
+    `⚔ <b>${escapeHtml(doctrineText(f, 'abilityName'))}</b> · ${escapeHtml(doctrineText(f, 'abilityDesc'))}<br>` +
+    `✦ ${escapeHtml(doctrineText(f, 'bonusDesc'))} · ${escapeHtml(doctrineText(f, 'startDesc'))}<br>` +
+    `<span style="opacity:.75">${escapeHtml(doctrineText(f, 'recommended'))}</span>`
   );
+}
+
+function localizedScenarioName(id: string, state?: Pick<GameState, 'customScenario'>): string {
+  return isBuiltinScenarioId(id) ? scenarioName(id) : (state?.customScenario?.title ?? id);
 }
 
 export class PlayController implements AppController, PlaySession {
@@ -140,7 +152,11 @@ export class PlayController implements AppController, PlaySession {
     this.ctx.enterMode('setup');
     showSetupScreen(this.ctx.overlay, {
       describeFaction,
-      scenarios: SCENARIO_IDS.map((id) => SCENARIOS[id]),
+      scenarios: SCENARIO_IDS.map((id) => ({
+        ...SCENARIOS[id],
+        name: scenarioName(id),
+        description: scenarioDescription(id),
+      })),
       initial: this.lastSetup ?? undefined,
       onStart: (sel) => {
         this.lastSetup = sel;
@@ -161,7 +177,7 @@ export class PlayController implements AppController, PlaySession {
   continueGame(): void {
     const state = loadGame();
     if (!state) {
-      this.ctx.hud.toast('저장된 게임이 없습니다');
+      this.ctx.hud.toast(t('play.noSavedGame'));
       this.showSetup();
       return;
     }
@@ -243,21 +259,21 @@ export class PlayController implements AppController, PlaySession {
 
   private showTutorial(): void {
     const total = 5;
-    const color = FACTION_TOKEN_DESC[this._state ? this.human() : 'azure'];
+    const color = t(`tutorial.token.${this._state ? this.human() : 'azure'}`);
     const hud = this.ctx.hud;
     switch (this.tutorialStep) {
       case 1:
-        hud.showTutorialStep(1, total, `당신의 유닛(${color} 방패 토큰)을 탭하세요.`, null);
+        hud.showTutorialStep(1, total, t('tutorial.step1', { color }), null);
         break;
       case 2:
-        hud.showTutorialStep(2, total, '금색으로 강조된 타일을 탭해 이동하세요.', null);
+        hud.showTutorialStep(2, total, t('tutorial.step2'), null);
         break;
       case 3:
         hud.showTutorialStep(
           3,
           total,
-          '사거리 안의 적은 붉게 표시됩니다. 적 토큰을 탭하면 전투 예측이 뜨고, 공격 버튼이나 한 번 더 탭하면 공격합니다.',
-          '알겠습니다',
+          t('tutorial.step3'),
+          t('common.ok'),
           () => this.advanceTutorial(4),
         );
         break;
@@ -265,13 +281,13 @@ export class PlayController implements AppController, PlaySession {
         hud.showTutorialStep(
           4,
           total,
-          '중립 마을에 유닛을 올리면 점령합니다. 점령한 거점은 매 턴 금을 생산하고, 수도와 마을에서는 새 유닛을 생산할 수 있습니다.',
-          '알겠습니다',
+          t('tutorial.step4'),
+          t('common.ok'),
           () => this.advanceTutorial(5),
         );
         break;
       case 5:
-        hud.showTutorialStep(5, total, "오른쪽 아래 '턴 종료'를 누르면 적 세력들이 움직입니다.", null);
+        hud.showTutorialStep(5, total, t('tutorial.step5'), null);
         break;
       default:
         hud.hideTutorial();
@@ -364,10 +380,10 @@ export class PlayController implements AppController, PlaySession {
 
     let hint: string;
     if (this.moveDests.length > 0 && targets.length > 0)
-      hint = '강조된 타일로 이동하거나 붉은 칸의 적을 탭해 공격하세요';
-    else if (this.moveDests.length > 0) hint = '강조된 타일을 탭해 이동하세요';
-    else if (targets.length > 0) hint = '붉은 칸의 적을 탭해 공격하세요';
-    else hint = '이번 턴 행동을 마친 유닛입니다';
+      hint = t('play.hint.moveOrAttack');
+    else if (this.moveDests.length > 0) hint = t('play.hint.move');
+    else if (targets.length > 0) hint = t('play.hint.attack');
+    else hint = t('play.hint.done');
     this.ctx.hud.showUnitPanel(unit, null, hint);
 
     if (this.tutorialStep === 1) this.advanceTutorial(2);
@@ -390,12 +406,12 @@ export class PlayController implements AppController, PlaySession {
     const fc = forecastAttack(state, attacker, defender);
     this.pendingAttackId = defender.id;
     const notes: string[] = [];
-    if (fc.damage.atkBonus > 0) notes.push(`능력·수정자 공격 +${fc.damage.atkBonus}`);
+    if (fc.damage.atkBonus > 0) notes.push(t('play.attackBonus', { n: fc.damage.atkBonus }));
     const defTotal = fc.damage.terrainDef + fc.damage.doctrineDef;
-    if (defTotal > 0) notes.push(`상대 지형·거점 방어 +${defTotal}`);
+    if (defTotal > 0) notes.push(t('play.defenseBonus', { n: defTotal }));
     this.ctx.hud.showForecast({
-      attackerName: UNIT_NAMES[attacker.type],
-      defenderName: `${FACTION_NAMES[defender.faction]} ${UNIT_NAMES[defender.type]}`,
+      attackerName: unitName(attacker.type),
+      defenderName: `${factionName(defender.faction)} ${unitName(defender.type)}`,
       damage: fc.damage.total,
       counter: fc.counter?.total ?? null,
       kill: fc.defenderDies,
@@ -427,8 +443,11 @@ export class PlayController implements AppController, PlaySession {
       sfx.capture();
       await this.scene?.animateCapture(captured.at, captured.building !== 'village');
       const gold = findEvent(result.events, 'gold-changed');
-      const bonus = gold && gold.reason === 'capture-bonus' ? ` (+${gold.delta}금)` : '';
-      this.ctx.hud.toast(`${BUILDING_NAMES[captured.building]} 점령!${bonus}`);
+      const bonus =
+        gold && gold.reason === 'capture-bonus' ? t('play.captureGold', { n: gold.delta }) : '';
+      this.ctx.hud.toast(
+        t('play.capture', { building: buildingName(captured.building), bonus }),
+      );
     }
     this.ctx.hud.updateTop(state);
     this.persist(state);
@@ -477,7 +496,7 @@ export class PlayController implements AppController, PlaySession {
     const defenderDied = result.events.some((e) => e.type === 'unit-died' && e.unitId === defenderId);
     const attackerDied = result.events.some((e) => e.type === 'unit-died' && e.unitId === attackerId);
     if (defenderDied || attackerDied) sfx.hit();
-    if (defenderDied) this.ctx.hud.toast('적 유닛 처치!');
+    if (defenderDied) this.ctx.hud.toast(t('play.enemyDefeated'));
     this.ctx.hud.updateTop(state);
     this.persist(state);
     this._busy = false;
@@ -494,7 +513,7 @@ export class PlayController implements AppController, PlaySession {
     sfx.select();
     const gold = state.factions[this.human()].gold;
     this.ctx.hud.showProduction(
-      BUILDING_NAMES[tile.building!],
+      buildingName(tile.building!),
       gold,
       (t) => unitCost(this.human(), t),
     );
@@ -517,10 +536,10 @@ export class PlayController implements AppController, PlaySession {
     if (!result.ok) {
       this.ctx.hud.toast(
         result.reason === 'no-gold'
-          ? '금이 부족합니다'
+          ? t('play.noGold')
           : result.reason === 'unit-cap'
-            ? '유닛 수가 최대입니다'
-            : '지금은 생산할 수 없습니다',
+            ? t('play.unitCap')
+            : t('play.cannotProduce'),
       );
       return;
     }
@@ -529,7 +548,7 @@ export class PlayController implements AppController, PlaySession {
     sfx.capture();
     const produced = findEvent(result.events, 'unit-produced')!;
     void this.scene?.animateSpawn(produced.unitId);
-    this.ctx.hud.toast(`${UNIT_NAMES[type]} 생산 완료 — 다음 턴부터 행동합니다`);
+    this.ctx.hud.toast(t('play.produced', { unit: unitName(type) }));
     this.ctx.hud.updateTop(state);
     this.persist(state);
   }
@@ -590,7 +609,7 @@ export class PlayController implements AppController, PlaySession {
       state.tiles.find((t) => t.building === 'capital' && t.owner === me) ??
       state.units.find((u) => u.faction === me);
     if (home) this.scene?.panTo({ q: home.q, r: home.r });
-    hud.toast(`${state.turn}턴 — 당신의 차례입니다`);
+    hud.toast(t('play.yourTurn', { turn: state.turn }));
     this.observations.markPhaseStart();
     this._busy = false;
     hud.setEndTurnEnabled(true);
@@ -636,9 +655,9 @@ export class PlayController implements AppController, PlaySession {
   private showResult(state: GameState, outcome: RecordOutcome): void {
     const modifier = state.config.modifier as ModifierId | undefined;
     showResultScreen(this.ctx.overlay, state, {
-      scenarioName: scenarioDisplayName(state.config.scenario, state),
-      difficultyName: DIFFICULTY_NAMES[state.config.difficulty],
-      modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
+      scenarioName: localizedScenarioName(state.config.scenario, state),
+      difficultyName: difficultyName(state.config.difficulty),
+      modifierName: modifier ? modifierName(modifier) : undefined,
       prevBest: outcome.prevBestScore,
       isNewBest: outcome.isNewBest,
       onOpenReplay: this.ctx.replays.hasLastReplay
@@ -658,10 +677,10 @@ export class PlayController implements AppController, PlaySession {
   private async shareResult(outcome: RecordOutcome): Promise<void> {
     const e = outcome.entry;
     const modifier = this._state?.config.modifier as ModifierId | undefined;
-    const text = shareText({
-      scenarioName: scenarioDisplayName(e.scenario, this._state ?? undefined),
-      difficultyName: DIFFICULTY_NAMES[e.difficulty],
-      factionName: FACTION_NAMES[e.faction],
+    const text = resultShareText({
+      scenarioName: localizedScenarioName(e.scenario, this._state ?? undefined),
+      difficultyName: difficultyName(e.difficulty),
+      factionName: factionName(e.faction),
       outcome: e.outcome,
       turns: e.turns,
       score: e.score,
@@ -669,7 +688,7 @@ export class PlayController implements AppController, PlaySession {
       kills: e.kills,
       seed: e.seed,
       daily: e.mode === 'daily',
-      modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
+      modifierName: modifier ? modifierName(modifier) : undefined,
     });
     try {
       if (navigator.share) {
@@ -681,9 +700,9 @@ export class PlayController implements AppController, PlaySession {
     }
     try {
       await navigator.clipboard.writeText(text);
-      this.ctx.hud.toast('결과를 클립보드에 복사했습니다');
+      this.ctx.hud.toast(t('play.copied'));
     } catch {
-      this.ctx.hud.toast('공유를 지원하지 않는 환경입니다');
+      this.ctx.hud.toast(t('play.shareUnavailable'));
     }
   }
 

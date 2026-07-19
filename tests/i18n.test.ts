@@ -1,6 +1,13 @@
 // 한 줄 목적: ko/en 사전의 키 완전성·자리 표시자 정합·언어 전환 동작을 검증한다
 import { afterEach, describe, expect, it } from 'vitest';
-import { getLocale, onLocaleChange, setLocale, t, type MessageKey } from '../src/i18n';
+import {
+  getLocale,
+  onLocaleChange,
+  resultShareText,
+  setLocale,
+  t,
+  type MessageKey,
+} from '../src/i18n';
 import { EN } from '../src/i18n/en';
 import { KO } from '../src/i18n/ko';
 
@@ -49,5 +56,26 @@ describe('언어 전환', () => {
     off();
     setLocale('ko');
     expect(calls).toBe(1);
+  });
+
+  it('영어 결과 공유 문자열의 동적 값까지 번역한다', () => {
+    setLocale('en');
+    const text = resultShareText({
+      scenarioName: 'Broken Strait',
+      difficultyName: 'Hard',
+      factionName: 'Crimson Duchy',
+      outcome: 'win',
+      turns: 9,
+      score: 86,
+      captured: 5,
+      kills: 8,
+      seed: 20260719,
+      daily: true,
+      modifierName: 'Sharp Arrows',
+    });
+    expect(text).toContain('Victory in 9 turns');
+    expect(text).toContain('Daily Challenge');
+    expect(text).toContain('Modifier: Sharp Arrows');
+    expect(text).not.toMatch(/[가-힣]/);
   });
 });
