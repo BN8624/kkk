@@ -17,7 +17,7 @@ import {
   HIGHGROUND_TERRAINS,
   VIOLET_ARCHER_RANGE,
 } from './doctrines';
-import { hexDistance, hexKey } from './hex';
+import { hexDistance, hexKey, neighbors } from './hex';
 import { movementRange, reconstructPath } from './pathfind';
 import { isBuiltinScenarioId } from './scenarios';
 import { builtinScenarioSnapshot, objectivesFromSnapshot } from './scenario/builtin';
@@ -536,12 +536,30 @@ export function advancePhase(state: GameState): void {
   if (state.crownHold && hold) {
     const crownTile = tileAt(state, hold.at.q, hold.at.r);
     const owner = crownTile?.owner ?? null;
-    if (owner && owner === state.crownHold.owner) state.crownHold.turns++;
-    else state.crownHold = { owner, turns: owner ? 1 : 0 };
-    if (owner && state.crownHold.turns >= hold.turns) {
-      state.over = true;
-      state.winner = owner;
-      return;
+    const activationTurn = hold.activationTurn;
+    // 활성화 전: 소유만 추적하고 카운트·승리는 없다
+    if (activationTurn !== undefined && state.turn < activationTurn) {
+      state.crownHold = { owner, turns: 0 };
+    } else if (!owner) {
+      state.crownHold = { owner: null, turns: 0 };
+    } else {
+      const garrisoned = state.units.some(
+        (u) => u.faction === owner && u.q === hold.at.q && u.r === hold.at.r,
+      );
+      const enemyAdjacent = neighbors(hold.at).some((n) =>
+        state.units.some((u) => u.faction !== owner && u.q === n.q && u.r === n.r),
+      );
+      const contested = enemyAdjacent && !garrisoned;
+      if (owner !== state.crownHold.owner) {
+        state.crownHold = { owner, turns: contested ? 0 : 1 };
+      } else if (!contested) {
+        state.crownHold.turns++;
+      }
+      if (state.crownHold.turns >= hold.turns) {
+        state.over = true;
+        state.winner = owner;
+        return;
+      }
     }
   }
   state.turn++;

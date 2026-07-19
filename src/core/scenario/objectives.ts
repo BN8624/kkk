@@ -6,9 +6,11 @@ import type { DefeatCondition, StarCondition, VictoryCondition } from './types';
 /** 첫 hold-building 승리 조건을 반환한다(연속 보유 추적 대상). */
 export function holdVictoryCondition(
   state: GameState,
-): { at: { q: number; r: number }; turns: number } | null {
+): { at: { q: number; r: number }; turns: number; activationTurn?: number } | null {
   for (const c of state.objectives.victory) {
-    if (c.type === 'hold-building') return { at: c.at, turns: c.turns };
+    if (c.type === 'hold-building') {
+      return { at: c.at, turns: c.turns, activationTurn: c.activationTurn };
+    }
   }
   return null;
 }

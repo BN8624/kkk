@@ -1,7 +1,8 @@
 // 한 줄 목적: 시드 기반 결정론적 시나리오 지도 생성과 자동 검증·재생성·fallback을 담당한다
 import { FACTION_IDS } from './data';
-import { hexDistance, hexKey, hexLine, offsetToAxial } from './hex';
+import { hexDistance, hexesInRange, hexKey, hexLine, offsetToAxial } from './hex';
 import { mulberry32, shuffle, type Rng } from './rng';
+import { analyzeObjectiveArrival } from './scenario/arrival';
 import type { Axial, FactionId, BuiltinScenarioId, Tile } from './types';
 
 export const MAP_COLS = 9;
@@ -192,22 +193,81 @@ function genBrokenStrait(seed: number): GeneratedMap {
   return { tiles: [...tiles.values()], capitals };
 }
 
-/** 시나리오 3 — 왕관의 심장: 중앙 왕관 요새를 연속 보유하면 승리 */
-function genCrownHeart(seed: number): GeneratedMap {
-  const rng = mulberry32(seed);
-  const tiles = baseIsland(rng);
-  const capitals = placeCapitals(tiles);
-  // 세 수도에서 최대 거리 격차 1의 준등거리 지점(기병이 빠른 진홍이 한 칸 멀다)
-  const crown = offsetToAxial(4, 5);
+/** 후보 맵에 왕관을 배치하고 인접 물을 평원으로 개통한다. */
+function applyCrownAt(tiles: Map<string, Tile>, crown: Axial): void {
   const crownTile = tiles.get(hexKey(crown.q, crown.r))!;
   crownTile.terrain = 'plains';
   crownTile.building = 'crown';
   crownTile.owner = undefined;
-  // 요새 주변 1칸은 지상 보장(포위전이 성립하도록)
   for (const dir of HEX_DIRS) {
     const t = tiles.get(hexKey(crown.q + dir.q, crown.r + dir.r));
     if (t && t.terrain === 'water') t.terrain = 'plains';
   }
+}
+
+/** 타일 맵을 얕은 복제한다(후보 평가용). */
+function cloneTileMap(tiles: Map<string, Tile>): Map<string, Tile> {
+  const out = new Map<string, Tile>();
+  for (const [k, t] of tiles) out.set(k, { ...t });
+  return out;
+}
+
+/** 시나리오 3 — 왕관의 심장: 중앙 후보 중 도착 공정성을 만족하는 왕관 위치를 고른다 */
+function genCrownHeart(seed: number): GeneratedMap {
+  const rng = mulberry32(seed);
+  const tiles = baseIsland(rng);
+  const capitals = placeCapitals(tiles);
+  const center = offsetToAxial(4, 6);
+
+  type CrownCandidate = {
+    cand: Axial;
+    maxGap: number;
+    minEarliest: number;
+    distCenter: number;
+    passableAdj: number;
+  };
+  const candidates: CrownCandidate[] = [];
+  for (const cand of hexesInRange(center, 2)) {
+    const base = tiles.get(hexKey(cand.q, cand.r));
+    if (!base || base.building === 'capital' || base.building === 'village') continue;
+    const trial = cloneTileMap(tiles);
+    applyCrownAt(trial, cand);
+    const trialMap: GeneratedMap = {
+      tiles: [...trial.values()],
+      capitals,
+      crown: cand,
+    };
+    const rep = analyzeObjectiveArrival(trialMap, cand);
+    const earliest = FACTION_IDS.map((f) => rep.earliestByFaction[f]);
+    if (!earliest.every((n) => Number.isFinite(n))) continue;
+    const minEarliest = Math.min(...earliest);
+    if (minEarliest < 2 || rep.maxGap > 1) continue;
+    let passableAdj = 0;
+    for (const dir of HEX_DIRS) {
+      const t = trial.get(hexKey(cand.q + dir.q, cand.r + dir.r));
+      if (t && t.terrain !== 'water') passableAdj++;
+    }
+    candidates.push({
+      cand,
+      maxGap: rep.maxGap,
+      minEarliest,
+      distCenter: hexDistance(cand, center),
+      passableAdj,
+    });
+  }
+
+  candidates.sort((a, b) => {
+    if (a.maxGap !== b.maxGap) return a.maxGap - b.maxGap;
+    if (a.minEarliest !== b.minEarliest) return b.minEarliest - a.minEarliest;
+    if (a.distCenter !== b.distCenter) return a.distCenter - b.distCenter;
+    if (a.passableAdj !== b.passableAdj) return b.passableAdj - a.passableAdj;
+    if (a.cand.q !== b.cand.q) return a.cand.q - b.cand.q;
+    return a.cand.r - b.cand.r;
+  });
+
+  // 유효 후보가 없으면 중앙 배치(검증 실패 시 상위 repair·static fallback이 이어진다)
+  const crown = candidates[0]?.cand ?? center;
+  applyCrownAt(tiles, crown);
   const villages = placeVillages(tiles, rng, capitals, 4, crown);
   finishConnectivity(tiles, capitals, [crown, ...villages]);
   return { tiles: [...tiles.values()], capitals, crown };
@@ -254,10 +314,16 @@ export function validateMap(map: GeneratedMap): string[] {
     if (!isReachable(byKey, base, b)) issues.push(`unreachable:${b.q},${b.r}`);
   }
 
-  // 공정성: 왕관 요새까지 수도별 거리 격차 2 이하
+  // 공정성: 왕관 요새까지 세력별 실제 도착 턴(1턴 점령 불가·격차 1 이하)
   if (map.crown) {
-    const dists = FACTION_IDS.map((f) => hexDistance(map.capitals[f], map.crown!));
-    if (Math.max(...dists) - Math.min(...dists) > 2) issues.push('crown-unfair');
+    const rep = analyzeObjectiveArrival(map, map.crown);
+    const earliest = FACTION_IDS.map((f) => rep.earliestByFaction[f]);
+    if (earliest.some((n) => !Number.isFinite(n))) issues.push('crown-unreachable');
+    else {
+      const minEarliest = Math.min(...earliest);
+      if (minEarliest < 2) issues.push('crown-turn1');
+      if (rep.maxGap > 1) issues.push('crown-arrival-unfair');
+    }
   }
   // 공정성: 가장 가까운 마을 거리 격차 4 이하
   const villages = buildings.filter((t) => t.building === 'village');
@@ -316,7 +382,8 @@ function staticFallbackMap(scenario: BuiltinScenarioId): GeneratedMap {
   }
   let crown: Axial | undefined;
   if (scenario === 'crown-heart') {
-    crown = offsetToAxial(4, 5);
+    // 전평원에서 중앙(4,6)이 min>=2·gap<=1 을 만족한다
+    crown = offsetToAxial(4, 6);
     const t = tiles.get(hexKey(crown.q, crown.r))!;
     t.building = 'crown';
     t.owner = undefined;

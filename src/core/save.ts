@@ -126,6 +126,7 @@ function migrateV2(state: GameState): GameState | null {
         type: 'hold-building',
         at: { q: crown.q, r: crown.r },
         turns: def.crownHoldTurns ?? 4,
+        activationTurn: def.crownActivationTurn,
       });
     }
   }

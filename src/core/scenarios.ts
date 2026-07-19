@@ -10,6 +10,8 @@ export interface ScenarioDefinition {
   victory: 'conquest' | 'crown-hold';
   /** crown-hold: 왕관 요새를 이 턴 수만큼 연속 보유하면 승리 */
   crownHoldTurns?: number;
+  /** crown-hold: 이 라운드부터 연속 보유 카운트가 시작된다(활성화 지연). */
+  crownActivationTurn?: number;
 }
 
 export const SCENARIOS: Record<BuiltinScenarioId, ScenarioDefinition> = {
@@ -34,6 +36,7 @@ export const SCENARIOS: Record<BuiltinScenarioId, ScenarioDefinition> = {
     maxTurns: 14,
     victory: 'crown-hold',
     crownHoldTurns: 4,
+    crownActivationTurn: 3,
   },
 };
 

@@ -13,7 +13,7 @@ import type {
 /** 승리 조건. conquest·hold-building은 모든 세력에 대칭 적용, 나머지는 인간 세력 기준이다. */
 export type VictoryCondition =
   | { type: 'conquest' } // 한 세력이 모든 수도 점령
-  | { type: 'hold-building'; at: Axial; turns: number } // 지정 거점 N턴 연속 보유(대칭)
+  | { type: 'hold-building'; at: Axial; turns: number; activationTurn?: number } // 지정 거점 N턴 연속 보유(대칭)
   | { type: 'capture-building'; at: Axial } // 지정 거점 점령
   | { type: 'capture-count'; building: BuildingId; count: number } // 지정 종류 거점 N개 보유
   | { type: 'eliminate-faction'; faction: FactionId } // 지정 세력 제거
