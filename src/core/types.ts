@@ -90,6 +90,25 @@ export interface GameState {
   cmdSeq?: number;
   /** 성공한 명령 전체 기록(리플레이 생성용). 규칙에는 영향을 주지 않으며 다이제스트에서 제외된다 */
   commandLog?: GameCommand[];
+  /** 인간 행동 관측 기록(리플레이 v2 관측 메타데이터). 규칙·다이제스트에 영향을 주지 않는다 */
+  observationLog?: ReplayObservation[];
+}
+
+/**
+ * 명령 하나에 대한 사용자 행동 관측(결정론 게임 명령과 분리된 선택적 메타데이터).
+ * 상대 시간(ms)만 기록하며 실제 벽시계 시각·개인 식별 정보는 담지 않는다.
+ */
+export interface ReplayObservation {
+  /** 관측 대상 명령의 순번 */
+  commandSeq: number;
+  /** 직전 인간 명령(또는 인간 차례 시작)부터 이 명령까지 걸린 시간. 백그라운드 시간 제외 */
+  elapsedMs?: number;
+  /** 이 명령을 만든 선택이 시작된 시점부터 명령까지의 망설임 시간 */
+  hesitationMs?: number;
+  /** 직전 명령 이후 명령 없이 취소한 선택 횟수 */
+  canceledSelectionCount?: number;
+  /** 직전 명령 이후 사용자가 카메라를 움직인 횟수(드래그 제스처 단위) */
+  cameraMoves?: number;
 }
 
 export interface UnitStats {

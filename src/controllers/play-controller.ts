@@ -13,6 +13,7 @@ import { SCENARIO_IDS, SCENARIOS, scenarioDisplayName } from '../core/scenarios'
 import type { Axial, FactionId, GameState, ScenarioId, Tile, Unit, UnitTypeId } from '../core/types';
 import { playEvents } from '../render/event-player';
 import { setSoundEnabled, sfx } from '../render/sound';
+import { ObservationTracker } from '../replay/observation';
 import { TestPlayBar } from '../ui/editor/testplay';
 import { showPauseScreen, showResultScreen } from '../ui/game/screens';
 import { showSetupScreen, type GameSetup } from '../ui/setup';
@@ -54,8 +55,15 @@ export class PlayController implements AppController, PlaySession {
   private testPlay = false;
   private spectate = false;
   private testPlayBar: TestPlayBar | null = null;
+  private observations = new ObservationTracker();
+  private onVisibility = (): void => {
+    if (document.visibilityState === 'hidden') this.observations.onHidden();
+    else this.observations.onVisible();
+  };
 
-  constructor(private ctx: AppContext) {}
+  constructor(private ctx: AppContext) {
+    document.addEventListener('visibilitychange', this.onVisibility);
+  }
 
   get state(): GameState | null {
     return this._state;
@@ -191,6 +199,7 @@ export class PlayController implements AppController, PlaySession {
     const scene = this.ctx.ensureBoard(state);
     scene.clearHighlights();
     scene.showSelection(null);
+    this.observations.reset();
     // 끝난 게임이 저장돼 있던 극단적 경우: 즉시 결과 처리
     if (state.over) {
       this.finishGame();
@@ -199,6 +208,8 @@ export class PlayController implements AppController, PlaySession {
     // 저장 시점이 AI 차례였다면(또는 관전이면) 남은 AI 턴을 이어서 진행한다
     if (this.spectate || !isHumanTurn(state)) {
       void this.runAiPhases();
+    } else {
+      this.observations.markPhaseStart();
     }
   }
 
@@ -336,6 +347,7 @@ export class PlayController implements AppController, PlaySession {
     const state = this._state!;
     const unit = unitById(state, unitId)!;
     this.selectedUnitId = unitId;
+    this.observations.onSelect();
     sfx.select();
 
     this.moveDests = unit.moved
@@ -362,6 +374,7 @@ export class PlayController implements AppController, PlaySession {
   }
 
   private deselect(): void {
+    if (this.selectedUnitId !== null) this.observations.onDeselect();
     this.selectedUnitId = null;
     this.pendingAttackId = null;
     this.moveDests = [];
@@ -405,6 +418,7 @@ export class PlayController implements AppController, PlaySession {
       this.deselect();
       return;
     }
+    this.observations.record(state, result.command.seq);
     sfx.move();
     const moved = findEvent(result.events, 'unit-moved')!;
     await this.scene?.animateMove(unitId, moved.path);
@@ -446,6 +460,7 @@ export class PlayController implements AppController, PlaySession {
       this.deselect();
       return;
     }
+    this.observations.record(state, result.command.seq);
     sfx.attack();
     // 이벤트가 공격 시점 좌표를 보존하므로 사망 유닛도 정확한 위치에서 연출된다
     const atk = findEvent(result.events, 'unit-attacked')!;
@@ -509,6 +524,7 @@ export class PlayController implements AppController, PlaySession {
       );
       return;
     }
+    this.observations.record(state, result.command.seq);
     this.closeProduction();
     sfx.capture();
     const produced = findEvent(result.events, 'unit-produced')!;
@@ -526,7 +542,8 @@ export class PlayController implements AppController, PlaySession {
     this.deselect();
     this.closeProduction();
     if (this.tutorialStep === 5) this.advanceTutorial(6);
-    issueCommand(state, { type: 'end-phase' }, 'human'); // 인간 페이즈 종료 → 다음 세력
+    const result = issueCommand(state, { type: 'end-phase' }, 'human'); // 인간 페이즈 종료 → 다음 세력
+    if (result.ok) this.observations.record(state, result.command.seq);
     await this.runAiPhases();
   }
 
@@ -574,6 +591,7 @@ export class PlayController implements AppController, PlaySession {
       state.units.find((u) => u.faction === me);
     if (home) this.scene?.panTo({ q: home.q, r: home.r });
     hud.toast(`${state.turn}턴 — 당신의 차례입니다`);
+    this.observations.markPhaseStart();
     this._busy = false;
     hud.setEndTurnEnabled(true);
   }
@@ -669,6 +687,11 @@ export class PlayController implements AppController, PlaySession {
     }
   }
 
+  /** 보드 카메라를 사용자가 드래그·핀치로 움직임(관측 메타데이터용). */
+  onCameraDrag(): void {
+    if (this.ctx.mode === 'play' && this._state && !this._state.over) this.observations.onCameraMove();
+  }
+
   /** E2E 브리지: 선택 유닛의 공격 가능 대상. */
   targetsOf(id: number): { id: number; q: number; r: number }[] {
     const u = this._state ? unitById(this._state, id) : null;
@@ -678,6 +701,7 @@ export class PlayController implements AppController, PlaySession {
   }
 
   dispose(): void {
+    document.removeEventListener('visibilitychange', this.onVisibility);
     this.testPlayBar?.destroy();
     this.testPlayBar = null;
     this._state = null;

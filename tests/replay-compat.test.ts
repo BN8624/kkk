@@ -1,6 +1,6 @@
 // 한 줄 목적: 리플레이 게임 버전 호환 판정(exact·migratable·playable-unverified·unsupported)과 마이그레이션 기제를 검증한다
 import { describe, expect, it } from 'vitest';
-import { GAME_VERSION, type ReplayDocumentV1 } from '../src/core/replay';
+import { GAME_VERSION, type ReplayDocument } from '../src/core/replay';
 import {
   checkReplayCompatibility,
   compatibilityLabel,
@@ -9,7 +9,7 @@ import {
   type ReplayRuleVersion,
 } from '../src/core/replay-compat';
 
-function docWithVersion(gameVersion: string): Pick<ReplayDocumentV1, 'gameVersion'> {
+function docWithVersion(gameVersion: string): Pick<ReplayDocument, 'gameVersion'> {
   return { gameVersion };
 }
 
@@ -73,7 +73,7 @@ describe('호환 판정', () => {
 
 describe('마이그레이션 기제', () => {
   it('migratable 항목은 migrate 결과를 돌려주고, 실패·예외 시 unsupported로 강등된다', () => {
-    const migratedDoc = { gameVersion: GAME_VERSION } as ReplayDocumentV1;
+    const migratedDoc = { gameVersion: GAME_VERSION } as ReplayDocument;
     const registry: ReplayRuleVersion[] = [
       { versionRange: '1.4.x', compatibility: 'migratable', migrate: () => migratedDoc },
       { versionRange: '1.3.x', compatibility: 'migratable', migrate: () => null },

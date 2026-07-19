@@ -1,5 +1,5 @@
 // 한 줄 목적: 리플레이의 게임 규칙 버전 호환 판정(exact·migratable·playable-unverified·unsupported)과 마이그레이션
-import { GAME_VERSION, type ReplayDocumentV1 } from './replay';
+import { GAME_VERSION, type ReplayDocument } from './replay';
 
 /**
  * 호환 등급.
@@ -15,7 +15,7 @@ export interface ReplayRuleVersion {
   versionRange: string;
   compatibility: ReplayCompatibility;
   /** migratable일 때 필수: 현재 문서 형식으로 변환한다(예외를 던지지 않아야 한다). */
-  migrate?: (doc: ReplayDocumentV1) => ReplayDocumentV1 | null;
+  migrate?: (doc: ReplayDocument) => ReplayDocument | null;
 }
 
 export interface CompatibilityDecision {
@@ -23,7 +23,7 @@ export interface CompatibilityDecision {
   /** 사용자에게 보여 줄 판정 이유. */
   reason: string;
   /** migratable 판정 시 변환된 문서. */
-  migrated?: ReplayDocumentV1;
+  migrated?: ReplayDocument;
 }
 
 /** 'a.b.x' 패턴 또는 정확한 버전과 대조한다. 형식이 어긋나면 false. */
@@ -64,7 +64,7 @@ function cmpVersion(a: [number, number, number], b: [number, number, number]): n
  * 레지스트리에 없는 미래·중간 버전은 재생만 가능(playable-unverified)으로 취급한다.
  */
 export function checkReplayCompatibility(
-  doc: Pick<ReplayDocumentV1, 'gameVersion'>,
+  doc: Pick<ReplayDocument, 'gameVersion'>,
   registry: ReplayRuleVersion[] = REPLAY_RULE_VERSIONS,
 ): CompatibilityDecision {
   const parsed = parseVersion(doc.gameVersion);
@@ -74,9 +74,9 @@ export function checkReplayCompatibility(
   for (const entry of registry) {
     if (!matchVersionRange(doc.gameVersion, entry.versionRange)) continue;
     if (entry.compatibility === 'migratable') {
-      let migrated: ReplayDocumentV1 | null = null;
+      let migrated: ReplayDocument | null = null;
       try {
-        migrated = entry.migrate ? entry.migrate(doc as ReplayDocumentV1) : null;
+        migrated = entry.migrate ? entry.migrate(doc as ReplayDocument) : null;
       } catch {
         migrated = null;
       }

@@ -8,7 +8,7 @@ import {
   scanStructure,
 } from '../src/core/decode';
 import { newGame } from '../src/core/game';
-import { buildReplayDocument, type ReplayDocumentV1 } from '../src/core/replay';
+import { buildReplayDocument, type ReplayDocument } from '../src/core/replay';
 import { decodeReplayDocument, safeVerifyReplay } from '../src/core/replay-decode';
 import { CAMPAIGNS } from '../src/core/campaign/missions';
 import { normalizeScenario } from '../src/core/scenario/normalize';
@@ -28,7 +28,7 @@ function playFullGame(state: GameState): void {
 }
 
 /** 검증 완료된 실제 리플레이 문서(테스트 공용). */
-function validReplay(): ReplayDocumentV1 {
+function validReplay(): ReplayDocument {
   const state = newGame(20260719, { scenario: 'three-crowns', humanFaction: 'azure', difficulty: 'normal' });
   playFullGame(state);
   const doc = buildReplayDocument(state, {
@@ -39,7 +39,7 @@ function validReplay(): ReplayDocumentV1 {
   return doc!;
 }
 
-function mutated(doc: ReplayDocumentV1, patch: (d: Record<string, unknown>) => void): unknown {
+function mutated(doc: ReplayDocument, patch: (d: Record<string, unknown>) => void): unknown {
   const copy = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
   patch(copy);
   return copy;

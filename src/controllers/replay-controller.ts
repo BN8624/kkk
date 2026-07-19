@@ -4,7 +4,8 @@ import { factionScore } from '../core/game';
 import {
   buildReplayDocument,
   REPLAY_MAX_IMPORT_BYTES,
-  type ReplayDocumentV1,
+  upgradeStoredReplay,
+  type ReplayDocument,
 } from '../core/replay';
 import { decodeReplayDocument, safeVerifyReplay } from '../core/replay-decode';
 import { checkReplayCompatibility, compatibilityLabel } from '../core/replay-compat';
@@ -32,7 +33,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
   private speed: 1 | 2 | 4 = 1;
   private stepBusy = false;
   private controls: ReplayControls | null = null;
-  private lastReplay: ReplayDocumentV1 | null = null;
+  private lastReplay: ReplayDocument | null = null;
 
   constructor(private ctx: AppContext) {}
 
@@ -74,9 +75,9 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     try {
       const summaries = await documentStore().list('replays');
       for (const s of summaries) {
-        const rec = await documentStore().get<ReplayDocumentV1>('replays', s.id);
-        const doc = rec?.data;
-        if (!doc || doc.schemaVersion !== 1) continue;
+        const rec = await documentStore().get<ReplayDocument>('replays', s.id);
+        const doc = upgradeStoredReplay(rec?.data);
+        if (!doc) continue;
         const me = doc.initialConfig.humanFaction;
         const compat = checkReplayCompatibility(doc);
         items.push({
@@ -129,14 +130,15 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
   private async openReplayById(id: string): Promise<void> {
     const token = this.ctx.currentToken();
     const rec = await documentStore()
-      .get<ReplayDocumentV1>('replays', id)
+      .get<ReplayDocument>('replays', id)
       .catch(() => null);
     if (!token.alive) return;
-    if (!rec?.data) {
+    const doc = upgradeStoredReplay(rec?.data);
+    if (!doc) {
       this.ctx.hud.toast('리플레이를 불러오지 못했습니다');
       return;
     }
-    this.openPlayback(rec.data);
+    this.openPlayback(doc);
   }
 
   // ---------------- 재생 ----------------
@@ -145,7 +147,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
    * 리플레이 재생 화면을 연다. exact 계열은 전체 재생 검증으로 재생 가능성을 보장한다.
    * unverified: 다른 규칙 버전의 기록 — 검증 없이 재생만 하며 결과를 정본으로 취급하지 않는다.
    */
-  openPlayback(doc: ReplayDocumentV1, opts: { unverified?: boolean } = {}): void {
+  openPlayback(doc: ReplayDocument, opts: { unverified?: boolean } = {}): void {
     if (!opts.unverified && !safeVerifyReplay(doc).ok) {
       this.ctx.hud.toast('재생할 수 없는 리플레이입니다');
       return;
@@ -182,7 +184,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
   }
 
   /** 분석 화면에서 특정 턴으로 바로 이동해 재생을 연다. */
-  openPlaybackAtTurn(doc: ReplayDocumentV1, turn: number): void {
+  openPlaybackAtTurn(doc: ReplayDocument, turn: number): void {
     this.openPlayback(doc);
     const pb = this.playback;
     if (!pb) return; // 검증 실패로 열리지 않은 경우
@@ -282,7 +284,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
 
   private async exportReplay(id: string): Promise<void> {
     const rec = await documentStore()
-      .get<ReplayDocumentV1>('replays', id)
+      .get<ReplayDocument>('replays', id)
       .catch(() => null);
     if (!rec?.data) {
       this.ctx.hud.toast('리플레이를 불러오지 못했습니다');
@@ -299,7 +301,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
 
   private async shareReplay(id: string): Promise<void> {
     const rec = await documentStore()
-      .get<ReplayDocumentV1>('replays', id)
+      .get<ReplayDocument>('replays', id)
       .catch(() => null);
     if (!rec?.data) {
       this.ctx.hud.toast('리플레이를 불러오지 못했습니다');

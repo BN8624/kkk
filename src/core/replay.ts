@@ -6,9 +6,11 @@ import { starCount } from './scenario/objectives';
 import { builtinScenarioSnapshot } from './scenario/builtin';
 import { isBuiltinScenarioId } from './scenarios';
 import type { ScenarioRuntimeSnapshot } from './scenario/types';
-import type { FactionId, GameConfig, GameState } from './types';
+import type { FactionId, GameConfig, GameState, ReplayObservation } from './types';
 
-export const REPLAY_SCHEMA_VERSION = 1;
+export type { ReplayObservation } from './types';
+
+export const REPLAY_SCHEMA_VERSION = 2;
 /** 리플레이를 기록한 게임 버전(공개판 마감 시 package.json과 함께 올린다). */
 export const GAME_VERSION = '1.5.0';
 
@@ -106,7 +108,7 @@ export function scenarioDigest(snapshot: ScenarioRuntimeSnapshot): string {
   return digestString(canonicalJson(snapshot));
 }
 
-// ---------------- ReplayDocument v1 ----------------
+// ---------------- ReplayDocument (v2 현행 · v1 역사) ----------------
 
 export interface ReplayResult {
   winner: FactionId | 'draw';
@@ -117,8 +119,8 @@ export interface ReplayResult {
   stars: number;
 }
 
-export interface ReplayDocumentV1 {
-  schemaVersion: typeof REPLAY_SCHEMA_VERSION;
+/** v1·v2가 공유하는 정본 필드. 결정론 검증은 이 필드들만 사용한다. */
+interface ReplayDocumentBase {
   gameVersion: string;
 
   replayId: string;
@@ -138,6 +140,53 @@ export interface ReplayDocumentV1 {
   finalStateDigest: string;
 }
 
+/** 역사적 v1 문서(관측 메타데이터 없음). 가져오기·보관함 로드 시 v2로 마이그레이션한다. */
+export interface ReplayDocumentV1 extends ReplayDocumentBase {
+  schemaVersion: 1;
+}
+
+/** 현행 v2 문서. observations는 선택적이며 결정론 검증·다이제스트에 관여하지 않는다. */
+export interface ReplayDocument extends ReplayDocumentBase {
+  schemaVersion: typeof REPLAY_SCHEMA_VERSION;
+  /** 인간 행동 관측 메타데이터(없어도 재생·검증 가능) */
+  observations?: ReplayObservation[];
+}
+
+/** v1 → v2 마이그레이션: 정본 필드는 그대로 두고 스키마 버전만 올린다(관측 없음). 예외를 던지지 않는다. */
+export function migrateReplayV1(doc: ReplayDocumentV1): ReplayDocument {
+  return { ...doc, schemaVersion: REPLAY_SCHEMA_VERSION };
+}
+
+/**
+ * 로컬 보관함(IndexedDB)의 v1·v2 레코드를 현행 형식으로 올린다.
+ * 저장 시점에 이미 정밀 검증을 통과한 레코드용이므로 스키마 버전만 판정한다. 예외를 던지지 않는다.
+ */
+export function upgradeStoredReplay(doc: unknown): ReplayDocument | null {
+  if (!doc || typeof doc !== 'object') return null;
+  const v = (doc as { schemaVersion?: unknown }).schemaVersion;
+  if (v === REPLAY_SCHEMA_VERSION) return doc as ReplayDocument;
+  if (v === 1) return migrateReplayV1(doc as ReplayDocumentV1);
+  return null;
+}
+
+/** 관측 배열 정리: 명령 범위를 벗어나거나 형식이 어긋난 항목을 버리고 순번 오름차순으로 만든다. */
+export function sanitizeObservations(
+  observations: ReplayObservation[] | undefined,
+  commandCount: number,
+): ReplayObservation[] | undefined {
+  if (!observations || observations.length === 0) return undefined;
+  const valid = observations.filter(
+    (o) =>
+      Number.isInteger(o.commandSeq) &&
+      o.commandSeq >= 0 &&
+      o.commandSeq < commandCount &&
+      (o.elapsedMs === undefined || (Number.isInteger(o.elapsedMs) && o.elapsedMs >= 0)) &&
+      (o.hesitationMs === undefined || (Number.isInteger(o.hesitationMs) && o.hesitationMs >= 0)),
+  );
+  if (valid.length === 0) return undefined;
+  return [...valid].sort((a, b) => a.commandSeq - b.commandSeq);
+}
+
 /** 상태에서 시나리오 스냅샷을 복원한다(내장은 시드로 재생성, 커스텀은 상태에 포함된 스냅샷). */
 export function scenarioSnapshotOf(state: GameState): ScenarioRuntimeSnapshot | null {
   if (state.customScenario) return state.customScenario;
@@ -154,13 +203,14 @@ export function scenarioSnapshotOf(state: GameState): ScenarioRuntimeSnapshot | 
 export function buildReplayDocument(
   state: GameState,
   opts: { replayId?: string; createdAt?: string } = {},
-): ReplayDocumentV1 | null {
+): ReplayDocument | null {
   if (!state.over || state.winner === undefined) return null;
   const commands = state.commandLog;
   if (!commands || commands.length !== (state.cmdSeq ?? 0)) return null;
   const scenario = scenarioSnapshotOf(state);
   if (!scenario) return null;
   const initial = newGameFromScenario(state.seed, scenario, { ...state.config });
+  const observations = sanitizeObservations(state.observationLog, commands.length);
   return {
     schemaVersion: REPLAY_SCHEMA_VERSION,
     gameVersion: GAME_VERSION,
@@ -179,6 +229,7 @@ export function buildReplayDocument(
       stars: starCount(state),
     },
     finalStateDigest: stateDigest(state),
+    ...(observations ? { observations } : {}),
   };
 }
 
@@ -208,7 +259,7 @@ export interface ReplayVerification {
 }
 
 /** 리플레이 문서의 초기 상태를 재구성한다. */
-export function replayInitialState(doc: ReplayDocumentV1): GameState {
+export function replayInitialState(doc: ReplayDocument): GameState {
   return newGameFromScenario(doc.seed, doc.scenario, { ...doc.initialConfig });
 }
 
@@ -216,7 +267,7 @@ export function replayInitialState(doc: ReplayDocumentV1): GameState {
  * 명령을 순서대로 재실행해 결정론을 검증한다.
  * 모든 명령이 성공하고 최종 다이제스트가 일치해야 ok다.
  */
-export function verifyReplay(doc: ReplayDocumentV1): ReplayVerification {
+export function verifyReplay(doc: ReplayDocument): ReplayVerification {
   if (doc.schemaVersion !== REPLAY_SCHEMA_VERSION) {
     return { ok: false, reason: 'unsupported-version' };
   }

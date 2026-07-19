@@ -1,6 +1,6 @@
 // 한 줄 목적: 컨트롤러 사이의 명시적 경계 — 상위 화면 이동과 컨트롤러 간 공개 계약을 정의한다
 import type { GameState } from '../core/types';
-import type { ReplayDocumentV1 } from '../core/replay';
+import type { ReplayDocument } from '../core/replay';
 import type { ScenarioDocumentV1 } from '../core/scenario/types';
 
 /** 일반 플레이 진입 옵션. */
@@ -24,7 +24,7 @@ export interface AppNavigation {
   toReplayArchive(): void;
   toAnalysis(): void;
   launch(state: GameState, opts?: LaunchOptions): void;
-  openPlayback(doc: ReplayDocumentV1): void;
+  openPlayback(doc: ReplayDocument): void;
 }
 
 /** PlayController가 다른 컨트롤러·셸에 공개하는 계약. */
@@ -66,9 +66,9 @@ export interface EditorFlow {
 /** ReplayController 공개 계약. */
 export interface ReplayArchiveFlow {
   showArchive(): Promise<void>;
-  openPlayback(doc: ReplayDocumentV1, opts?: { unverified?: boolean }): void;
+  openPlayback(doc: ReplayDocument, opts?: { unverified?: boolean }): void;
   /** 분석 화면에서 특정 턴으로 바로 이동해 재생을 연다. */
-  openPlaybackAtTurn(doc: ReplayDocumentV1, turn: number): void;
+  openPlaybackAtTurn(doc: ReplayDocument, turn: number): void;
   /** 재생 UI 정리(다른 화면으로 나갈 때). */
   stopPlaybackUi(): void;
   /** 게임 종료 시 리플레이 자동 보관(실패 무시). */

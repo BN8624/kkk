@@ -4,7 +4,7 @@ import { unitAt, unitsOf } from '../board';
 import { BUILDING_NAMES, FACTION_NAMES, MAX_UNITS_PER_FACTION, UNIT_NAMES } from '../data';
 import { attackTargets, forecastAttack, unitCost } from '../game';
 import { hexDistance } from '../hex';
-import { replayInitialState, type ReplayDocumentV1 } from '../replay';
+import { replayInitialState, type ReplayDocument } from '../replay';
 import { starsEarned } from '../scenario/objectives';
 import type { StarCondition } from '../scenario/types';
 import type { Axial, FactionId, GameConfig, GameState, UnitTypeId } from '../types';
@@ -198,7 +198,7 @@ function reviewStar(state: GameState, c: StarCondition, earned: boolean): StarRe
  * 리플레이를 처음부터 재실행하며 지표를 수집한다. 예외를 던지지 않는다.
  * 명령 실행이 실패하면(규칙 불일치 기록) 분석 불가로 안전하게 반환한다.
  */
-export function analyzeReplay(doc: ReplayDocumentV1): AnalyzeResult {
+export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
   try {
     const state = replayInitialState(doc);
     const me = doc.initialConfig.humanFaction;

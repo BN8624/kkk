@@ -130,8 +130,8 @@ describe('리플레이 기록·결정론 재생', () => {
     const tampered3 = { ...doc, commands: doc.commands.slice(0, -1) };
     expect(verifyReplay(tampered3).reason).toBe('digest-mismatch');
 
-    // 미래 스키마 버전 안전 거부
-    const tampered4 = { ...doc, schemaVersion: 2 as unknown as 1 };
+    // 다른 스키마 버전 안전 거부(verifyReplay는 현행 v2만 재생한다)
+    const tampered4 = { ...doc, schemaVersion: 3 as unknown as 2 };
     expect(verifyReplay(tampered4).reason).toBe('unsupported-version');
   });
 });

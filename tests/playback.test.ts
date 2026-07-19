@@ -2,11 +2,11 @@
 import { describe, expect, it } from 'vitest';
 import { runAiTurn } from '../src/core/ai';
 import { newGame } from '../src/core/game';
-import { buildReplayDocument, stateDigest, type ReplayDocumentV1 } from '../src/core/replay';
+import { buildReplayDocument, stateDigest, type ReplayDocument } from '../src/core/replay';
 import { ReplayPlayback } from '../src/replay/playback';
 import type { GameState } from '../src/core/types';
 
-function recordGame(seed: number): ReplayDocumentV1 {
+function recordGame(seed: number): ReplayDocument {
   const state: GameState = newGame(seed);
   let guard = 0;
   while (!state.over && guard < 200) {

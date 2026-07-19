@@ -153,6 +153,7 @@ export class AppShell implements AppContext, AppNavigation {
         callbacks: {
           onTileTap: (q: number, r: number) => this.playCtrl.onTileTap(q, r),
           onReady: () => this.playCtrl.refreshHudIfPlaying(),
+          onCameraDrag: () => this.playCtrl.onCameraDrag(),
         },
       });
       this.scene = this.game.scene.getScene('board') as BoardScene;

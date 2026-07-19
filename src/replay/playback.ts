@@ -1,6 +1,6 @@
 // 한 줄 목적: 리플레이 문서를 명령 단위로 앞뒤 재생하는 결정론적 재생 세션을 제공한다
 import { executeCommand, type GameCommand, type GameEvent } from '../core/command';
-import { replayInitialState, type ReplayDocumentV1 } from '../core/replay';
+import { replayInitialState, type ReplayDocument } from '../core/replay';
 import type { GameState } from '../core/types';
 
 /**
@@ -8,7 +8,7 @@ import type { GameState } from '../core/types';
  * 역방향 이동은 매 프레임 저장 대신 게임 시작·턴 시작 스냅샷에서 가까운 지점부터 재실행한다.
  */
 export class ReplayPlayback {
-  readonly doc: ReplayDocumentV1;
+  readonly doc: ReplayDocument;
   private current: GameState;
   /** 다음에 실행할 명령 인덱스(= 지금까지 실행된 명령 수) */
   private cursor = 0;
@@ -19,7 +19,7 @@ export class ReplayPlayback {
   /** 마지막 stepForward가 만든 이벤트(설명 표시용) */
   lastEvents: GameEvent[] = [];
 
-  constructor(doc: ReplayDocumentV1) {
+  constructor(doc: ReplayDocument) {
     this.doc = doc;
     this.current = replayInitialState(doc);
     this.snapshots.set(0, JSON.stringify(this.current));

@@ -6,7 +6,7 @@ import { reportCsv, reportJson, reportMarkdown, type ReportFilters } from '../co
 import { missionByScenarioId } from '../core/campaign/missions';
 import { loadCampaignProgress } from '../core/campaign/progress';
 import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
-import { REPLAY_MAX_IMPORT_BYTES, type ReplayDocumentV1 } from '../core/replay';
+import { REPLAY_MAX_IMPORT_BYTES, upgradeStoredReplay, type ReplayDocument } from '../core/replay';
 import { checkReplayCompatibility } from '../core/replay-compat';
 import { decodeReplayDocument } from '../core/replay-decode';
 import { documentStore } from '../storage/idb';
@@ -23,7 +23,7 @@ import type { AppController } from '../app/lifecycle';
 
 interface LoadedReplay {
   id: string;
-  doc: ReplayDocumentV1;
+  doc: ReplayDocument;
 }
 
 const MODE_NAMES: Record<string, string> = {
@@ -58,8 +58,9 @@ export class AnalysisController implements AppController {
     try {
       const summaries = await documentStore().list('replays');
       for (const s of summaries) {
-        const rec = await documentStore().get<ReplayDocumentV1>('replays', s.id);
-        if (rec?.data && rec.data.schemaVersion === 1) this.loaded.push({ id: s.id, doc: rec.data });
+        const rec = await documentStore().get<ReplayDocument>('replays', s.id);
+        const doc = upgradeStoredReplay(rec?.data);
+        if (doc) this.loaded.push({ id: s.id, doc });
       }
     } catch {
       /* 저장소 접근 실패: 빈 목록 */
@@ -126,7 +127,7 @@ export class AnalysisController implements AppController {
   }
 
   /** 캐시를 사용한 단일 분석(무거운 재실행은 판당 1회). */
-  private analysisOf(id: string, doc: ReplayDocumentV1): ReplayAnalysis | null {
+  private analysisOf(id: string, doc: ReplayDocument): ReplayAnalysis | null {
     const cached = this.analysisCache.get(id);
     if (cached) return cached;
     const r = analyzeReplay(doc);
@@ -160,7 +161,7 @@ export class AnalysisController implements AppController {
     return `캠페인 기록 — ${parts.join(' · ')}`;
   }
 
-  private showSingle(doc: ReplayDocumentV1, analysis: ReplayAnalysis): void {
+  private showSingle(doc: ReplayDocument, analysis: ReplayAnalysis): void {
     this.ctx.enterMode('analysis');
     showSingleAnalysisScreen(
       this.ctx.overlay,

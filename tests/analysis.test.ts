@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { runAiTurn } from '../src/core/ai';
 import { newGame } from '../src/core/game';
-import { buildReplayDocument, type ReplayDocumentV1 } from '../src/core/replay';
+import { buildReplayDocument, type ReplayDocument } from '../src/core/replay';
 import { analyzeReplay, type ReplayAnalysis } from '../src/core/analysis/replay-metrics';
 import { aggregateAnalyses } from '../src/core/analysis/aggregate';
 import { coachAggregate, coachSingleGame } from '../src/core/analysis/coaching';
@@ -19,7 +19,7 @@ function playFullGame(state: GameState): void {
   if (!state.over) throw new Error('게임이 종료되지 않음');
 }
 
-function makeReplay(seed: number, scenario: BuiltinScenarioId, faction: FactionId): ReplayDocumentV1 {
+function makeReplay(seed: number, scenario: BuiltinScenarioId, faction: FactionId): ReplayDocument {
   const state = newGame(seed, { scenario, humanFaction: faction, difficulty: 'normal' });
   playFullGame(state);
   const doc = buildReplayDocument(state, {

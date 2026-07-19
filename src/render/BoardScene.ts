@@ -21,6 +21,8 @@ import {
 export interface BoardCallbacks {
   onTileTap: (q: number, r: number) => void;
   onReady: () => void;
+  /** 사용자가 드래그·핀치로 카메라를 움직였을 때(제스처 종료 시점, 관측 메타데이터용) */
+  onCameraDrag?: () => void;
 }
 
 export class BoardScene extends Phaser.Scene {
@@ -396,7 +398,10 @@ export class BoardScene extends Phaser.Scene {
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       const wasPinch = this.pinchDist > 0;
       if (!this.input.pointer1.isDown && !this.input.pointer2.isDown) this.pinchDist = 0;
-      if (wasPinch || this.dragging) return;
+      if (wasPinch || this.dragging) {
+        this.callbacks.onCameraDrag?.();
+        return;
+      }
       if (this.time.now - this.downAt.t > 500) return;
       const world = this.cameras.main.getWorldPoint(p.x, p.y);
       const hex = pixelToHex(world.x, world.y);

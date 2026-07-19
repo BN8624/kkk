@@ -18,9 +18,11 @@ import {
   type StructureLimits,
 } from './decode';
 import {
+  migrateReplayV1,
   REPLAY_MAX_IMPORT_BYTES,
   REPLAY_SCHEMA_VERSION,
   verifyReplay,
+  type ReplayDocument,
   type ReplayDocumentV1,
   type ReplayVerification,
 } from './replay';
@@ -164,11 +166,11 @@ function validateSnapshot(s: unknown, issues: DecodeIssue[]): s is ScenarioRunti
  * 외부 리플레이 입력(문자열 또는 이미 파싱된 값)을 정밀 검증해 문서로 디코드한다.
  * 어떤 입력에도 예외를 던지지 않는다. 결정론 재생 가능성은 별도로 safeVerifyReplay로 확인한다.
  */
-export function decodeReplayDocument(input: string | unknown): DecodeResult<ReplayDocumentV1> {
+export function decodeReplayDocument(input: string | unknown): DecodeResult<ReplayDocument> {
   let raw: unknown;
   if (typeof input === 'string') {
     const parsed = safeJsonParse(input, REPLAY_DECODE_LIMITS);
-    if (!parsed.ok) return parsed as DecodeResult<ReplayDocumentV1>;
+    if (!parsed.ok) return parsed as DecodeResult<ReplayDocument>;
     raw = parsed.value;
   } else {
     const violation = scanStructure(input, REPLAY_DECODE_LIMITS);
@@ -177,8 +179,9 @@ export function decodeReplayDocument(input: string | unknown): DecodeResult<Repl
   }
   if (!isRecord(raw)) return decodeFail('not-object', '리플레이 문서 형식이 아닙니다', 'schema');
 
-  // 스키마 버전: 미래 버전은 명확한 코드로 거부한다(호환 정책이 이 코드를 사용한다)
-  if (raw.schemaVersion !== REPLAY_SCHEMA_VERSION) {
+  // 스키마 버전: v1(마이그레이션)·v2(현행)만 수용하고 미래 버전은 명확한 코드로 거부한다
+  const schemaVersion = raw.schemaVersion;
+  if (schemaVersion !== 1 && schemaVersion !== REPLAY_SCHEMA_VERSION) {
     if (intInRange(raw.schemaVersion, REPLAY_SCHEMA_VERSION + 1, 1_000_000)) {
       return decodeFail('future-schema', '이 리플레이는 더 새로운 앱 버전에서 만들어졌습니다', 'schema', 'schemaVersion');
     }
@@ -248,19 +251,57 @@ export function decodeReplayDocument(input: string | unknown): DecodeResult<Repl
     }
   }
 
+  // 관측 메타데이터(v2 전용·선택): 정본 결과에 관여하지 않지만 형식은 정밀 검증한다
+  const observations = raw.observations;
+  if (observations !== undefined) {
+    if (schemaVersion === 1) {
+      issues.push(err('bad-observations', 'v1 리플레이에는 관측 메타데이터가 존재할 수 없습니다', 'observations'));
+    } else if (!Array.isArray(observations)) {
+      issues.push(err('bad-observations', '관측 메타데이터가 배열이 아닙니다', 'observations'));
+    } else if (Array.isArray(commands) && observations.length > commands.length) {
+      issues.push({ code: 'too-many-observations', message: '관측 항목 수가 명령 수를 초과합니다', severity: 'error', cause: 'limit', path: 'observations' });
+    } else {
+      const commandCount = Array.isArray(commands) ? commands.length : 0;
+      for (let i = 0; i < observations.length; i++) {
+        const o: unknown = observations[i];
+        const path = `observations[${i}]`;
+        if (!isRecord(o)) {
+          issues.push(err('bad-observation', '관측 항목이 객체가 아닙니다', path));
+        } else {
+          if (!intInRange(o.commandSeq, 0, Math.max(0, commandCount - 1)))
+            issues.push(err('bad-observation-seq', '관측 항목의 명령 순번이 범위를 벗어납니다', `${path}.commandSeq`));
+          if (o.elapsedMs !== undefined && !intInRange(o.elapsedMs, 0, 86_400_000))
+            issues.push(err('bad-observation-time', '관측 시간 값이 잘못되었습니다', `${path}.elapsedMs`));
+          if (o.hesitationMs !== undefined && !intInRange(o.hesitationMs, 0, 86_400_000))
+            issues.push(err('bad-observation-time', '관측 시간 값이 잘못되었습니다', `${path}.hesitationMs`));
+          if (o.canceledSelectionCount !== undefined && !intInRange(o.canceledSelectionCount, 0, 100_000))
+            issues.push(err('bad-observation-count', '관측 횟수 값이 잘못되었습니다', `${path}.canceledSelectionCount`));
+          if (o.cameraMoves !== undefined && !intInRange(o.cameraMoves, 0, 100_000))
+            issues.push(err('bad-observation-count', '관측 횟수 값이 잘못되었습니다', `${path}.cameraMoves`));
+        }
+        if (issues.length >= 20) break;
+      }
+    }
+  }
+
   // 중첩 시나리오(기존 검증기 재사용)
   if (issues.length === 0) {
     validateSnapshot(raw.scenario, issues);
   }
 
   if (issues.length > 0) return { ok: false, issues };
-  return decodeOk(raw as unknown as ReplayDocumentV1);
+  if (schemaVersion === 1) {
+    return decodeOk(migrateReplayV1(raw as unknown as ReplayDocumentV1), [
+      { code: 'migrated-v1', message: 'v1 리플레이를 v2 형식으로 변환했습니다', severity: 'warning', cause: 'schema' },
+    ]);
+  }
+  return decodeOk(raw as unknown as ReplayDocument);
 }
 
 /**
  * verifyReplay의 비예외 래퍼: 재생 중 내부 오류가 나도 예외를 밖으로 던지지 않는다.
  */
-export function safeVerifyReplay(doc: ReplayDocumentV1): ReplayVerification {
+export function safeVerifyReplay(doc: ReplayDocument): ReplayVerification {
   try {
     return verifyReplay(doc);
   } catch {
