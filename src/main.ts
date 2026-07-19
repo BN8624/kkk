@@ -1295,10 +1295,24 @@ class App {
       } · 점수 ${factionScore(state, me)}점</p>
       <button class="big-btn" id="tp-again">다시 테스트</button>
       <button class="sub-btn" id="tp-spectate">AI 관전으로 다시</button>
+      <button class="sub-btn" id="tp-save-replay">리플레이 저장</button>
       <button class="sub-btn" id="tp-editor">에디터로 돌아가기</button>`);
     this.overlay.bind({
       'tp-again': () => this.startTestPlay(false),
       'tp-spectate': () => this.startTestPlay(true),
+      // 테스트 플레이는 자동 보관하지 않는다 — 원할 때만 보관함에 남긴다
+      'tp-save-replay': () => {
+        const btn = this.overlay.element.querySelector<HTMLButtonElement>('#tp-save-replay')!;
+        if (btn.disabled) return;
+        this.saveReplay(state);
+        if (this.lastReplay) {
+          btn.disabled = true;
+          btn.textContent = '리플레이 저장됨';
+          this.hud.toast('리플레이를 보관함에 저장했습니다');
+        } else {
+          this.hud.toast('이 게임은 리플레이로 저장할 수 없습니다');
+        }
+      },
       'tp-editor': () => this.backToEditor(),
     });
   }
