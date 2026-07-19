@@ -3,11 +3,10 @@ import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
 import { factionScore } from '../core/game';
 import {
   buildReplayDocument,
-  parseReplayDocument,
   REPLAY_MAX_IMPORT_BYTES,
-  verifyReplay,
   type ReplayDocumentV1,
 } from '../core/replay';
+import { decodeReplayDocument, safeVerifyReplay } from '../core/replay-decode';
 import type { GameState } from '../core/types';
 import { playEvents } from '../render/event-player';
 import { ReplayPlayback } from '../replay/playback';
@@ -140,7 +139,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
 
   /** 리플레이 재생 화면을 연다. 열기 전에 전체 재생 검증으로 재생 가능성을 보장한다. */
   openPlayback(doc: ReplayDocumentV1): void {
-    if (!verifyReplay(doc).ok) {
+    if (!safeVerifyReplay(doc).ok) {
       this.ctx.hud.toast('재생할 수 없는 리플레이입니다');
       return;
     }
@@ -311,12 +310,17 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     }
     const token = this.ctx.currentToken();
     const text = await file.text().catch(() => null);
-    const doc = text ? parseReplayDocument(text) : null;
-    if (!doc) {
-      this.ctx.hud.toast('리플레이 형식이 아니거나 지원하지 않는 버전입니다');
+    if (text === null) {
+      this.ctx.hud.toast('파일을 읽지 못했습니다');
       return;
     }
-    if (!verifyReplay(doc).ok) {
+    const decoded = decodeReplayDocument(text);
+    if (!decoded.ok) {
+      this.ctx.hud.toast(decoded.issues[0]?.message ?? '리플레이 형식이 아닙니다');
+      return;
+    }
+    const doc = decoded.value;
+    if (!safeVerifyReplay(doc).ok) {
       this.ctx.hud.toast('재생 검증에 실패한 리플레이입니다');
       return;
     }
@@ -339,7 +343,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     try {
       const doc = buildReplayDocument(state, { replayId: newDocId('replay') });
       if (!doc) return; // 구버전 저장 이어하기 등으로 명령 기록이 불완전한 게임
-      if (!verifyReplay(doc).ok) return; // 재생 불가능한 기록은 저장하지 않는다
+      if (!safeVerifyReplay(doc).ok) return; // 재생 불가능한 기록은 저장하지 않는다
       this.lastReplay = doc;
       void documentStore()
         .put('replays', doc.replayId, doc)

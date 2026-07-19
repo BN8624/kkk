@@ -5,6 +5,7 @@ import {
   type ValidationIssue,
 } from '../core/scenario/types';
 import { parseScenarioDocument } from '../core/scenario/validate';
+import { SCENARIO_DECODE_LIMITS, scanStructure } from '../core/decode';
 
 /** 공유 코드 접두사. D=deflate-raw 압축, R=무압축(CompressionStream 미지원 환경 폴백). */
 const PREFIX_DEFLATE = 'TCS1.';
@@ -136,6 +137,9 @@ export async function decodeShareCode(
   } catch {
     return fail('공유 코드 내용이 올바른 JSON이 아닙니다');
   }
+  // 공용 구조 제한(깊이·노드·문자열 길이)을 공유 코드에도 동일하게 적용한다
+  const violation = scanStructure(raw, SCENARIO_DECODE_LIMITS);
+  if (violation) return fail(violation.message);
   return parseScenarioDocument(raw);
 }
 

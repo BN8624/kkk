@@ -1,8 +1,9 @@
 // 한 줄 목적: 제작실 홈·초안·에디터 씬/패널 수명주기·가져오기/내보내기·테스트 플레이 진입·복귀를 담당한다
 import { UNIT_STATS, FACTION_NAMES } from '../core/data';
 import { factionScore, newGameFromScenario } from '../core/game';
+import { decodeScenarioInput } from '../core/decode';
 import { normalizeScenario } from '../core/scenario/normalize';
-import { isPlayable, parseScenarioDocument } from '../core/scenario/validate';
+import { isPlayable } from '../core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from '../core/scenario/types';
 import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
 import type { Axial, GameState } from '../core/types';
@@ -107,19 +108,12 @@ export class EditorFlowController implements AppController, EditorFlow {
     const token = this.ctx.currentToken();
     const text = await file.text().catch(() => null);
     if (!token.alive) return;
-    let raw: unknown = null;
-    try {
-      raw = text ? JSON.parse(text) : null;
-    } catch {
-      this.ctx.hud.toast('JSON을 읽을 수 없습니다');
+    const result = decodeScenarioInput(text ?? '');
+    if (!result.ok) {
+      this.ctx.hud.toast(result.issues[0]?.message ?? '시나리오 형식이 아닙니다');
       return;
     }
-    const { doc, issues } = parseScenarioDocument(raw);
-    if (!doc) {
-      this.ctx.hud.toast(issues[0]?.message ?? '시나리오 형식이 아닙니다');
-      return;
-    }
-    this.openImportedDocument(doc);
+    this.openImportedDocument(result.value);
   }
 
   /** 붙여넣기 가져오기: JSON 텍스트 또는 공유 코드(TCS1)·공유 URL을 판별해 처리한다. */
@@ -127,29 +121,23 @@ export class EditorFlowController implements AppController, EditorFlow {
     const t = text.trim();
     if (!t) return;
     const token = this.ctx.currentToken();
-    let result: { doc: ScenarioDocumentV1 | null; issues: { message: string }[] };
+    let doc: ScenarioDocumentV1 | null = null;
+    let firstMessage: string | undefined;
     if (t.startsWith('{')) {
-      if (t.length > SCENARIO_LIMITS.maxImportBytes) {
-        this.ctx.hud.toast('텍스트가 너무 큽니다');
-        return;
-      }
-      let raw: unknown = null;
-      try {
-        raw = JSON.parse(t);
-      } catch {
-        this.ctx.hud.toast('JSON을 읽을 수 없습니다');
-        return;
-      }
-      result = parseScenarioDocument(raw);
+      const result = decodeScenarioInput(t);
+      doc = result.ok ? result.value : null;
+      if (!result.ok) firstMessage = result.issues[0]?.message;
     } else {
-      result = await decodeShareCode(t);
+      const result = await decodeShareCode(t);
+      doc = result.doc;
+      if (!doc) firstMessage = result.issues[0]?.message;
     }
     if (!token.alive) return;
-    if (!result.doc) {
-      this.ctx.hud.toast(result.issues[0]?.message ?? '가져올 수 없습니다');
+    if (!doc) {
+      this.ctx.hud.toast(firstMessage ?? '가져올 수 없습니다');
       return;
     }
-    this.openImportedDocument(result.doc);
+    this.openImportedDocument(doc);
   }
 
   /** 가져온 문서는 새 ID로 초안이 된다(내장·기존 문서를 덮어쓰지 않는다). */

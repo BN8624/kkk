@@ -185,44 +185,16 @@ export function buildReplayDocument(
 /** 가져오기 파일 크기 제한(바이트). */
 export const REPLAY_MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
-/**
- * 외부 JSON을 리플레이 문서로 안전하게 해석한다.
- * 구조가 다르거나 미래 스키마 버전이면 null(안전 거부). 재생 가능성은 verifyReplay로 확인한다.
- */
-export function parseReplayDocument(raw: string): ReplayDocumentV1 | null {
-  if (typeof raw !== 'string' || raw.length > REPLAY_MAX_IMPORT_BYTES) return null;
-  let doc: unknown;
-  try {
-    doc = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return null;
-  const d = doc as Partial<ReplayDocumentV1>;
-  if (d.schemaVersion !== REPLAY_SCHEMA_VERSION) return null;
-  if (typeof d.replayId !== 'string' || d.replayId.length === 0 || d.replayId.length > 80)
-    return null;
-  if (typeof d.createdAt !== 'string' || typeof d.gameVersion !== 'string') return null;
-  if (typeof d.seed !== 'number' || !Number.isFinite(d.seed)) return null;
-  if (!d.scenario || typeof d.scenario !== 'object' || !Array.isArray(d.scenario.board?.tiles))
-    return null;
-  if (typeof d.scenarioDigest !== 'string' || typeof d.finalStateDigest !== 'string') return null;
-  if (typeof d.initialStateDigest !== 'string') return null;
-  if (!d.initialConfig || typeof d.initialConfig !== 'object') return null;
-  if (!Array.isArray(d.commands) || d.commands.length > 100_000) return null;
-  for (const c of d.commands) {
-    if (!c || typeof c !== 'object' || typeof (c as { type?: unknown }).type !== 'string')
-      return null;
-  }
-  if (!d.result || typeof d.result !== 'object') return null;
-  return d as ReplayDocumentV1;
-}
-
 // ---------------- 결정론 재생 검증 ----------------
 
 export interface ReplayVerification {
   ok: boolean;
-  reason?: 'unsupported-version' | 'initial-mismatch' | 'command-failed' | 'digest-mismatch';
+  reason?:
+    | 'unsupported-version'
+    | 'initial-mismatch'
+    | 'command-failed'
+    | 'digest-mismatch'
+    | 'internal-error';
   /** 실패한 명령(command-failed 시) */
   failedSeq?: number;
   failedCommand?: GameCommand;
