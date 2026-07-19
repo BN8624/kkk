@@ -1,5 +1,13 @@
 // 한 줄 목적: 리플레이 보관함 화면과 재생 컨트롤 바를 렌더링한다
 import type { GameEvent } from '../../core/command';
+import {
+  EVAL_DEFECT_TAGS,
+  EVAL_ENJOYMENT,
+  EVAL_LENGTH,
+  EVAL_NOTE_MAX,
+  sanitizeEvaluation,
+  type PlaytestEvaluation,
+} from '../../core/replay';
 import type { FactionId } from '../../core/types';
 import { factionName, t, unitName } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
@@ -21,6 +29,8 @@ export interface ReplayListItem {
   compatLabel?: string;
   /** exact 계열이 아니면 true — 배지를 경고색으로 표시한다. */
   compatWarn?: boolean;
+  /** 플레이테스트 분류 라벨(있으면 목록에 표시) */
+  defectLabel?: string;
 }
 
 export interface ReplayArchiveHandlers {
@@ -71,7 +81,7 @@ export function showReplayArchiveScreen(
             it.compatLabel
               ? ` · <span class="rp-compat${it.compatWarn ? ' warn' : ''}">${escapeHtml(it.compatLabel)}</span>`
               : ''
-          }</span>
+          }${it.defectLabel ? ` · <span class="rp-defect">${escapeHtml(it.defectLabel)}</span>` : ''}</span>
         </button>
         <div class="rp-actions">
           <button data-act="fav" aria-label="${escapeHtml(t('replay.favorite'))}">${it.favorite ? '★' : '☆'}</button>
@@ -259,4 +269,113 @@ export function describeResult(winner: FactionId | 'draw', turns: number): strin
   return winner === 'draw'
     ? t('replay.result.draw', { turns })
     : t('replay.result.win', { faction: factionName(winner), turns });
+}
+
+/** 분류 태그 라벨(한/영 i18n). */
+export function defectTagLabel(tag: NonNullable<PlaytestEvaluation['defectTag']>): string {
+  return t(`eval.tag.${tag}`);
+}
+
+/**
+ * 내보내기 직전 선택적 플레이 평가 시트.
+ * 건너뛰기·모두 비움 → undefined. 입력값은 로컬 문서에만 담기며 외부 전송 없음.
+ */
+export function promptPlaytestEvaluation(host: HTMLElement): Promise<PlaytestEvaluation | undefined> {
+  return new Promise((resolve) => {
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet rp-eval-sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-label', t('eval.title'));
+
+    const chipRow = (
+      name: string,
+      options: readonly { value: string; label: string }[],
+    ): string =>
+      `<div class="rp-eval-row" data-group="${escapeHtml(name)}">${options
+        .map(
+          (o) =>
+            `<button type="button" class="rp-eval-chip" data-group="${escapeHtml(name)}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</button>`,
+        )
+        .join('')}</div>`;
+
+    sheet.innerHTML = `
+      <h3>${escapeHtml(t('eval.title'))}</h3>
+      ${chipRow(
+        'enjoyment',
+        EVAL_ENJOYMENT.map((v) => ({ value: v, label: t(`eval.enjoyment.${v}`) })),
+      )}
+      ${chipRow(
+        'length',
+        EVAL_LENGTH.map((v) => ({ value: v, label: t(`eval.length.${v}`) })),
+      )}
+      ${chipRow('understood', [
+        { value: 'yes', label: t('eval.understood.yes') },
+        { value: 'no', label: t('eval.understood.no') },
+      ])}
+      ${chipRow(
+        'defectTag',
+        EVAL_DEFECT_TAGS.map((v) => ({ value: v, label: t(`eval.tag.${v}`) })),
+      )}
+      <label class="rp-eval-note">
+        <span>${escapeHtml(t('eval.note'))}</span>
+        <textarea id="rp-eval-note" maxlength="${EVAL_NOTE_MAX}" rows="2"></textarea>
+      </label>
+      <div class="rp-eval-actions">
+        <button type="button" class="close-btn" id="rp-eval-skip">${escapeHtml(t('eval.skip'))}</button>
+        <button type="button" class="close-btn rp-eval-attach" id="rp-eval-attach">${escapeHtml(t('eval.attach'))}</button>
+      </div>`;
+    host.appendChild(sheet);
+    // 다음 프레임에 슬라이드 인
+    requestAnimationFrame(() => sheet.classList.add('show'));
+
+    const selected: Record<string, string | undefined> = {};
+    sheet.querySelectorAll<HTMLButtonElement>('.rp-eval-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const group = btn.dataset.group!;
+        const value = btn.dataset.value!;
+        // 같은 값 재탭 시 해제
+        if (selected[group] === value) {
+          selected[group] = undefined;
+          btn.classList.remove('on');
+          return;
+        }
+        selected[group] = value;
+        sheet.querySelectorAll<HTMLButtonElement>(`.rp-eval-chip[data-group="${group}"]`).forEach((b) => {
+          b.classList.toggle('on', b === btn);
+        });
+      });
+    });
+
+    const finish = (value: PlaytestEvaluation | undefined) => {
+      sheet.classList.remove('show');
+      window.setTimeout(() => sheet.remove(), 220);
+      resolve(value);
+    };
+
+    sheet.querySelector('#rp-eval-skip')!.addEventListener('click', () => finish(undefined));
+    sheet.querySelector('#rp-eval-attach')!.addEventListener('click', () => {
+      const noteEl = sheet.querySelector<HTMLTextAreaElement>('#rp-eval-note');
+      const draft: PlaytestEvaluation = {};
+      if (selected.enjoyment === 'fun' || selected.enjoyment === 'ok' || selected.enjoyment === 'boring') {
+        draft.enjoyment = selected.enjoyment;
+      }
+      if (selected.length === 'short' || selected.length === 'right' || selected.length === 'long') {
+        draft.length = selected.length;
+      }
+      if (selected.understood === 'yes') draft.understoodLoss = true;
+      else if (selected.understood === 'no') draft.understoodLoss = false;
+      if (
+        selected.defectTag === 'early-objective' ||
+        selected.defectTag === 'lost-before-acting' ||
+        selected.defectTag === 'unclear-objective' ||
+        selected.defectTag === 'no-retake-chance'
+      ) {
+        draft.defectTag = selected.defectTag;
+      }
+      const note = noteEl?.value.trim() ?? '';
+      if (note) draft.note = note.slice(0, EVAL_NOTE_MAX);
+      finish(sanitizeEvaluation(draft));
+    });
+  });
 }

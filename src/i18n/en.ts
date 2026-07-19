@@ -414,6 +414,24 @@ export const EN: Record<keyof typeof KO, string> = {
   'replay.storeFailed': 'Storage is full or the replay could not be saved.',
   'replay.imported': 'Replay imported.',
 
+  // Playtest evaluation (optional, local-only)
+  'eval.title': 'Play feedback (optional)',
+  'eval.note': 'Note',
+  'eval.skip': 'Skip',
+  'eval.attach': 'Attach feedback',
+  'eval.enjoyment.fun': 'Fun',
+  'eval.enjoyment.ok': 'OK',
+  'eval.enjoyment.boring': 'Boring',
+  'eval.length.short': 'Too short',
+  'eval.length.right': 'Just right',
+  'eval.length.long': 'Too long',
+  'eval.understood.yes': 'Yes',
+  'eval.understood.no': 'No',
+  'eval.tag.early-objective': 'Early objective grab',
+  'eval.tag.lost-before-acting': 'Lost before acting',
+  'eval.tag.unclear-objective': 'Unclear objective rules',
+  'eval.tag.no-retake-chance': 'No retake chance',
+
   // 플레이 분석
   'analysis.title': 'Play Analysis',
   'analysis.subtitle': 'Find the reasons behind your wins and losses (analysis stays in this browser).',

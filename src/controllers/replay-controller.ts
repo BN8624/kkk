@@ -14,8 +14,10 @@ import { ReplayPlayback } from '../replay/playback';
 import { newDocId } from '../storage/docstore';
 import { documentStore } from '../storage/idb';
 import {
+  defectTagLabel,
   describeResult,
   describeStep,
+  promptPlaytestEvaluation,
   ReplayControls,
   showReplayArchiveScreen,
   type ReplayListItem,
@@ -87,6 +89,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
         if (!doc) continue;
         const me = doc.initialConfig.humanFaction;
         const compat = checkReplayCompatibility(doc);
+        const tag = doc.evaluation?.defectTag;
         items.push({
           id: s.id,
           createdAt: doc.createdAt || rec!.updatedAt,
@@ -105,6 +108,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
           sizeBytes: s.size,
           compatLabel: replayCompatibilityLabel(compat.compatibility),
           compatWarn: compat.compatibility !== 'exact' && compat.compatibility !== 'migratable',
+          ...(tag ? { defectLabel: defectTagLabel(tag) } : {}),
         });
       }
     } catch {
@@ -300,7 +304,12 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
       this.ctx.hud.toast(t('replay.loadFailed'));
       return;
     }
-    const blob = new Blob([JSON.stringify(rec.data)], { type: 'application/json' });
+    // 선택 평가: 비우거나 건너뛰면 evaluation 생략. 로컬 JSON만 내려받고 외부 전송 없음.
+    const evaluation = await promptPlaytestEvaluation(this.ctx.hudRoot);
+    const base: ReplayDocument = { ...rec.data };
+    delete base.evaluation;
+    const payload: ReplayDocument = evaluation ? { ...base, evaluation } : base;
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

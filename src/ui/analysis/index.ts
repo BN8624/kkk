@@ -17,6 +17,8 @@ export interface AnalysisListItem {
   sub: string;
   outcome: 'win' | 'lose' | 'draw';
   selected: boolean;
+  /** 플레이테스트 분류 라벨(있으면 목록에 표시) */
+  defectLabel?: string;
 }
 
 export interface AnalysisFilterState {
@@ -59,6 +61,7 @@ export function showAnalysisListScreen(
           <span class="rp-title"><b>${escapeHtml(it.title)}</b>
             <span class="rp-outcome ${cls}">${escapeHtml(outcome)}</span></span>
           <span class="rp-sub">${escapeHtml(it.sub)}</span>
+          ${it.defectLabel ? `<span class="rp-sub rp-defect">${escapeHtml(it.defectLabel)}</span>` : ''}
         </button>
       </div>`;
     })
@@ -167,6 +170,7 @@ export function showSingleAnalysisScreen(
   coaching: CoachingNote[],
   campaignNote: string | null,
   handlers: SingleAnalysisHandlers,
+  defectLabel?: string | null,
 ): void {
   const word = a.outcome === 'win' ? t('result.win') : a.outcome === 'lose' ? t('result.lose') : t('result.draw');
   const summary = resultTableHtml([
@@ -177,6 +181,10 @@ export function showSingleAnalysisScreen(
     { label: t('analysis.economy'), value: t('analysis.economyValue', { income: a.totalIncome, spend: a.productionSpend, gold: a.goldAtEnd }) },
     { label: t('analysis.moveDistance'), value: t('analysis.tiles', { n: a.moveDistance }) },
   ]);
+  const defect =
+    defectLabel || a.defectTag
+      ? `<p class="an-defect">${escapeHtml(defectLabel ?? t(`eval.tag.${a.defectTag!}`))}</p>`
+      : '';
   const stars =
     a.starReviews.length > 0
       ? `<div class="an-block"><h2>${escapeHtml(t('analysis.starReview'))}</h2>${a.starReviews
@@ -196,6 +204,7 @@ export function showSingleAnalysisScreen(
   const root = overlay.show(`
       <h1 style="font-size:22px;">${escapeHtml(a.scenarioTitle)}</h1>
       <p class="subtitle" style="font-size:12.5px;">${escapeHtml(a.replayId)}</p>
+      ${defect}
       ${summary}
       ${campaignNote ? `<p class="subtitle">${escapeHtml(campaignNote)}</p>` : ''}
       ${stars}

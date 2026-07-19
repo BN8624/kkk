@@ -4,7 +4,7 @@ import { unitAt, unitsOf } from '../board';
 import { MAX_UNITS_PER_FACTION } from '../data';
 import { attackTargets, forecastAttack, unitCost } from '../game';
 import { hexDistance } from '../hex';
-import { replayInitialState, type ReplayDocument } from '../replay';
+import { replayInitialState, type PlaytestEvaluation, type ReplayDocument } from '../replay';
 import { starsEarned } from '../scenario/objectives';
 import type { StarCondition } from '../scenario/types';
 import type { Axial, FactionId, GameConfig, GameState, UnitTypeId } from '../types';
@@ -45,6 +45,8 @@ export interface ReplayAnalysis {
   createdAt: string;
   config: GameConfig;
   scenarioTitle: string;
+  /** 리플레이 문서의 선택 평가 분류(결정론·다이제스트와 무관) */
+  defectTag?: PlaytestEvaluation['defectTag'];
 
   // 전체
   outcome: 'win' | 'lose' | 'draw';
@@ -476,6 +478,7 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
       createdAt: doc.createdAt,
       config: { ...doc.initialConfig },
       scenarioTitle: localizedScenarioName(doc.initialConfig.scenario, doc.scenario.title),
+      ...(doc.evaluation?.defectTag ? { defectTag: doc.evaluation.defectTag } : {}),
       outcome: doc.result.winner === 'draw' ? 'draw' : doc.result.winner === me ? 'win' : 'lose',
       winner: doc.result.winner,
       turns,

@@ -412,6 +412,24 @@ export const KO = {
   'replay.storeFailed': '저장 공간이 부족하거나 저장하지 못했습니다',
   'replay.imported': '리플레이를 가져왔습니다',
 
+  // 플레이테스트 평가(선택·로컬 전용)
+  'eval.title': '플레이 평가(선택)',
+  'eval.note': '메모',
+  'eval.skip': '건너뛰기',
+  'eval.attach': '평가 첨부',
+  'eval.enjoyment.fun': '재미있음',
+  'eval.enjoyment.ok': '보통',
+  'eval.enjoyment.boring': '재미없음',
+  'eval.length.short': '너무 짧음',
+  'eval.length.right': '적당함',
+  'eval.length.long': '너무 김',
+  'eval.understood.yes': '예',
+  'eval.understood.no': '아니오',
+  'eval.tag.early-objective': '조기 목표 선점',
+  'eval.tag.lost-before-acting': '개입 전 패배',
+  'eval.tag.unclear-objective': '목표 규칙 불명확',
+  'eval.tag.no-retake-chance': '탈환 기회 부족',
+
   // 플레이 분석
   'analysis.title': '플레이 분석',
   'analysis.subtitle': '내 리플레이에서 승패의 이유를 찾습니다 (이 브라우저 안에서만 분석)',

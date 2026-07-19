@@ -21,6 +21,7 @@ import {
   migrateReplayV1,
   REPLAY_MAX_IMPORT_BYTES,
   REPLAY_SCHEMA_VERSION,
+  sanitizeEvaluation,
   verifyReplay,
   type ReplayDocument,
   type ReplayDocumentV1,
@@ -284,6 +285,13 @@ export function decodeReplayDocument(input: string | unknown): DecodeResult<Repl
     }
   }
 
+  // 플레이테스트 평가(선택): 정본·재생에 관여하지 않는다. 형식 오류 시 evaluation만 버린다(재생 차단 금지).
+  const cleanedEvaluation = sanitizeEvaluation(raw.evaluation);
+  if (raw.evaluation !== undefined) {
+    if (cleanedEvaluation) raw.evaluation = cleanedEvaluation;
+    else delete raw.evaluation;
+  }
+
   // 중첩 시나리오(기존 검증기 재사용)
   if (issues.length === 0) {
     validateSnapshot(raw.scenario, issues);
@@ -291,6 +299,7 @@ export function decodeReplayDocument(input: string | unknown): DecodeResult<Repl
 
   if (issues.length > 0) return { ok: false, issues };
   if (schemaVersion === 1) {
+    // v1 마이그레이션 후에도 evaluation이 있으면 보존(이미 위에서 정리됨)
     return decodeOk(migrateReplayV1(raw as unknown as ReplayDocumentV1), [
       { code: 'migrated-v1', message: 'v1 리플레이를 v2 형식으로 변환했습니다', severity: 'warning', cause: 'schema' },
     ]);

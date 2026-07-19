@@ -103,6 +103,18 @@ export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): 
   );
   lines.push(`- ${t('report.averages', { turns: agg.avgTurns, score: agg.avgScore })}`);
   if (agg.starTotal > 0) lines.push(`- ${t('report.stars')}: ${agg.totalStars}/${agg.starTotal}`);
+  // 선택 평가 분류별 개수(한 줄, 있을 때만)
+  const tagCounts = new Map<string, number>();
+  for (const a of list) {
+    if (!a.defectTag) continue;
+    tagCounts.set(a.defectTag, (tagCounts.get(a.defectTag) ?? 0) + 1);
+  }
+  if (tagCounts.size > 0) {
+    const parts = [...tagCounts.entries()]
+      .map(([tag, n]) => `${t(`eval.tag.${tag as 'early-objective' | 'lost-before-acting' | 'unclear-objective' | 'no-retake-chance'}`)} ${n}`)
+      .join(' · ');
+    lines.push(`- ${t('eval.title')}: ${parts}`);
+  }
   lines.push('');
 
   lines.push(`## ${t('report.unitUsage')}`);

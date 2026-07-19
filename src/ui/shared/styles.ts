@@ -193,6 +193,23 @@ export function injectSharedStyles(): void {
 .rp-sub { font-size: 12px; color: #a9b4cc; }
 .rp-compat { color: #7fae7a; }
 .rp-compat.warn { color: #d9a441; }
+.rp-eval-sheet { z-index: 8; max-height: 70vh; overflow-y: auto; }
+.rp-eval-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.rp-eval-chip {
+  border: 1.5px solid #8a6d14; border-radius: 999px; background: #faf5e8;
+  padding: 6px 10px; font-size: 12.5px; color: #2b2416;
+}
+.rp-eval-chip.on { background: #c9a227; color: #2b2416; font-weight: bold; }
+.rp-eval-note { display: flex; flex-direction: column; gap: 4px; font-size: 13px; margin: 6px 0; }
+.rp-eval-note textarea {
+  width: 100%; border: 1.5px solid #8a6d14; border-radius: 10px; background: #faf5e8;
+  padding: 8px; font: inherit; color: #2b2416; resize: vertical;
+}
+.rp-eval-actions { display: flex; gap: 8px; }
+.rp-eval-actions .close-btn { flex: 1; margin-top: 6px; }
+.rp-eval-attach { background: linear-gradient(#d9b544, #c9a227) !important; font-weight: bold; }
+.rp-defect { color: #d9a441; font-size: 12px; }
+.an-defect { color: #e8c95a; font-size: 13px; margin: 0 0 6px; }
 .an-filters { width: min(430px, 92vw); display: flex; flex-wrap: wrap; gap: 6px; }
 .an-filters select {
   flex: 1; min-width: 96px; padding: 6px 8px; border-radius: 10px; font-size: 12.5px;

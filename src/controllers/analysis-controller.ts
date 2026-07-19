@@ -15,6 +15,7 @@ import {
   replayCompatibilityReason,
   t,
 } from '../i18n';
+import { defectTagLabel } from '../ui/replay';
 import { documentStore } from '../storage/idb';
 import {
   showAnalysisListScreen,
@@ -111,6 +112,7 @@ export class AnalysisController implements AppController {
     const list = this.filtered();
     const items: AnalysisListItem[] = list.map(({ id, doc }) => {
       const me = doc.initialConfig.humanFaction;
+      const tag = doc.evaluation?.defectTag;
       return {
         id,
         title: localizedScenarioName(
@@ -127,6 +129,7 @@ export class AnalysisController implements AppController {
         outcome:
           doc.result.winner === me ? 'win' : doc.result.winner === 'draw' ? 'draw' : 'lose',
         selected: this.selected.has(id),
+        ...(tag ? { defectLabel: defectTagLabel(tag) } : {}),
       };
     });
     const scenarioOptions = [...new Map(this.loaded.map(({ doc }) => [doc.initialConfig.scenario, localizedScenarioName(doc.initialConfig.scenario, doc.scenario.title || doc.initialConfig.scenario)])).entries()].map(
@@ -195,6 +198,7 @@ export class AnalysisController implements AppController {
 
   private showSingle(doc: ReplayDocument, analysis: ReplayAnalysis): void {
     this.ctx.enterMode('analysis');
+    const tag = doc.evaluation?.defectTag ?? analysis.defectTag;
     showSingleAnalysisScreen(
       this.ctx.overlay,
       analysis,
@@ -205,6 +209,7 @@ export class AnalysisController implements AppController {
         onExport: (format) => this.export([analysis], format),
         onBack: () => this.renderList(),
       },
+      tag ? defectTagLabel(tag) : null,
     );
   }
 
