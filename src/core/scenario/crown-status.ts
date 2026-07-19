@@ -65,14 +65,16 @@ export function crownStatus(state: GameState): CrownStatus | null {
     contested = active && flags.contested;
   }
 
+  // 엔진은 라운드 종료 시 held를 올린 뒤 승리하면 turn++ 전에 return한다.
+  // 남은 필요 라운드 r이면 현재 턴 포함 r번째 라운드 종료에 승리 → turn + r - 1.
   let earliestWinTurn: number | null = null;
   if (!active && activationTurn !== undefined) {
     earliestWinTurn = activationTurn + needTurns - 1;
   } else if (owner && active && !contested) {
-    earliestWinTurn = state.turn + (needTurns - heldTurns);
+    earliestWinTurn = state.turn + needTurns - heldTurns - 1;
   } else if (!owner && active) {
-    // 미점령: 이번 턴 점령 후 연속 보유 하한
-    earliestWinTurn = state.turn + needTurns;
+    // 미점령: 이번 라운드 점령 가정 후 연속 보유 하한
+    earliestWinTurn = state.turn + needTurns - 1;
   }
 
   return {

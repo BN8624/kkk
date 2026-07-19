@@ -76,6 +76,35 @@ describe('호환 판정', () => {
     );
   });
 
+  /**
+   * 보관함 openReplayById → playFromDocument 분기 계약.
+   * 저장된 문서도 가져오기와 동일하게 checkReplayCompatibility 결과를 따른다.
+   */
+  describe('보관함 열기 호환 분기(playFromDocument 계약)', () => {
+    /** openPlayback 옵션으로 매핑되는 재생 모드 */
+    function archiveOpenMode(
+      gameVersion: string,
+      scenarioId: string,
+    ): 'unverified' | 'verified' | 'reject' {
+      const d = checkReplayCompatibility(docWithVersion(gameVersion, scenarioId));
+      if (d.compatibility === 'unsupported') return 'reject';
+      if (d.compatibility === 'playable-unverified') return 'unverified';
+      return 'verified';
+    }
+
+    it('보관함 2.0.x crown-heart → playable-unverified(확인 후 unverified 재생)', () => {
+      expect(archiveOpenMode('2.0.0', 'crown-heart')).toBe('unverified');
+      expect(archiveOpenMode('2.0.5', 'crown-heart')).toBe('unverified');
+    });
+
+    it('보관함 exact(2.1.x crown · 2.0.x 비-crown) → 검증 재생', () => {
+      expect(archiveOpenMode('2.1.0', 'crown-heart')).toBe('verified');
+      expect(archiveOpenMode(GAME_VERSION, 'crown-heart')).toBe('verified');
+      expect(archiveOpenMode('2.0.0', 'three-crowns')).toBe('verified');
+      expect(archiveOpenMode('2.0.1', 'broken-strait')).toBe('verified');
+    });
+  });
+
   it('리플레이 도입 이전 버전 표기는 unsupported', () => {
     expect(checkReplayCompatibility(docWithVersion('1.0.0')).compatibility).toBe('unsupported');
     expect(checkReplayCompatibility(docWithVersion('0.9.0')).compatibility).toBe('unsupported');

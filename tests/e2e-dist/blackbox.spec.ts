@@ -293,4 +293,3 @@ test('왕관의 심장: 봉인 UI 표시 후 턴 진행, turn 4 자동종료 없
     await expect(page.locator('.result-word')).toHaveCount(0);
   }
 });
-

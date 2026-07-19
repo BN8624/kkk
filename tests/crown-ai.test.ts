@@ -2,11 +2,18 @@
 import { describe, expect, it } from 'vitest';
 import { runAiTurn } from '../src/core/ai';
 import { tileAt, unitsOf } from '../src/core/board';
-import { newGame } from '../src/core/game';
+import { advancePhase, newGame } from '../src/core/game';
 import { hexDistance, neighbors } from '../src/core/hex';
 import { crownStatus } from '../src/core/scenario/crown-status';
 import type { GameState } from '../src/core/types';
 import { addUnit, makeState } from './helpers';
+
+/** 세 세력 페이즈를 모두 넘겨 라운드 종료 보유 판정을 유발한다. */
+function endRound(state: GameState): void {
+  advancePhase(state);
+  advancePhase(state);
+  advancePhase(state);
+}
 
 /** hold-building 왕관 미니 상태를 조립한다. */
 function makeCrownState(opts: {
@@ -62,7 +69,7 @@ describe('crownStatus 순수 함수', () => {
     expect(cs.earliestWinTurn).toBe(3 + 4 - 1);
   });
 
-  it('활성화 후 소유·비경합이면 earliestWinTurn = turn + (need - held)', () => {
+  it('활성화 후 소유·비경합이면 earliestWinTurn = turn + need - held - 1', () => {
     const state = makeCrownState({
       turn: 6,
       activationTurn: 3,
@@ -76,7 +83,32 @@ describe('crownStatus 순수 함수', () => {
     expect(cs.turnsToActivate).toBe(0);
     expect(cs.garrisoned).toBe(true);
     expect(cs.contested).toBe(false);
-    expect(cs.earliestWinTurn).toBe(6 + (4 - 2));
+    // turn=6 held=2 need=4 → 6라운드 종료 3, 7라운드 종료 4 → 7턴 승리
+    expect(cs.earliestWinTurn).toBe(6 + 4 - 2 - 1);
+  });
+
+  it('earliestWinTurn 예측이 엔진 실제 승리 턴과 일치한다', () => {
+    const state = makeCrownState({
+      turn: 6,
+      activationTurn: 3,
+      need: 4,
+      owner: 'crimson',
+      held: 2,
+    });
+    addUnit(state, { faction: 'crimson', q: 2, r: 2 }); // 주둔·비경합 유지
+    const predicted = crownStatus(state)!.earliestWinTurn;
+    expect(predicted).not.toBeNull();
+
+    // 소유·비경합을 유지한 채 라운드를 진행해 엔진 winner 확정 턴과 비교
+    let guard = 0;
+    while (!state.over && guard < 20) {
+      endRound(state);
+      guard++;
+    }
+    expect(state.over).toBe(true);
+    expect(state.winner).toBe('crimson');
+    // 승리 시 advancePhase는 turn++ 전에 return → state.turn 이 확정 턴
+    expect(state.turn).toBe(predicted);
   });
 
   it('인접 적 + 비주둔이면 contested=true 이고 예측은 null', () => {

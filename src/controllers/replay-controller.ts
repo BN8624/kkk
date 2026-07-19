@@ -152,7 +152,32 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
       this.ctx.hud.toast(t('replay.loadFailed'));
       return;
     }
-    this.openPlayback(doc);
+    this.playFromDocument(doc);
+  }
+
+  /**
+   * 호환 판정 후 재생. 보관함 열기·가져오기(재생만) 공통 경로.
+   * unsupported 거부, playable-unverified 확인 후 비검증 재생, exact/migratable 검증 재생.
+   */
+  private playFromDocument(doc: ReplayDocument): void {
+    const compat = checkReplayCompatibility(doc);
+    if (compat.compatibility === 'unsupported') {
+      this.ctx.hud.toast(replayCompatibilityReason(compat));
+      return;
+    }
+    const playDoc = compat.migrated ?? doc;
+    if (compat.compatibility === 'playable-unverified') {
+      if (
+        !window.confirm(
+          t('replay.playOnlyConfirm', { reason: replayCompatibilityReason(compat) }),
+        )
+      ) {
+        return;
+      }
+      this.openPlayback(playDoc, { unverified: true });
+      return;
+    }
+    this.openPlayback(playDoc);
   }
 
   // ---------------- 재생 ----------------
@@ -362,22 +387,12 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     }
     // 게임 버전 호환 판정: exact·migratable만 보관하고, 다른 규칙 버전은 재생만 허용한다
     const compat = checkReplayCompatibility(decoded.value);
-    if (compat.compatibility === 'unsupported') {
-      this.ctx.hud.toast(replayCompatibilityReason(compat));
+    if (compat.compatibility === 'unsupported' || compat.compatibility === 'playable-unverified') {
+      if (compat.compatibility === 'playable-unverified' && !token.alive) return;
+      this.playFromDocument(decoded.value);
       return;
     }
     const doc = compat.migrated ?? decoded.value;
-    if (compat.compatibility === 'playable-unverified') {
-      if (!token.alive) return;
-      if (
-        window.confirm(
-          t('replay.playOnlyConfirm', { reason: replayCompatibilityReason(compat) }),
-        )
-      ) {
-        this.openPlayback(doc, { unverified: true });
-      }
-      return;
-    }
     if (!safeVerifyReplay(doc).ok) {
       this.ctx.hud.toast(t('replay.verifyFailed'));
       return;
