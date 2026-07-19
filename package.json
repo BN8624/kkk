@@ -21,6 +21,8 @@
     "simulate:campaign": "vite-node scripts/campaign-sim.ts",
     "simulate:matrix": "vite-node scripts/campaign-matrix.ts",
     "simulate:official": "vite-node scripts/official-sim.ts",
+    "simulate:units": "vite-node scripts/unit-sim.ts",
+    "audit:rosters": "vite-node scripts/roster-audit.ts",
     "test:scenario": "vitest run tests/scenario-document.test.ts tests/campaign.test.ts",
     "build:test": "tsc --noEmit && vite build --outDir dist-test --mode testbridge",
     "test:e2e:dist": "playwright test -c playwright.dist.config.ts"

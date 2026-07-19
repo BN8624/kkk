@@ -1,0 +1,183 @@
+{
+  "generatedAt": "2026-07-19T20:38:13.155Z",
+  "seedsPerQuick": 8,
+  "pass": true,
+  "gates": [
+    {
+      "label": "quick-battle",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "label": "campaign-m2-m3",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "label": "official",
+      "ok": true,
+      "notes": []
+    }
+  ],
+  "buckets": [
+    {
+      "label": "quick-battle",
+      "games": 8,
+      "unfinished": 0,
+      "illegal": 0,
+      "byFaction": {
+        "azure": {
+          "produced": {
+            "infantry": 53,
+            "archer": 15,
+            "cavalry": 8,
+            "guardian": 11,
+            "raider": 0,
+            "crossbow": 0
+          },
+          "uniqueProduced": 11,
+          "sharedProduced": 76,
+          "gamesWithUnique": 7,
+          "games": 8
+        },
+        "crimson": {
+          "produced": {
+            "infantry": 35,
+            "archer": 9,
+            "cavalry": 14,
+            "guardian": 0,
+            "raider": 37,
+            "crossbow": 0
+          },
+          "uniqueProduced": 37,
+          "sharedProduced": 58,
+          "gamesWithUnique": 8,
+          "games": 8
+        },
+        "violet": {
+          "produced": {
+            "infantry": 29,
+            "archer": 2,
+            "cavalry": 5,
+            "guardian": 0,
+            "raider": 0,
+            "crossbow": 15
+          },
+          "uniqueProduced": 15,
+          "sharedProduced": 36,
+          "gamesWithUnique": 7,
+          "games": 8
+        }
+      },
+      "braceHits": 31,
+      "plunderEvents": 20,
+      "pierceAttacks": 56
+    },
+    {
+      "label": "campaign-m2-m3",
+      "games": 12,
+      "unfinished": 0,
+      "illegal": 0,
+      "byFaction": {
+        "azure": {
+          "produced": {
+            "infantry": 14,
+            "archer": 8,
+            "cavalry": 8,
+            "guardian": 4,
+            "raider": 0,
+            "crossbow": 0
+          },
+          "uniqueProduced": 4,
+          "sharedProduced": 30,
+          "gamesWithUnique": 2,
+          "games": 12
+        },
+        "crimson": {
+          "produced": {
+            "infantry": 10,
+            "archer": 0,
+            "cavalry": 0,
+            "guardian": 0,
+            "raider": 8,
+            "crossbow": 0
+          },
+          "uniqueProduced": 8,
+          "sharedProduced": 10,
+          "gamesWithUnique": 4,
+          "games": 12
+        },
+        "violet": {
+          "produced": {
+            "infantry": 18,
+            "archer": 0,
+            "cavalry": 0,
+            "guardian": 0,
+            "raider": 0,
+            "crossbow": 8
+          },
+          "uniqueProduced": 8,
+          "sharedProduced": 18,
+          "gamesWithUnique": 6,
+          "games": 12
+        }
+      },
+      "braceHits": 16,
+      "plunderEvents": 8,
+      "pierceAttacks": 26
+    },
+    {
+      "label": "official",
+      "games": 12,
+      "unfinished": 0,
+      "illegal": 0,
+      "byFaction": {
+        "azure": {
+          "produced": {
+            "infantry": 76,
+            "archer": 22,
+            "cavalry": 32,
+            "guardian": 10,
+            "raider": 0,
+            "crossbow": 0
+          },
+          "uniqueProduced": 10,
+          "sharedProduced": 130,
+          "gamesWithUnique": 6,
+          "games": 12
+        },
+        "crimson": {
+          "produced": {
+            "infantry": 56,
+            "archer": 18,
+            "cavalry": 22,
+            "guardian": 0,
+            "raider": 34,
+            "crossbow": 0
+          },
+          "uniqueProduced": 34,
+          "sharedProduced": 96,
+          "gamesWithUnique": 6,
+          "games": 12
+        },
+        "violet": {
+          "produced": {
+            "infantry": 28,
+            "archer": 2,
+            "cavalry": 4,
+            "guardian": 0,
+            "raider": 0,
+            "crossbow": 20
+          },
+          "uniqueProduced": 20,
+          "sharedProduced": 34,
+          "gamesWithUnique": 6,
+          "games": 12
+        }
+      },
+      "braceHits": 2,
+      "plunderEvents": 12,
+      "pierceAttacks": 86
+    }
+  ]
+}

@@ -1,0 +1,266 @@
+{
+  "generatedAt": "2026-07-19T20:38:10.428Z",
+  "pass": true,
+  "notes": [],
+  "matrix": [
+    {
+      "id": "infantry",
+      "faction": null,
+      "hp": 12,
+      "atk": 5,
+      "def": 2,
+      "move": 3,
+      "range": 1,
+      "cost": 30,
+      "traits": [],
+      "role": "frontline",
+      "forestCost": 2,
+      "mountainCost": 3,
+      "braceBonus": 0,
+      "plunderGold": 0,
+      "pierce": 0
+    },
+    {
+      "id": "archer",
+      "faction": null,
+      "hp": 10,
+      "atk": 5,
+      "def": 0,
+      "move": 2,
+      "range": 2,
+      "cost": 35,
+      "traits": [],
+      "role": "ranged-harass",
+      "forestCost": 2,
+      "mountainCost": 3,
+      "braceBonus": 0,
+      "plunderGold": 0,
+      "pierce": 0
+    },
+    {
+      "id": "cavalry",
+      "faction": null,
+      "hp": 14,
+      "atk": 7,
+      "def": 1,
+      "move": 5,
+      "range": 1,
+      "cost": 50,
+      "traits": [],
+      "role": "mobility-strike",
+      "forestCost": 2,
+      "mountainCost": 3,
+      "braceBonus": 0,
+      "plunderGold": 0,
+      "pierce": 0
+    },
+    {
+      "id": "guardian",
+      "faction": "azure",
+      "hp": 16,
+      "atk": 4,
+      "def": 4,
+      "move": 2,
+      "range": 1,
+      "cost": 48,
+      "traits": [
+        "brace"
+      ],
+      "role": "hold-defense",
+      "forestCost": 2,
+      "mountainCost": 3,
+      "braceBonus": 2,
+      "plunderGold": 0,
+      "pierce": 0
+    },
+    {
+      "id": "raider",
+      "faction": "crimson",
+      "hp": 11,
+      "atk": 6,
+      "def": 0,
+      "move": 4,
+      "range": 1,
+      "cost": 42,
+      "traits": [
+        "terrain-mobility",
+        "plunder"
+      ],
+      "role": "flank-plunder",
+      "forestCost": 1,
+      "mountainCost": 2,
+      "braceBonus": 0,
+      "plunderGold": 5,
+      "pierce": 0
+    },
+    {
+      "id": "crossbow",
+      "faction": "violet",
+      "hp": 10,
+      "atk": 7,
+      "def": 0,
+      "move": 2,
+      "range": 2,
+      "cost": 50,
+      "traits": [
+        "armor-piercing"
+      ],
+      "role": "armor-pierce",
+      "forestCost": 2,
+      "mountainCost": 3,
+      "braceBonus": 0,
+      "plunderGold": 0,
+      "pierce": 2
+    }
+  ],
+  "matchupSample": [
+    {
+      "attacker": "cavalry",
+      "defender": "archer",
+      "damage": 7
+    },
+    {
+      "attacker": "guardian",
+      "defender": "cavalry",
+      "damage": 3
+    },
+    {
+      "attacker": "raider",
+      "defender": "archer",
+      "damage": 6
+    },
+    {
+      "attacker": "crossbow",
+      "defender": "guardian",
+      "damage": 3,
+      "braced": 2
+    }
+  ],
+  "scenarioAudit": {
+    "campaigns": [
+      {
+        "id": "azure-1",
+        "uniqueUnits": false,
+        "uniqueOnBoard": [],
+        "errors": []
+      },
+      {
+        "id": "azure-2",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "azure:guardian"
+        ],
+        "errors": []
+      },
+      {
+        "id": "azure-3",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "azure:guardian",
+          "crimson:raider",
+          "violet:crossbow"
+        ],
+        "errors": []
+      },
+      {
+        "id": "crimson-1",
+        "uniqueUnits": false,
+        "uniqueOnBoard": [],
+        "errors": []
+      },
+      {
+        "id": "crimson-2",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "crimson:raider"
+        ],
+        "errors": []
+      },
+      {
+        "id": "crimson-3",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "crimson:raider",
+          "azure:guardian",
+          "violet:crossbow"
+        ],
+        "errors": []
+      },
+      {
+        "id": "violet-1",
+        "uniqueUnits": false,
+        "uniqueOnBoard": [],
+        "errors": []
+      },
+      {
+        "id": "violet-2",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "violet:crossbow",
+          "azure:guardian"
+        ],
+        "errors": []
+      },
+      {
+        "id": "violet-3",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "violet:crossbow",
+          "azure:guardian",
+          "crimson:raider"
+        ],
+        "errors": []
+      }
+    ],
+    "official": [
+      {
+        "id": "official-lightning-duel",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [],
+        "errors": []
+      },
+      {
+        "id": "official-grand-continent",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [],
+        "errors": []
+      },
+      {
+        "id": "official-narrow-bridge",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "crimson:raider"
+        ],
+        "errors": []
+      },
+      {
+        "id": "official-ring-fortress",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "violet:crossbow",
+          "azure:guardian",
+          "crimson:raider"
+        ],
+        "errors": []
+      },
+      {
+        "id": "official-golden-road",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "violet:crossbow",
+          "azure:guardian"
+        ],
+        "errors": []
+      },
+      {
+        "id": "official-kings-escort",
+        "uniqueUnits": true,
+        "uniqueOnBoard": [
+          "azure:guardian",
+          "crimson:raider"
+        ],
+        "errors": []
+      }
+    ]
+  }
+}

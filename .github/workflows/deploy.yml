@@ -129,6 +129,35 @@ jobs:
       - run: npm ci
       - run: npm test -- --run tests/analysis.test.ts
 
+  unit-system:
+    name: Unit System
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run tests/units.test.ts tests/unit-abilities.test.ts tests/ai-unique-units.test.ts tests/unique-save-replay.test.ts
+      - run: npm run audit:rosters
+      - run: npm run simulate:units -- --seeds=8
+      - name: Upload unit system evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-system-evidence
+          path: |
+            artifacts/unit-role-matrix.json
+            artifacts/unit-role-matrix.md
+            artifacts/unique-unit-simulation.json
+            artifacts/unique-unit-simulation.md
+          if-no-files-found: warn
+          retention-days: 14
+
   campaign-matrix:
     name: Campaign Matrix
     runs-on: ubuntu-latest
@@ -159,7 +188,7 @@ jobs:
 
   e2e:
     name: E2E
-    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix]
+    needs: [core, security, scenario, determinism, playtest-analysis, unit-system, campaign-matrix]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -187,7 +216,7 @@ jobs:
 
   release-assets:
     name: Release Assets
-    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix, e2e]
+    needs: [core, security, scenario, determinism, playtest-analysis, unit-system, campaign-matrix, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -212,7 +241,7 @@ jobs:
 
   package-pages:
     name: Package Pages
-    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix, e2e, release-assets]
+    needs: [core, security, scenario, determinism, playtest-analysis, unit-system, campaign-matrix, e2e, release-assets]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
