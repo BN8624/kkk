@@ -23,6 +23,7 @@ import type {
   Unit,
   UnitTypeId,
 } from './types';
+import { isUniqueUnit, producibleUnits } from './units';
 
 /** AI 턴 실행 결과: 발행한 정본 명령(리플레이 기록용)과 연출용 정본 이벤트. */
 export interface AiTurnResult {
@@ -320,11 +321,25 @@ function assignRoles(
 
   if (profile.defend && an.myCapital && an.capitalThreats.length > 0) {
     const cap = an.myCapital;
+    // 수호대를 수도 방어에 우선 배정
     const defenders = units
       .filter((u) => !roles.has(u.id))
-      .sort((a, b) => hexDistance(a, cap) - hexDistance(b, cap))
+      .sort((a, b) => {
+        const typeBias = (u: Unit) => (u.type === 'guardian' ? -2 : 0);
+        return typeBias(a) - typeBias(b) || hexDistance(a, cap) - hexDistance(b, cap);
+      })
       .slice(0, Math.min(2, an.capitalThreats.length));
     for (const d of defenders) roles.set(d.id, 'defend');
+  }
+
+  // 거점 위 수호대는 주둔(수호 태세 유지) — 불필요한 이탈 방지
+  for (const u of units) {
+    if (roles.has(u.id) || u.type !== 'guardian') continue;
+    const tile = tileAt(state, u.q, u.r);
+    if (tile?.building && tile.owner === faction) {
+      roles.set(u.id, 'hold');
+      holdTargets.set(u.id, tile);
+    }
   }
 
   // 왕관 요새를 소유 중이면(활성화 후) 비어 있는 요새에 수비대를 보낸다
@@ -338,7 +353,10 @@ function assignRoles(
     const crown = an.crownTile;
     const candidate = units
       .filter((u) => !roles.has(u.id))
-      .sort((a, b) => hexDistance(a, crown) - hexDistance(b, crown))[0];
+      .sort((a, b) => {
+        const typeBias = (u: Unit) => (u.type === 'guardian' ? -2 : u.type === 'raider' ? 1 : 0);
+        return typeBias(a) - typeBias(b) || hexDistance(a, crown) - hexDistance(b, crown);
+      })[0];
     if (candidate) roles.set(candidate.id, 'garrison');
   }
 
@@ -347,7 +365,12 @@ function assignRoles(
     const crown = an.crownTile;
     const candidate = units
       .filter((u) => !roles.has(u.id))
-      .sort((a, b) => hexDistance(a, crown) - hexDistance(b, crown))[0];
+      .sort((a, b) => {
+        // 약탈대·기병이 왕관 경합 진입에 유리
+        const typeBias = (u: Unit) =>
+          u.type === 'raider' || u.type === 'cavalry' ? -2 : u.type === 'guardian' ? 1 : 0;
+        return typeBias(a) - typeBias(b) || hexDistance(a, crown) - hexDistance(b, crown);
+      })[0];
     if (candidate) roles.set(candidate.id, 'garrison');
   }
   return { roles, holdTargets };
@@ -394,6 +417,8 @@ function actUnit(
   }
   if (role === 'defend') {
     // 방어: 위협 공격 우선, 수도가 비어 있으면 주둔, 아니면 수도 쪽으로 물러난다
+    // 수호대: 제자리 공격으로 수호 태세를 유지할 수 있으면 이동하지 않는다
+    if (unit.type === 'guardian' && attackInPlace(state, unit, an, issue, false)) return;
     if (tryAttack(state, unit, an, profile, issue)) return;
     if (an.myCapital) {
       if (tryOccupy(state, unit, an.myCapital, issue)) return;
@@ -420,7 +445,62 @@ function actUnit(
     retreatToSafety(state, unit, an, issue);
     return;
   }
-  // 공격 역할: 공격 → 점령 → 전진
+
+  // ---- 병종 전술 특화 ----
+  // 수호대: 거점 방어 우선, 빈 평원 추격·원거리 무한 추격 금지
+  if (unit.type === 'guardian') {
+    const tile = tileAt(state, unit.q, unit.r);
+    const onOwnedBuilding = !!(tile?.building && tile.owner === unit.faction);
+    if (onOwnedBuilding) {
+      // 제자리 공격(수호 태세 유지) 우선 — 공격은 태세 해제 조건이 아님
+      if (attackInPlace(state, unit, an, issue, false)) return;
+      // 사거리 밖 적만 있을 때는 거점을 버리지 않는다
+      return;
+    }
+    // 빈 아군 거점이 있으면 주둔
+    const emptyHold = state.tiles.find(
+      (t) => t.building && t.owner === unit.faction && !unitAt(state, t.q, t.r),
+    );
+    if (emptyHold && tryOccupy(state, unit, emptyHold, issue)) {
+      attackInPlace(state, unit, an, issue, false);
+      return;
+    }
+    if (tryAttack(state, unit, an, profile, issue)) return;
+    // 수도·왕관 쪽으로만 전진(평원 추격 금지)
+    if (an.myCapital) moveToward(state, unit, an.myCapital, profile, issue);
+    return;
+  }
+
+  // 약탈대: 빈 마을·후방 거점 점령 우선, 수호대 거점 정면 돌파 회피
+  if (unit.type === 'raider') {
+    if (tryCapture(state, unit, an, issue)) return;
+    if (tryAttack(state, unit, an, profile, issue)) return;
+    tryAdvance(state, unit, an, profile, issue);
+    return;
+  }
+
+  // 쇠뇌대: 중장 목표 우선 사격, 기병·약탈 인접 단독 이동 회피
+  if (unit.type === 'crossbow') {
+    if (tryAttack(state, unit, an, profile, issue)) return;
+    // 전선 뒤 안전 사격 위치 선호
+    if (profile.seekTerrain || profile.counterAware) {
+      const nearbyMelee = an.enemies.some(
+        (e) =>
+          unitById(state, e.id) &&
+          (e.type === 'cavalry' || e.type === 'raider') &&
+          hexDistance(unit, e) <= 2,
+      );
+      if (nearbyMelee) {
+        retreatToSafety(state, unit, an, issue);
+        return;
+      }
+    }
+    if (tryCapture(state, unit, an, issue)) return;
+    tryAdvance(state, unit, an, profile, issue);
+    return;
+  }
+
+  // 공용 병종 공격 역할: 공격 → 점령 → 전진
   if (tryAttack(state, unit, an, profile, issue)) return;
   if (tryCapture(state, unit, an, issue)) return;
   tryAdvance(state, unit, an, profile, issue);
@@ -491,6 +571,12 @@ function tryAttack(
         } else if (enemy.faction === an.crownOwner) {
           score += an.crownDenyImminent ? 50 + profile.crownDenyBonus / 5 : 20;
         }
+      }
+      // 병종 상성: 쇠뇌대는 고방어·수호대 우선, 약탈대는 원거리·빈 거점 적 우선
+      score += unitMatchupBonus(unit, enemy, state, pos);
+      // 약탈대: 수호대·보병이 지키는 거점 정면 돌파 억제
+      if (unit.type === 'raider' && isHardBuildingDefense(state, enemy) && !fc.defenderDies) {
+        score -= 18;
       }
       if (!best || score > best.score) best = { destKey: pos.key, target: enemy, score };
     }
@@ -579,12 +665,65 @@ function tryCapture(state: GameState, unit: Unit, an: Analysis, issue: IssueFn):
     const tile = tileAt(state, e.q, e.r);
     if (!tile?.building || tile.owner === unit.faction) continue;
     const objective = an.objectives.find((o) => o.q === e.q && o.r === e.r);
-    const value = (objective?.value ?? 50) * 2 - e.cost;
+    let value = (objective?.value ?? 50) * 2 - e.cost;
+    // 약탈대: 점령 보상·빈 마을 우선
+    if (unit.type === 'raider') {
+      value += 30;
+      if (tile.building === 'village' && !tile.owner) value += 15;
+      if (tile.building === 'village') value += 10;
+    }
     if (!best || value > best.value) best = { key, value };
   }
   if (!best) return false;
   const entry = reach.get(best.key)!;
   return issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } }).ok;
+}
+
+/** 병종 상성 점수: 정본 forecast breakdown(관통·수호 태세 반영) 기반. */
+function unitMatchupBonus(
+  attacker: Unit,
+  enemy: Unit,
+  state: GameState,
+  pos: { q: number; r: number },
+): number {
+  let bonus = 0;
+  if (attacker.type === 'crossbow') {
+    // 중장·수호대·거점 위 고방어 유닛 우선
+    if (enemy.type === 'guardian') bonus += 18;
+    else if (enemy.type === 'infantry') bonus += 10;
+    const enemyDef = UNIT_STATS[enemy.type].def;
+    if (enemyDef >= 2) bonus += 8;
+    const tile = tileAt(state, enemy.q, enemy.r);
+    if (tile?.building) bonus += 6;
+    // 저방어 원거리만 계속 때리는 것 억제
+    if (enemy.type === 'archer' || enemy.type === 'crossbow' || enemy.type === 'raider') bonus -= 4;
+  }
+  if (attacker.type === 'raider') {
+    // 노출된 원거리 병종
+    if (enemy.type === 'archer' || enemy.type === 'crossbow') bonus += 14;
+    if (enemy.type === 'guardian') bonus -= 10;
+  }
+  if (attacker.type === 'guardian') {
+    // 돌격 부대 저지
+    if (enemy.type === 'cavalry' || enemy.type === 'raider') bonus += 12;
+  }
+  // 이동 후 위치에서 기병·약탈이 쇠뇌에 위협적이면 감점
+  if (attacker.type === 'crossbow') {
+    const afterPos = pos;
+    for (const e of state.units) {
+      if (e.faction === attacker.faction) continue;
+      if (e.type !== 'cavalry' && e.type !== 'raider') continue;
+      if (hexDistance(afterPos, e) <= 1) bonus -= 20;
+    }
+  }
+  return bonus;
+}
+
+/** 수호대·보병이 거점을 지키는 강경 방어 여부. */
+function isHardBuildingDefense(state: GameState, enemy: Unit): boolean {
+  if (enemy.type !== 'guardian' && enemy.type !== 'infantry') return false;
+  const tile = tileAt(state, enemy.q, enemy.r);
+  return !!(tile?.building && tile.owner === enemy.faction);
 }
 
 /** 목표 지점을 향해 실제 도달 가능 타일 중 가장 가까워지는 곳으로 이동한다. */
@@ -665,46 +804,144 @@ function tryAdvance(
 
 // ---------------- 8.4 생산 결정 ----------------
 
+/** 병종 생산 점수: 보유 구성·적 구성·지도·왕관·금·고유 병종 역할을 반영한다. */
+function scoreProductionType(
+  state: GameState,
+  faction: FactionId,
+  type: UnitTypeId,
+  an: Analysis,
+  profile: AiProfile,
+): number {
+  const mine = unitsOf(state, faction);
+  const count = mine.length;
+  const ofType = mine.filter((u) => u.type === type).length;
+  const fs = state.factions[faction];
+  const cost = unitCost(faction, type, state.config.modifier);
+  if (fs.gold < cost) return -Infinity;
+
+  let score = 10;
+  // 생산 후 즉시 행동 불가 — 비싸면 약간 감점
+  score -= cost * 0.05;
+
+  // 공용 비율 목표
+  if (type === 'infantry') {
+    const target = Math.ceil((count + 1) * 0.35);
+    score += ofType < target ? 25 : 5 - ofType * 3;
+  } else if (type === 'archer') {
+    const target = Math.ceil((count + 1) * 0.25);
+    score += ofType < target ? 20 : 4 - ofType * 3;
+  } else if (type === 'cavalry') {
+    score += ofType <= Math.ceil((count + 1) * 0.25) ? 18 : 2 - ofType * 4;
+  }
+
+  // 고유 병종: 최소 1기는 유도, 과다 생산 억제
+  if (isUniqueUnit(type)) {
+    if (ofType === 0) score += 28;
+    else if (ofType === 1) score += 8;
+    else score -= 12 * ofType; // 과사용 금지
+  }
+
+  // 수호대: 방어·거점·왕관 시나리오
+  if (type === 'guardian') {
+    if (an.capitalThreats.length > 0) score += 22;
+    if (an.crownScenario) score += 12;
+    if (an.holdTiles.length > 0) score += 15;
+    const enemyRaiders = an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length;
+    if (an.enemies.length > 0 && enemyRaiders / an.enemies.length >= 0.3) score += 18;
+    // 넓은 지도·점령 경쟁에서는 억제
+    if (an.objectives.length >= 6 && an.capitalThreats.length === 0) score -= 8;
+  }
+
+  // 약탈대: 빈 거점·왕관 경합·원거리 적
+  if (type === 'raider') {
+    const emptyBuildings = state.tiles.filter(
+      (t) => t.building && t.owner !== faction && !unitAt(state, t.q, t.r),
+    ).length;
+    score += Math.min(20, emptyBuildings * 4);
+    if (an.crownScenario) score += 14;
+    const enemyRanged = an.enemies.filter((e) => e.type === 'archer' || e.type === 'crossbow').length;
+    if (an.enemies.length > 0 && enemyRanged / an.enemies.length >= 0.3) score += 12;
+    // 남은 턴이 매우 적으면 저렴한 보병 선호
+    if (an.turnsLeft <= 2) score -= 15;
+  }
+
+  // 쇠뇌대: 고방어·수호대 대응
+  if (type === 'crossbow') {
+    const armored = an.enemies.filter(
+      (e) => e.type === 'guardian' || e.type === 'infantry' || UNIT_STATS[e.type].def >= 2,
+    ).length;
+    if (an.enemies.length > 0 && armored / an.enemies.length >= 0.25) score += 20;
+    if (an.enemies.some((e) => e.type === 'guardian')) score += 16;
+    // 기병·약탈 다수면 억제
+    const fast = an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length;
+    if (an.enemies.length > 0 && fast / an.enemies.length >= 0.4) score -= 10;
+  }
+
+  // adaptive: 적 구성 상성
+  if (profile.production === 'adaptive' && an.enemies.length > 0) {
+    const enemyCav =
+      an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length /
+      an.enemies.length;
+    const enemyArc =
+      an.enemies.filter((e) => e.type === 'archer' || e.type === 'crossbow').length /
+      an.enemies.length;
+    const enemyGuard = an.enemies.filter((e) => e.type === 'guardian').length / an.enemies.length;
+    if (enemyCav >= 0.35) {
+      if (type === 'infantry' || type === 'guardian') score += 15;
+      if (type === 'raider') score -= 8;
+    }
+    if (enemyArc >= 0.4) {
+      if (type === 'cavalry' || type === 'raider') score += 14;
+    }
+    if (enemyGuard >= 0.2 && type === 'crossbow') score += 18;
+  }
+
+  // 지도 크기(거점 수) — 넓은 지도는 기동 병종
+  const buildings = state.tiles.filter((t) => t.building).length;
+  if (buildings >= 8) {
+    if (type === 'cavalry' || type === 'raider') score += 6;
+    if (type === 'guardian') score -= 4;
+  }
+
+  // 금이 충분한데 싸게만 찍는 것 방지: 여유 금 + 역할 필요 시 고유/고급 병종
+  if (fs.gold >= cost + 40 && isUniqueUnit(type) && ofType < 2) score += 6;
+
+  return score;
+}
+
 function pickProductionType(
   state: GameState,
   faction: FactionId,
   an: Analysis,
   profile: AiProfile,
 ): UnitTypeId {
+  const roster = producibleUnits(state, faction);
   const fs = state.factions[faction];
   const mine = unitsOf(state, faction);
   const count = mine.length;
 
   if (profile.production === 'cycle') {
+    // 쉬움: 공용 순환 + 가끔 고유(허용 시)
+    const unique = roster.find((t) => isUniqueUnit(t));
+    if (unique && count > 0 && count % 5 === 4 && fs.gold >= unitCost(faction, unique, state.config.modifier)) {
+      return unique;
+    }
     return count % 2 === 0 ? 'infantry' : 'archer';
   }
 
   // 남은 턴이 1 이하면 저렴한 유닛으로 점수를 극대화한다
   if (an.turnsLeft <= 1) return 'infantry';
 
-  if (profile.production === 'adaptive' && an.enemies.length > 0) {
-    const enemyCav = an.enemies.filter((e) => e.type === 'cavalry').length;
-    const enemyArc = an.enemies.filter((e) => e.type === 'archer').length;
-    // 적 기병 비중이 크면 방어 보병, 적 궁병 비중이 크면 접근 기병
-    if (enemyCav / an.enemies.length >= 0.4) return 'infantry';
-    if (
-      enemyArc / an.enemies.length >= 0.5 &&
-      fs.gold >= unitCost(faction, 'cavalry', state.config.modifier)
-    )
-      return 'cavalry';
+  let best: UnitTypeId = 'infantry';
+  let bestScore = -Infinity;
+  for (const type of roster) {
+    const s = scoreProductionType(state, faction, type, an, profile);
+    if (s > bestScore) {
+      bestScore = s;
+      best = type;
+    }
   }
-
-  // 균형 구성: 보병 4 : 궁병 3 : 기병 3 비율을 향한다
-  const inf = mine.filter((u) => u.type === 'infantry').length;
-  const arc = mine.filter((u) => u.type === 'archer').length;
-  const cav = mine.filter((u) => u.type === 'cavalry').length;
-  const targetInf = Math.ceil((count + 1) * 0.4);
-  const targetArc = Math.ceil((count + 1) * 0.3);
-  if (inf < targetInf) return 'infantry';
-  if (arc < targetArc) return 'archer';
-  if (fs.gold >= unitCost(faction, 'cavalry', state.config.modifier) + 20 && cav <= arc)
-    return 'cavalry';
-  return 'infantry';
+  return best;
 }
 
 function produceUnits(
@@ -732,8 +969,20 @@ function produceUnits(
       if (adjacentEnemy) continue;
     }
     let type = pickProductionType(state, faction, an, profile);
-    if (fs.gold < unitCost(faction, type, state.config.modifier)) type = 'infantry';
+    if (fs.gold < unitCost(faction, type, state.config.modifier)) {
+      // 살 수 있는 가장 싼 생산 가능 병종
+      const affordable = producibleUnits(state, faction)
+        .filter((t) => fs.gold >= unitCost(faction, t, state.config.modifier))
+        .sort(
+          (a, b) =>
+            unitCost(faction, a, state.config.modifier) -
+            unitCost(faction, b, state.config.modifier),
+        );
+      if (affordable.length === 0) break;
+      type = affordable[0];
+    }
     if (fs.gold < unitCost(faction, type, state.config.modifier)) break;
     issue({ type: 'produce-unit', at: { q: spot.q, r: spot.r }, unitType: type });
   }
 }
+
