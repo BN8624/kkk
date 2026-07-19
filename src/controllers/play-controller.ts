@@ -778,6 +778,7 @@ export class PlayController implements AppController, PlaySession {
       seed: e.seed,
       daily: e.mode === 'daily',
       modifierName: modifier ? modifierName(modifier) : undefined,
+      url: window.location.href.split(/[?#]/, 1)[0],
     });
     try {
       if (navigator.share) {

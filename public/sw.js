@@ -9,6 +9,7 @@ const APP_SHELL = [
   './icon-192.png',
   './icon-512.png',
 ];
+const CACHEABLE_DESTINATIONS = new Set(['script', 'style', 'image', 'font', 'manifest']);
 
 async function precacheShell() {
   const cache = await caches.open(CACHE_NAME);
@@ -21,7 +22,7 @@ async function precacheShell() {
   const urls = [...new Set([...APP_SHELL, ...linked].map((path) => new URL(path, rootUrl).href))];
   await Promise.all(urls.map(async (url) => {
     const asset = await fetch(url, { cache: 'reload' });
-    if (asset.ok) await cache.put(url, asset);
+    if (asset.ok && asset.type === 'basic') await cache.put(url, asset);
   }));
 }
 
@@ -46,12 +47,16 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  const scopeUrl = new URL(self.registration.scope);
+  if (!url.pathname.startsWith(scopeUrl.pathname)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then(async (response) => {
-          if (response.ok) (await caches.open(CACHE_NAME)).put(request, response.clone());
+          if (response.ok && response.type === 'basic') {
+            await (await caches.open(CACHE_NAME)).put(scopeUrl, response.clone());
+          }
           return response;
         })
         .catch(async () =>
@@ -63,9 +68,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (url.search || !CACHEABLE_DESTINATIONS.has(request.destination)) return;
+
   event.respondWith(
     caches.match(request).then((cached) => cached ?? fetch(request).then(async (response) => {
-      if (response.ok) (await caches.open(CACHE_NAME)).put(request, response.clone());
+      if (response.ok && response.type === 'basic') {
+        await (await caches.open(CACHE_NAME)).put(request, response.clone());
+      }
       return response;
     })),
   );

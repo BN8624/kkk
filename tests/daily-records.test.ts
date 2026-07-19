@@ -96,10 +96,12 @@ describe('로컬 기록', () => {
       kills: 8,
       seed: 20260719,
       daily: true,
+      url: 'https://example.test/new-repository/',
     });
     expect(text).toContain('갈라진 해협');
     expect(text).toContain('진홍 공국으로 9턴 승리');
     expect(text).toContain('점수 86');
     expect(text).toContain('20260719');
+    expect(text).toContain('https://example.test/new-repository/');
   });
 });

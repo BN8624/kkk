@@ -2,7 +2,12 @@
 
 하나의 섬을 두고 세 왕국이 겨루는 모바일 우선 육각 턴제 전략게임이자 전장 제작 플랫폼. 빠른 전투뿐 아니라 왕국별 캠페인, 모바일 시나리오 제작실, 커스텀 전장 공유, 결정론적 리플레이를 지원한다.
 
-<p align="center"><img src="docs/screenshot-mobile.png" alt="세 왕관의 섬 플레이 화면" width="360"></p>
+<p align="center">
+  <img src="docs/screenshot-ko.png" alt="세 왕관의 섬 한국어 플레이 화면" width="320">
+  <img src="docs/screenshot-en.png" alt="Three Crowns Island English gameplay" width="320">
+</p>
+
+<p align="center"><img src="docs/hero.gif" alt="세 왕관의 섬 2.0 플레이 흐름" width="360"></p>
 
 ## ▶ Play Now
 
@@ -103,6 +108,7 @@ npm run determinism   # 500개+ 실제 기록·재생 다이제스트 검증
 npm run simulate:campaign # 9개 미션 900게임+ 안정성·승리 가능성 검증
 npm run lint          # ESLint
 npm run package:itch  # itch.io 업로드용 three-crowns-island.zip 생성
+npm run release:assets # dist 기반 2.0 업로드 묶음과 SHA-256 체크섬 생성
 ```
 
 `main`에 푸시하면 GitHub Actions가 lint·타입·단위 테스트·프로덕션 빌드·멀티브라우저 E2E를 모두 통과한 경우에만 GitHub Pages에 배포한다. 배포판에는 테스트 브리지가 포함되지 않는다.
@@ -115,7 +121,24 @@ npm run package:itch  # itch.io 업로드용 three-crowns-island.zip 생성
 
 - 게임 설명 초안: *하나의 섬, 세 왕국, 열두 번의 턴. 왕국을 골라 고유 능력으로 섬을 지배하라. 세 시나리오와 매일 바뀌는 일일 도전을 브라우저에서 바로 플레이할 수 있다.*
 - 권장 설정: 화면 방향 자유(세로·가로 모두 지원), 모바일 지원 체크, 대표 이미지는 `public/og-image.png`
-- 버전: 1.5.0
+- 버전: 2.0.0
+
+## 저장소 이름 변경
+
+저장소 이름은 제품명으로 사용되지 않는다. GitHub에서 저장소 이름을 바꾼 뒤 Pages 설정에서 `main`의 Actions 배포를 유지하고, 위 README의 공개 URL만 새 Pages URL로 갱신하면 된다. Vite `base`, Open Graph 이미지, PWA `start_url`·`scope`, 앱 내부 공유 링크는 모두 상대 경로 또는 현재 브라우저 주소를 사용한다.
+
+## English
+
+Three Crowns Island is a mobile-first, deterministic hex strategy game and scenario workshop. Version 2.0 includes quick battles, nine campaign missions, a daily challenge, six official custom battlefields, a mobile editor, replay playback and local playtest analysis, Korean/English UI, offline PWA play, and full/selective data backup.
+
+- Play online at **https://bn8624.github.io/kkk/** or install it from your browser's Add to Home Screen menu.
+- Choose **Settings** to switch languages immediately.
+- All saves, replays, scenarios, and analysis data stay on this device; no analytics server is used.
+- Use **Data management** to export a full backup before clearing browser data or moving devices.
+- Existing 1.5 saves remain supported. Replay 1.5.x and 2.0.x use the documented compatibility policy.
+- For contributors: run `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e:dist` before submitting changes.
+
+See [the 2.0 release notes](docs/RELEASE_NOTES_2.0.0.md) and [the physical iPhone checklist](docs/IPHONE_CHECKLIST.md) for release details.
 
 ## 그래픽 에셋 교체
 

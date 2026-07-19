@@ -285,6 +285,7 @@ export function resultShareText(opts: {
   seed: number;
   daily?: boolean;
   modifierName?: string;
+  url?: string;
 }): string {
   const result =
     opts.outcome === 'win'
@@ -304,6 +305,6 @@ export function resultShareText(opts: {
         : '',
       seed: opts.seed,
     }),
-    'https://bn8624.github.io/kkk/',
+    ...(opts.url ? [opts.url] : []),
   ].join('\n');
 }

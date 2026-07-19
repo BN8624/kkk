@@ -38,4 +38,13 @@ describe('PWA 정적 계약', () => {
     const installBlock = worker.slice(worker.indexOf("addEventListener('install'"), worker.indexOf("addEventListener('activate'"));
     expect(installBlock).not.toContain('skipWaiting');
   });
+
+  it('현재 scope의 정적 응답만 캐시해 검색 URL·외부 출처·오류 응답 오염을 막는다', () => {
+    const worker = readFileSync('public/sw.js', 'utf8');
+    expect(worker).toContain("url.origin !== self.location.origin");
+    expect(worker).toContain("url.pathname.startsWith(scopeUrl.pathname)");
+    expect(worker).toContain("CACHEABLE_DESTINATIONS.has(request.destination)");
+    expect(worker).toContain('url.search');
+    expect(worker).toContain("response.ok && response.type === 'basic'");
+  });
 });

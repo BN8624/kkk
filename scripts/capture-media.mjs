@@ -1,32 +1,32 @@
-// 한 줄 목적: 실행 중인 개발 서버에서 공개 OG·캠페인 PNG와 README용 에디터·리플레이 GIF를 캡처한다
+// 한 줄 목적: 실행 중인 개발 서버에서 한·영 스크린샷과 2.0 대표·에디터·리플레이 GIF 등 공개 미디어를 캡처한다
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, devices } from '@playwright/test';
 
 const BASE = process.env.CAPTURE_URL ?? 'http://localhost:5199';
 const SEED = 20260719;
 
-async function startGame(page) {
-  await page.addInitScript(() => {
+async function preparePage(page, locale = 'ko') {
+  await page.addInitScript((selectedLocale) => {
     localStorage.setItem(
       'three-crowns-settings',
       JSON.stringify({ soundOn: false, tutorialDone: true, aiSpeed: 0 }),
     );
-  });
+    localStorage.setItem('three-crowns-locale', selectedLocale);
+  }, locale);
+}
+
+async function startGame(page, locale = 'ko') {
+  await preparePage(page, locale);
   await page.goto(`${BASE}/?seed=${SEED}`);
-  await page.getByRole('button', { name: '빠른 전투' }).click();
-  await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
+  await page.locator('#btn-new').click();
+  await page.locator('#btn-start').click();
   await page.waitForFunction(() => window.__tc?.state() !== null);
 }
 
-async function openTitle(page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'three-crowns-settings',
-      JSON.stringify({ soundOn: false, tutorialDone: true, aiSpeed: 0 }),
-    );
-  });
+async function openTitle(page, locale = 'ko') {
+  await preparePage(page, locale);
   await page.goto(BASE);
 }
 
@@ -51,7 +51,7 @@ function makeGif(frameDir, output) {
 
 async function playTurns(page, turns) {
   for (let i = 0; i < turns; i++) {
-    await page.getByRole('button', { name: '턴 종료' }).click();
+    await page.locator('button.end-turn').click();
     await page.waitForFunction(() => window.__tc && !window.__tc.busy(), undefined, {
       timeout: 60_000,
     });
@@ -100,15 +100,49 @@ const browser = await chromium.launch();
   console.log('public/og-image.png');
 }
 
-// README 모바일 스크린샷(iPhone 13 뷰포트)
+// README 한국어 모바일 스크린샷(iPhone 13 뷰포트)
 {
   const page = await browser.newPage({ ...devices['iPhone 13'] });
   await startGame(page);
   await playTurns(page, 2);
   await selectUnit(page);
-  await page.screenshot({ path: 'docs/screenshot-mobile.png' });
+  await page.screenshot({ path: 'docs/screenshot-ko.png' });
+  copyFileSync('docs/screenshot-ko.png', 'docs/screenshot-mobile.png');
   await page.close();
-  console.log('docs/screenshot-mobile.png');
+  console.log('docs/screenshot-ko.png');
+}
+
+// README 영어 모바일 스크린샷(iPhone 13 뷰포트)
+{
+  const page = await browser.newPage({ ...devices['iPhone 13'] });
+  await startGame(page, 'en');
+  await playTurns(page, 2);
+  await selectUnit(page);
+  await page.screenshot({ path: 'docs/screenshot-en.png' });
+  await page.close();
+  console.log('docs/screenshot-en.png');
+}
+
+// 2.0 대표 GIF: 타이틀→설정→전투→선택 가능한 행동
+{
+  const frames = join('docs', '.hero-frames');
+  rmSync(frames, { recursive: true, force: true });
+  mkdirSync(frames, { recursive: true });
+  const page = await browser.newPage({ ...devices['iPhone 13'] });
+  await openTitle(page);
+  await page.screenshot({ path: join(frames, '00.png') });
+  await page.locator('#btn-new').click();
+  await page.screenshot({ path: join(frames, '01.png') });
+  await page.locator('#btn-start').click();
+  await page.waitForFunction(() => window.__tc?.state() !== null);
+  await page.screenshot({ path: join(frames, '02.png') });
+  await playTurns(page, 1);
+  await selectUnit(page);
+  await page.screenshot({ path: join(frames, '03.png') });
+  await page.close();
+  makeGif(frames, 'docs/hero.gif');
+  rmSync(frames, { recursive: true, force: true });
+  console.log('docs/hero.gif');
 }
 
 // 캠페인 선택 화면

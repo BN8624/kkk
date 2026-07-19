@@ -1,6 +1,7 @@
 // 한 줄 목적: dist 산출물을 itch.io 업로드용 ZIP으로 묶는다
-import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { platform } from 'node:os';
 
 if (!existsSync('dist/index.html')) {
@@ -8,13 +9,18 @@ if (!existsSync('dist/index.html')) {
   process.exit(1);
 }
 
-const out = 'three-crowns-island.zip';
+const out = resolve(process.env.ITCH_OUTPUT ?? 'three-crowns-island.zip');
+mkdirSync(dirname(out), { recursive: true });
+rmSync(out, { force: true });
+
 if (platform() === 'win32') {
-  execSync(
-    `powershell -NoProfile -Command "if (Test-Path '${out}') { Remove-Item '${out}' }; Compress-Archive -Path dist/* -DestinationPath '${out}'"`,
+  execFileSync(
+    'tar.exe',
+    ['-a', '-cf', out, '-C', resolve('dist'), '.'],
     { stdio: 'inherit' },
   );
 } else {
-  execSync(`rm -f ${out} && cd dist && zip -r ../${out} .`, { stdio: 'inherit', shell: '/bin/sh' });
+  execFileSync('zip', ['-q', '-r', out, '.'], { cwd: resolve('dist'), stdio: 'inherit' });
 }
-console.log(`생성 완료: ${out} (itch.io에 HTML 게임으로 업로드)`);
+
+console.log(`생성 완료: ${out} (itch.io의 HTML 게임으로 업로드)`);

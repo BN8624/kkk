@@ -185,9 +185,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  release-assets:
+    name: Release Assets
+    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          name: production-dist
+          path: dist
+      - run: npm run release:assets
+      - uses: actions/upload-artifact@v7
+        with:
+          name: three-crowns-island-2.0.0
+          path: release
+          if-no-files-found: error
+
   package-pages:
     name: Package Pages
-    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix, e2e]
+    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix, e2e, release-assets]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

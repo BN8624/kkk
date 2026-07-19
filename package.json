@@ -1,7 +1,7 @@
 {
   "name": "three-crowns-island",
   "private": true,
-  "version": "1.5.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,7 @@
     "simulate": "vite-node scripts/simulate.ts",
     "determinism": "vite-node scripts/determinism.ts",
     "package:itch": "node scripts/package-itch.mjs",
+    "release:assets": "vite-node scripts/release-assets.ts",
     "simulate:campaign": "vite-node scripts/campaign-sim.ts",
     "simulate:matrix": "vite-node scripts/campaign-matrix.ts",
     "simulate:official": "vite-node scripts/official-sim.ts",
