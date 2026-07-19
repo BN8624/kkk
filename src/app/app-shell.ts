@@ -66,6 +66,9 @@ export class AppShell implements AppContext, AppNavigation {
   private epoch = 0;
   private scene: BoardScene | null = null;
   private boardStarted = false;
+  private swRegistration: ServiceWorkerRegistration | null = null;
+  private updateAvailable = false;
+  private reloadForUpdate = false;
 
   private playCtrl: PlayController;
   private campaignCtrl: CampaignController;
@@ -115,6 +118,7 @@ export class AppShell implements AppContext, AppNavigation {
   boot(): void {
     this.toTitle();
     void this.consumeShareHash();
+    void this.registerServiceWorker();
     this.installTestBridge();
   }
 
@@ -215,6 +219,7 @@ export class AppShell implements AppContext, AppNavigation {
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
       saveSummary: summary,
+      updateAvailable: this.updateAvailable,
       features: { campaign: true, scenarios: true, editor: true, replays: true, analysis: true },
       handlers: {
         onContinue: () => this.continueGame(),
@@ -226,8 +231,45 @@ export class AppShell implements AppContext, AppNavigation {
         onReplays: () => this.toReplayArchive(),
         onAnalysis: () => this.toAnalysis(),
         onRecords: () => this.toRecords(),
+        onUpdate: () => this.activateUpdate(),
       },
     });
+  }
+
+  private async registerServiceWorker(): Promise<void> {
+    if (!import.meta.env.PROD || !('serviceWorker' in navigator) || location.protocol === 'file:') return;
+    try {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (this.reloadForUpdate) location.reload();
+      });
+      const registration = await navigator.serviceWorker.register(
+        new URL('sw.js', document.baseURI),
+      );
+      this.swRegistration = registration;
+      if (registration.waiting && navigator.serviceWorker.controller) this.markUpdateAvailable();
+      registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        worker?.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            this.markUpdateAvailable();
+          }
+        });
+      });
+    } catch {
+      // 서비스 워커 실패는 일반 웹 실행을 막지 않는다
+    }
+  }
+
+  private markUpdateAvailable(): void {
+    this.updateAvailable = true;
+    if (this.mode === 'title') this.toTitle();
+  }
+
+  private activateUpdate(): void {
+    const waiting = this.swRegistration?.waiting;
+    if (!waiting) return;
+    this.reloadForUpdate = true;
+    waiting.postMessage({ type: 'SKIP_WAITING' });
   }
 
   toSetup(): void {

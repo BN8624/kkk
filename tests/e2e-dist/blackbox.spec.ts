@@ -59,6 +59,49 @@ test('공개 빌드에는 테스트 브리지가 없다', async ({ page }) => {
   expect(await page.evaluate(() => typeof window.__tc)).toBe('undefined');
 });
 
+test('PWA 앱 셸은 설치 후 오프라인에서 핵심 로컬 화면을 연다', async ({ page, context }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise<void>((resolve) =>
+        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true }),
+      );
+    }
+  });
+  await page.reload();
+  await context.setOffline(true);
+  try {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('button', { name: '빠른 전투' })).toBeVisible();
+
+    await page.getByRole('button', { name: '빠른 전투' }).click();
+    await expect(page.getByRole('button', { name: '이 왕국으로 시작' })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로' }).click();
+
+    await page.getByRole('button', { name: '캠페인' }).click();
+    await expect(page.getByRole('button', { name: '1. 남쪽 관문' })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로' }).click();
+
+    await page.getByRole('button', { name: '일일 도전' }).click();
+    await expect(page.getByRole('button', { name: '도전 시작' })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로' }).click();
+
+    await page.getByRole('button', { name: '커스텀 시나리오' }).click();
+    await expect(page.getByText('번개 결투장')).toBeVisible();
+    await page.getByRole('button', { name: '뒤로' }).click();
+
+    await page.getByRole('button', { name: '리플레이' }).click();
+    await expect(page.getByRole('heading', { name: '리플레이' })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로' }).click();
+
+    await page.getByRole('button', { name: '시나리오 제작' }).click();
+    await expect(page.getByRole('button', { name: '빈 지도' })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
 test('빠른 전투: 시작→턴 종료→새로 고침 후 이어하기 복구', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: '빠른 전투' }).click();

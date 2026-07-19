@@ -23,6 +23,8 @@ export const EN: Record<keyof typeof KO, string> = {
   'title.records': 'Records',
   'title.saveSummary': '{faction} · {scenario} · {difficulty} · turn {turns}{daily}',
   'title.dailySuffix': ' · Daily Challenge',
+  'title.updateReady': 'A new version is ready. Your saved game will be preserved.',
+  'title.updateNow': 'Update to new version',
   'share.readFailed': 'Unable to read the share code.',
   'share.confirmOpen': 'Open the shared scenario "{title}" in Scenario Studio?',
 

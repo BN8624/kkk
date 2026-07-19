@@ -21,6 +21,8 @@ export const KO = {
   'title.records': '기록',
   'title.saveSummary': '{faction} · {scenario} · {difficulty} · {turns}턴{daily}',
   'title.dailySuffix': ' · 일일 도전',
+  'title.updateReady': '새 버전을 사용할 수 있습니다. 진행 중 게임은 그대로 유지됩니다.',
+  'title.updateNow': '새 버전으로 갱신',
   'share.readFailed': '공유 코드를 읽을 수 없습니다',
   'share.confirmOpen': '공유된 시나리오 "{title}"을(를) 제작실에서 열까요?',
 

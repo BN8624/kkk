@@ -13,6 +13,7 @@ export interface TitleMenuHandlers {
   onReplays: () => void;
   onAnalysis: () => void;
   onRecords: () => void;
+  onUpdate: () => void;
 }
 
 /** 타이틀 화면. 제작·보관함 메뉴는 준비된 단계에서만 표시한다(모바일 밀집 방지 계층화). */
@@ -21,6 +22,7 @@ export function showTitleScreen(
   opts: {
     hasSave: boolean;
     saveSummary?: string;
+    updateAvailable: boolean;
     /** 아직 열리지 않은 메뉴는 렌더링하지 않는다(단계별 수직 완성 원칙) */
     features: {
       campaign: boolean;
@@ -32,11 +34,12 @@ export function showTitleScreen(
     handlers: TitleMenuHandlers;
   },
 ): void {
-  const { hasSave, saveSummary, features, handlers } = opts;
+  const { hasSave, saveSummary, updateAvailable, features, handlers } = opts;
   overlay.show(`
       <div class="crown">${CROWN_SVG}</div>
       <h1>${escapeHtml(t('title.appName'))}</h1>
       <p class="subtitle">${escapeHtml(t('title.tagline')).replace('\n', '<br>')}</p>
+      ${updateAvailable ? `<p class="subtitle">${escapeHtml(t('title.updateReady'))}</p><button class="big-btn" id="btn-update">${escapeHtml(t('title.updateNow'))}</button>` : ''}
       ${
         hasSave
           ? `<button class="big-btn" id="btn-continue">${escapeHtml(t('title.continue'))}</button>
@@ -61,6 +64,7 @@ export function showTitleScreen(
     'btn-replays': handlers.onReplays,
     'btn-analysis': handlers.onAnalysis,
     'btn-records': handlers.onRecords,
+    'btn-update': handlers.onUpdate,
   });
 }
 

@@ -2,9 +2,10 @@
   "name": "세 왕관의 섬",
   "short_name": "세 왕관",
   "description": "하나의 섬을 두고 세 왕국이 겨루는 육각 턴제 전략게임",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "any",
   "start_url": ".",
+  "scope": ".",
   "background_color": "#1d2a44",
   "theme_color": "#1d2a44",
   "icons": [
