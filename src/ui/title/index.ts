@@ -1,4 +1,5 @@
 // 한 줄 목적: 타이틀·일일 도전 안내·기록 화면을 렌더링한다(오버레이 호스트 기반)
+import { t } from '../../i18n';
 import { CROWN_SVG, escapeHtml, resultTableHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -34,22 +35,22 @@ export function showTitleScreen(
   const { hasSave, saveSummary, features, handlers } = opts;
   overlay.show(`
       <div class="crown">${CROWN_SVG}</div>
-      <h1>세 왕관의 섬</h1>
-      <p class="subtitle">하나의 섬, 세 개의 왕관.<br>가장 강한 왕국을 세우십시오.</p>
+      <h1>${escapeHtml(t('title.appName'))}</h1>
+      <p class="subtitle">${escapeHtml(t('title.tagline')).replace('\n', '<br>')}</p>
       ${
         hasSave
-          ? `<button class="big-btn" id="btn-continue">이어하기</button>
+          ? `<button class="big-btn" id="btn-continue">${escapeHtml(t('title.continue'))}</button>
              ${saveSummary ? `<p class="subtitle" style="margin-top:-8px;font-size:12.5px;">${escapeHtml(saveSummary)}</p>` : ''}`
           : ''
       }
-      <button class="${hasSave ? 'sub-btn' : 'big-btn'}" id="btn-new">빠른 전투</button>
-      ${features.campaign ? '<button class="sub-btn" id="btn-campaign">캠페인</button>' : ''}
-      <button class="sub-btn" id="btn-daily">일일 도전</button>
-      ${features.scenarios ? '<button class="sub-btn" id="btn-scenarios">커스텀 시나리오</button>' : ''}
-      ${features.editor ? '<button class="sub-btn" id="btn-editor">시나리오 제작</button>' : ''}
-      ${features.replays ? '<button class="sub-btn" id="btn-replays">리플레이</button>' : ''}
-      ${features.analysis ? '<button class="sub-btn" id="btn-analysis">플레이 분석</button>' : ''}
-      <button class="sub-btn" id="btn-records">기록</button>`);
+      <button class="${hasSave ? 'sub-btn' : 'big-btn'}" id="btn-new">${escapeHtml(t('title.quickBattle'))}</button>
+      ${features.campaign ? `<button class="sub-btn" id="btn-campaign">${escapeHtml(t('title.campaign'))}</button>` : ''}
+      <button class="sub-btn" id="btn-daily">${escapeHtml(t('title.daily'))}</button>
+      ${features.scenarios ? `<button class="sub-btn" id="btn-scenarios">${escapeHtml(t('title.customScenarios'))}</button>` : ''}
+      ${features.editor ? `<button class="sub-btn" id="btn-editor">${escapeHtml(t('title.editor'))}</button>` : ''}
+      ${features.replays ? `<button class="sub-btn" id="btn-replays">${escapeHtml(t('title.replays'))}</button>` : ''}
+      ${features.analysis ? `<button class="sub-btn" id="btn-analysis">${escapeHtml(t('title.analysis'))}</button>` : ''}
+      <button class="sub-btn" id="btn-records">${escapeHtml(t('title.records'))}</button>`);
   overlay.bind({
     'btn-continue': handlers.onContinue,
     'btn-new': handlers.onNewGame,
@@ -76,12 +77,12 @@ export function showDailyScreen(
   },
 ): void {
   overlay.show(`
-      <h1 style="font-size:24px;">일일 도전</h1>
+      <h1 style="font-size:24px;">${escapeHtml(t('daily.title'))}</h1>
       <p class="subtitle">${escapeHtml(opts.title)}</p>
       ${resultTableHtml(opts.lines)}
       <p class="subtitle" style="font-size:12.5px;">${escapeHtml(opts.note)}</p>
       <button class="big-btn" id="btn-daily-start">${escapeHtml(opts.startLabel)}</button>
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   overlay.bind({ 'btn-daily-start': opts.onStart, 'btn-back': opts.onBack });
 }
 
@@ -92,9 +93,9 @@ export function showRecordsScreen(
   onBack: () => void,
 ): void {
   overlay.show(`
-      <h1 style="font-size:24px;">기록</h1>
-      <p class="subtitle" style="font-size:12.5px;">이 브라우저에만 저장되는 로컬 기록입니다</p>
+      <h1 style="font-size:24px;">${escapeHtml(t('records.title'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('records.localOnly'))}</p>
       ${resultTableHtml(lines)}
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   overlay.bind({ 'btn-back': onBack });
 }
