@@ -1,7 +1,7 @@
 // 한 줄 목적: 이동·전투·점령·생산·턴 진행·승패 판정 규칙을 검증한다
 import { describe, expect, it } from 'vitest';
 import { tileAt, unitAt, unitsOf } from '../src/core/board';
-import { BUILDING_INCOME, START_GOLD, UNIT_STATS } from '../src/core/data';
+import { BUILDING_INCOME, SCORE_WEIGHTS, START_GOLD, UNIT_STATS } from '../src/core/data';
 import {
   advancePhase,
   attack,
@@ -294,7 +294,10 @@ describe('턴 제한과 점수', () => {
     vil.building = 'village';
     vil.owner = 'azure';
     addUnit(state, { faction: 'azure', q: 1, r: 1 });
-    expect(factionScore(state, 'azure')).toBe(30 + 10 + 2);
+    state.stats.azure.kills = 2;
+    expect(factionScore(state, 'azure')).toBe(
+      SCORE_WEIGHTS.capital + SCORE_WEIGHTS.village + SCORE_WEIGHTS.unit + 2 * SCORE_WEIGHTS.kill,
+    );
   });
 });
 

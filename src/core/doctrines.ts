@@ -25,7 +25,7 @@ export interface Doctrine {
 /** 교리 공격·방어 보너스 수치(밸런스 시뮬레이션으로 조정) */
 export const AZURE_BULWARK_DEF = 1; // 보병: 숲·산·거점에서 방어 +1
 export const CRIMSON_CHARGE_ATK = 2; // 기병: 이동 후 공격 시 공격 +2
-export const VIOLET_HIGHGROUND_ATK = 2; // 궁병: 숲·산에서 공격 시 공격 +2
+export const VIOLET_ARCHER_RANGE = 1; // 궁병: 사거리 +1
 
 export const HIGHGROUND_TERRAINS: TerrainId[] = ['forest', 'mountain'];
 
@@ -36,12 +36,12 @@ export const DOCTRINES: Record<FactionId, Doctrine> = {
     style: '견고한 방어선으로 영토를 지키며 착실히 넓힌다',
     abilityName: '보루',
     abilityDesc: `보병이 숲·산·거점에서 방어 +${AZURE_BULWARK_DEF}`,
-    bonusDesc: '보병 생산 비용 -5',
+    bonusDesc: '보병 생산 비용 -2',
     startDesc: '보병·궁병으로 시작 (금 40)',
     recommended: '처음 플레이에 추천',
     startGold: 40,
     startUnits: ['infantry', 'archer'],
-    unitCostDelta: { infantry: -5 },
+    unitCostDelta: { infantry: -2 },
     villageIncomeBonus: 0,
     captureGold: 0,
   },
@@ -52,9 +52,9 @@ export const DOCTRINES: Record<FactionId, Doctrine> = {
     abilityName: '돌격',
     abilityDesc: `기병이 이동 후 공격하면 공격 +${CRIMSON_CHARGE_ATK}`,
     bonusDesc: '거점 점령 시 즉시 금 +8',
-    startDesc: '기병·보병으로 시작 (금 30)',
+    startDesc: '기병·보병으로 시작 (금 40)',
     recommended: '공격적인 플레이어에게 추천',
-    startGold: 30,
+    startGold: 40,
     startUnits: ['cavalry', 'infantry'],
     unitCostDelta: {},
     villageIncomeBonus: 0,
@@ -64,15 +64,15 @@ export const DOCTRINES: Record<FactionId, Doctrine> = {
     id: 'violet',
     title: '사격과 경제',
     style: '원거리 화력과 풍부한 수입으로 후반을 지배한다',
-    abilityName: '고지 사격',
-    abilityDesc: `궁병이 숲·산에서 공격하면 공격 +${VIOLET_HIGHGROUND_ATK}`,
-    bonusDesc: '마을 수입 +5',
-    startDesc: '궁병 2기로 시작 (금 45)',
+    abilityName: '장궁',
+    abilityDesc: `궁병의 사거리 +${VIOLET_ARCHER_RANGE}`,
+    bonusDesc: '마을 수입 +8',
+    startDesc: '궁병 2기로 시작 (금 60)',
     recommended: '신중한 플레이어에게 추천',
-    startGold: 45,
+    startGold: 60,
     startUnits: ['archer', 'archer'],
     unitCostDelta: {},
-    villageIncomeBonus: 5,
+    villageIncomeBonus: 8,
     captureGold: 0,
   },
 };

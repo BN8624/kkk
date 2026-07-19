@@ -3,8 +3,8 @@ import type { BuildingId, FactionId, TerrainId, TerrainRule, UnitStats, UnitType
 
 export const UNIT_STATS: Record<UnitTypeId, UnitStats> = {
   infantry: { hp: 12, atk: 5, def: 2, move: 3, range: 1, cost: 30 },
-  archer: { hp: 9, atk: 5, def: 0, move: 2, range: 2, cost: 40 },
-  cavalry: { hp: 14, atk: 7, def: 1, move: 5, range: 1, cost: 60 },
+  archer: { hp: 10, atk: 5, def: 0, move: 2, range: 2, cost: 35 },
+  cavalry: { hp: 14, atk: 7, def: 1, move: 5, range: 1, cost: 50 },
 };
 
 export const TERRAIN_RULES: Record<TerrainId, TerrainRule> = {
@@ -30,7 +30,9 @@ export const SCORE_WEIGHTS = {
   capital: 30,
   village: 10,
   crown: 20,
-  unit: 2,
+  unit: 1,
+  /** 처치당 점수: 전투 회피·유닛 스팸만으로 점수전을 이기는 메타를 막는다 */
+  kill: 5,
 };
 
 export const START_GOLD = 40;

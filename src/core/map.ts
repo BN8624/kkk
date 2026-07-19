@@ -14,12 +14,12 @@ export interface GeneratedMap {
   crown?: Axial;
 }
 
-/** 세력 고유 본거지: 청람 남쪽, 진홍 북서, 자원 북동 */
+/** 세력 고유 본거지: 청람 남쪽, 진홍 북서, 자원 북동. 세 수도가 서로 등거리(8)가 되도록 배치한다 */
 function capitalSpots(): Record<FactionId, Axial> {
   return {
     azure: offsetToAxial(4, 10),
-    crimson: offsetToAxial(2, 1),
-    violet: offsetToAxial(6, 2),
+    crimson: offsetToAxial(0, 2),
+    violet: offsetToAxial(8, 2),
   };
 }
 
@@ -197,7 +197,8 @@ function genCrownHeart(seed: number): GeneratedMap {
   const rng = mulberry32(seed);
   const tiles = baseIsland(rng);
   const capitals = placeCapitals(tiles);
-  const crown = offsetToAxial(4, 6);
+  // 세 수도에서 최대 거리 격차 1의 준등거리 지점(기병이 빠른 진홍이 한 칸 멀다)
+  const crown = offsetToAxial(4, 5);
   const crownTile = tiles.get(hexKey(crown.q, crown.r))!;
   crownTile.terrain = 'plains';
   crownTile.building = 'crown';

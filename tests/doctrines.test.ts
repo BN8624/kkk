@@ -1,4 +1,4 @@
-// 한 줄 목적: 세 왕국 교리(보루·돌격·고지 사격·경제 보너스)가 규칙에 실제 적용되는지 검증한다
+// 한 줄 목적: 세 왕국 교리(보루·돌격·장궁·경제 보너스)가 규칙에 실제 적용되는지 검증한다
 import { describe, expect, it } from 'vitest';
 import { tileAt, unitsOf } from '../src/core/board';
 import { BUILDING_INCOME, UNIT_STATS } from '../src/core/data';
@@ -6,16 +6,18 @@ import {
   AZURE_BULWARK_DEF,
   CRIMSON_CHARGE_ATK,
   DOCTRINES,
-  VIOLET_HIGHGROUND_ATK,
+  VIOLET_ARCHER_RANGE,
 } from '../src/core/doctrines';
 import {
   advancePhase,
   attack,
+  attackTargets,
   damageBreakdown,
   forecastAttack,
   moveUnit,
   newGame,
   unitCost,
+  unitRange,
 } from '../src/core/game';
 import { addUnit, makeState } from './helpers';
 
@@ -43,8 +45,10 @@ describe('청람 왕국 — 보루', () => {
     expect(damageBreakdown(state, atk, archer).doctrineDef).toBe(0);
   });
 
-  it('보병 생산 비용이 5 싸다', () => {
-    expect(unitCost('azure', 'infantry')).toBe(UNIT_STATS.infantry.cost - 5);
+  it('보병 생산 비용이 교리 할인만큼 싸다', () => {
+    expect(unitCost('azure', 'infantry')).toBe(
+      UNIT_STATS.infantry.cost + DOCTRINES.azure.unitCostDelta.infantry!,
+    );
     expect(unitCost('crimson', 'infantry')).toBe(UNIT_STATS.infantry.cost);
   });
 });
@@ -89,17 +93,28 @@ describe('진홍 공국 — 돌격', () => {
   });
 });
 
-describe('자원 후국 — 고지 사격과 경제', () => {
-  it('궁병이 숲·산에서 공격하면 공격 +2, 평지에서는 없음', () => {
+describe('자원 후국 — 장궁과 경제', () => {
+  it('자원 궁병만 사거리 +1로 3칸 공격이 가능하다', () => {
     const state = makeState();
-    const archer = addUnit(state, { faction: 'violet', q: 0, r: 0, type: 'archer' });
-    const def = addUnit(state, { faction: 'azure', q: 2, r: 0 });
-    expect(damageBreakdown(state, archer, def).atkBonus).toBe(0);
-    tileAt(state, 0, 0)!.terrain = 'mountain';
-    expect(damageBreakdown(state, archer, def).atkBonus).toBe(VIOLET_HIGHGROUND_ATK);
+    const vArcher = addUnit(state, { faction: 'violet', q: 0, r: 0, type: 'archer' });
+    const aArcher = addUnit(state, { faction: 'azure', q: 0, r: 3, type: 'archer' });
+    const target = addUnit(state, { faction: 'crimson', q: 3, r: 0 });
+    expect(unitRange(vArcher)).toBe(UNIT_STATS.archer.range + VIOLET_ARCHER_RANGE);
+    expect(unitRange(aArcher)).toBe(UNIT_STATS.archer.range);
+    // 거리 3: 자원 궁병은 공격 가능, 청람 궁병은 불가
+    expect(attackTargets(state, vArcher).map((u) => u.id)).toContain(target.id);
+    expect(attack(state, aArcher.id, vArcher.id).reason).toBe('out-of-range');
   });
 
-  it('마을 수입이 +5', () => {
+  it('거리 3 공격에는 일반 궁병의 반격이 없다', () => {
+    const state = makeState();
+    const vArcher = addUnit(state, { faction: 'violet', q: 0, r: 0, type: 'archer' });
+    const enemy = addUnit(state, { faction: 'azure', q: 3, r: 0, type: 'archer' });
+    const fc = forecastAttack(state, vArcher, enemy);
+    expect(fc.counter).toBeNull();
+  });
+
+  it('마을 수입 보너스가 적용된다', () => {
     const state = makeState();
     const v1 = tileAt(state, 0, 0)!;
     v1.building = 'village';

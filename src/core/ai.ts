@@ -1,7 +1,15 @@
 // 한 줄 목적: 전략 분석·역할 배정·전투 평가·생산 판단을 수행하는 난이도별 AI 턴 실행기
 import { tileAt, unitAt, unitById, unitsOf } from './board';
 import { MAX_UNITS_PER_FACTION, UNIT_STATS } from './data';
-import { attack, forecastAttack, moveUnit, produceUnit, terrainDefBonus, unitCost } from './game';
+import {
+  attack,
+  forecastAttack,
+  moveUnit,
+  produceUnit,
+  terrainDefBonus,
+  unitCost,
+  unitRange,
+} from './game';
 import { hexDistance, hexKey } from './hex';
 import { movementRange, reconstructPath } from './pathfind';
 import type {
@@ -41,6 +49,8 @@ interface AiProfile {
   focusFire: boolean;
   /** 공격 위치 선정 시 지형 방어 선호 */
   seekTerrain: boolean;
+  /** 목표 탐색 지평(이 거리보다 먼 목표는 보지 못한다). 없으면 전장 전체 */
+  horizon?: number;
   production: 'cycle' | 'balanced' | 'adaptive';
 }
 
@@ -52,11 +62,12 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     defend: false,
     focusFire: false,
     seekTerrain: false,
+    horizon: 3,
     production: 'cycle',
   },
   normal: {
     moveAttack: true,
-    counterAware: false,
+    counterAware: true,
     avoidBadTrades: false,
     defend: true,
     focusFire: false,
@@ -125,7 +136,7 @@ function analyze(state: GameState, faction: FactionId): Analysis {
   // 위협: 다음 턴에 수도 사거리에 닿을 수 있는 적(이동력+사거리 근사)
   const capitalThreats = myCapital
     ? enemies.filter(
-        (e) => hexDistance(e, myCapital) <= UNIT_STATS[e.type].move + UNIT_STATS[e.type].range,
+        (e) => hexDistance(e, myCapital) <= UNIT_STATS[e.type].move + unitRange(e),
       )
     : [];
   const crownTile = state.tiles.find((t) => t.building === 'crown') ?? null;
@@ -243,7 +254,7 @@ function tryAttack(
   log: AiAction[],
 ): boolean {
   if (unit.attacked) return false;
-  const range = UNIT_STATS[unit.type].range;
+  const range = unitRange(unit);
   if (an.enemies.length === 0) return false;
 
   const reach = profile.moveAttack && !unit.moved ? movementRange(state, unit) : null;
@@ -402,7 +413,9 @@ function tryAdvance(
   let goal: Axial | null = null;
   let goalScore = -Infinity;
   let chosen: Objective | null = null;
+  const horizon = profile.horizon ?? Infinity;
   for (const o of an.objectives) {
+    if (hexDistance(unit, o) > horizon) continue; // 쉬움: 먼 목표를 보지 못한다
     const score = o.value - hexDistance(unit, o) * 8 - o.claimed * 25;
     if (score > goalScore) {
       goalScore = score;
@@ -412,6 +425,7 @@ function tryAdvance(
   }
   for (const e of an.enemies) {
     if (!unitById(state, e.id)) continue;
+    if (hexDistance(unit, e) > horizon) continue;
     const score = 40 + (UNIT_STATS[e.type].hp - e.hp) * 2 - hexDistance(unit, e) * 8;
     if (score > goalScore) {
       goalScore = score;
@@ -483,6 +497,8 @@ function produceUnits(
   spots.sort((a, b) => (b.building === 'capital' ? 1 : 0) - (a.building === 'capital' ? 1 : 0));
   for (const spot of spots) {
     if (unitsOf(state, faction).length >= MAX_UNITS_PER_FACTION) break;
+    // 쉬움: 경제 관리가 미숙해 수도에서만 생산한다
+    if (profile.production === 'cycle' && spot.building !== 'capital') continue;
     // 어려움: 적이 바로 옆에 있는 거점 생산은 피한다(생산 유닛은 그 턴 무방비)
     if (profile.production === 'adaptive') {
       const adjacentEnemy = an.enemies.some(

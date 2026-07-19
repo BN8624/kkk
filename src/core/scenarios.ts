@@ -30,10 +30,10 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
   'crown-heart': {
     id: 'crown-heart',
     name: '왕관의 심장',
-    description: '중앙 왕관 요새를 3턴 연속 보유하면 즉시 승리',
+    description: '중앙 왕관 요새를 4턴 연속 보유하면 즉시 승리',
     maxTurns: 14,
     victory: 'crown-hold',
-    crownHoldTurns: 3,
+    crownHoldTurns: 4,
   },
 };
 

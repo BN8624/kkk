@@ -15,7 +15,7 @@ import {
   CRIMSON_CHARGE_ATK,
   DOCTRINES,
   HIGHGROUND_TERRAINS,
-  VIOLET_HIGHGROUND_ATK,
+  VIOLET_ARCHER_RANGE,
 } from './doctrines';
 import { hexDistance, hexKey, neighbors } from './hex';
 import { generateScenarioMap } from './map';
@@ -125,23 +125,23 @@ export function doctrineDefBonus(unit: Unit, tile: Tile): number {
   return 0;
 }
 
-/** 교리에 따른 공격 보너스(진홍 돌격·자원 고지 사격). 반격에는 적용되지 않는다. */
+/** 교리에 따른 공격 보너스(진홍 돌격). 반격에는 적용되지 않는다. */
 export function doctrineAtkBonus(
   unit: Unit,
-  attackerTile: Tile,
+  _attackerTile: Tile,
   moved: boolean,
   counter: boolean,
 ): number {
   if (counter) return 0;
   if (unit.faction === 'crimson' && unit.type === 'cavalry' && moved) return CRIMSON_CHARGE_ATK;
-  if (
-    unit.faction === 'violet' &&
-    unit.type === 'archer' &&
-    HIGHGROUND_TERRAINS.includes(attackerTile.terrain)
-  ) {
-    return VIOLET_HIGHGROUND_ATK;
-  }
   return 0;
+}
+
+/** 교리를 반영한 유닛 사거리(자원 장궁: 궁병 사거리 +1). 공격·반격·UI가 모두 이 함수를 쓴다. */
+export function unitRange(unit: Unit): number {
+  let range = UNIT_STATS[unit.type].range;
+  if (unit.faction === 'violet' && unit.type === 'archer') range += VIOLET_ARCHER_RANGE;
+  return range;
 }
 
 /** 세력 교리·일일 수정자를 반영한 병과 생산 비용. */
@@ -213,7 +213,7 @@ export function forecastAttack(
   const pos = opts.attackerPos ?? attacker;
   let counter: DamageBreakdown | null = null;
   let attackerDies = false;
-  if (!defenderDies && hexDistance(pos, defender) <= UNIT_STATS[defender.type].range) {
+  if (!defenderDies && hexDistance(pos, defender) <= unitRange(defender)) {
     counter = damageBreakdown(state, defender, attacker, {
       counter: true,
       defenderPos: { q: pos.q, r: pos.r },
@@ -263,7 +263,7 @@ export function moveUnit(state: GameState, unitId: number, dest: Axial): MoveRes
 /** 현 위치에서 공격 가능한 적 유닛 목록을 반환한다. */
 export function attackTargets(state: GameState, unit: Unit): Unit[] {
   if (unit.attacked) return [];
-  const range = UNIT_STATS[unit.type].range;
+  const range = unitRange(unit);
   return state.units.filter(
     (u) => u.faction !== unit.faction && hexDistance(unit, u) <= range,
   );
@@ -284,7 +284,7 @@ export function attack(state: GameState, attackerId: number, defenderId: number)
   if (!attacker || !defender || state.over) return { ok: false, reason: 'invalid' };
   if (attacker.faction === defender.faction) return { ok: false, reason: 'friendly' };
   if (attacker.attacked) return { ok: false, reason: 'already-attacked' };
-  const range = UNIT_STATS[attacker.type].range;
+  const range = unitRange(attacker);
   const dist = hexDistance(attacker, defender);
   if (dist > range) return { ok: false, reason: 'out-of-range' };
 
@@ -361,6 +361,7 @@ export function factionScore(state: GameState, faction: FactionId): number {
           : SCORE_WEIGHTS.village;
   }
   score += unitsOf(state, faction).length * SCORE_WEIGHTS.unit;
+  score += state.stats[faction].kills * SCORE_WEIGHTS.kill;
   return score;
 }
 

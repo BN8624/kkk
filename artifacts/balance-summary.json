@@ -1,0 +1,133 @@
+{
+  "generatedAt": "2026-07-19T00:38:09.970Z",
+  "elapsedSec": 9.8,
+  "totalGames": 1080,
+  "seedsPerCombo": 40,
+  "unfinishedGames": 0,
+  "illegalGames": 0,
+  "draws": 3,
+  "overallWinRates": {
+    "azure": 0.425,
+    "crimson": 0.339,
+    "violet": 0.233
+  },
+  "proxyWinRateByFaction": {
+    "azure": 0.567,
+    "crimson": 0.464,
+    "violet": 0.381
+  },
+  "proxyWinRateByDifficulty": {
+    "easy": 0.836,
+    "normal": 0.353,
+    "hard": 0.222
+  },
+  "perDifficulty": [
+    {
+      "difficulty": "easy",
+      "games": 360,
+      "endReasons": {
+        "conquest": 53,
+        "crown-hold": 120,
+        "turn-limit": 187,
+        "unfinished": 0
+      },
+      "proxyWinRateTurnLimit": 0.989,
+      "proxyWinRateDecisive": 0.671,
+      "avgEndTurn": 9.67
+    },
+    {
+      "difficulty": "normal",
+      "games": 360,
+      "endReasons": {
+        "conquest": 19,
+        "crown-hold": 116,
+        "turn-limit": 225,
+        "unfinished": 0
+      },
+      "proxyWinRateTurnLimit": 0.369,
+      "proxyWinRateDecisive": 0.326,
+      "avgEndTurn": 9.96
+    },
+    {
+      "difficulty": "hard",
+      "games": 360,
+      "endReasons": {
+        "conquest": 48,
+        "crown-hold": 116,
+        "turn-limit": 196,
+        "unfinished": 0
+      },
+      "proxyWinRateTurnLimit": 0.291,
+      "proxyWinRateDecisive": 0.14,
+      "avgEndTurn": 10.03
+    }
+  ],
+  "perScenario": [
+    {
+      "scenario": "three-crowns",
+      "games": 360,
+      "seeds": 360,
+      "winRates": {
+        "azure": 0.472,
+        "crimson": 0.244,
+        "violet": 0.275
+      },
+      "avgEndTurn": 11.75,
+      "endReasons": {
+        "conquest": 56,
+        "crown-hold": 0,
+        "turn-limit": 304,
+        "unfinished": 0
+      }
+    },
+    {
+      "scenario": "broken-strait",
+      "games": 360,
+      "seeds": 360,
+      "winRates": {
+        "azure": 0.497,
+        "crimson": 0.261,
+        "violet": 0.242
+      },
+      "avgEndTurn": 11.72,
+      "endReasons": {
+        "conquest": 60,
+        "crown-hold": 0,
+        "turn-limit": 300,
+        "unfinished": 0
+      }
+    },
+    {
+      "scenario": "crown-heart",
+      "games": 360,
+      "seeds": 360,
+      "winRates": {
+        "azure": 0.306,
+        "crimson": 0.511,
+        "violet": 0.183
+      },
+      "avgEndTurn": 6.18,
+      "endReasons": {
+        "conquest": 4,
+        "crown-hold": 352,
+        "turn-limit": 4,
+        "unfinished": 0
+      }
+    }
+  ],
+  "productionShare": {
+    "infantry": 0.643,
+    "archer": 0.306,
+    "cavalry": 0.051
+  },
+  "survivalRate": {
+    "infantry": 0.449,
+    "archer": 0.297,
+    "cavalry": 0.344
+  },
+  "idlePhaseRate": 0.031,
+  "avgCapturesPerGame": 8.08,
+  "maxPhaseMs": 2.9,
+  "pass": true,
+  "failures": []
+}

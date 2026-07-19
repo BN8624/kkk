@@ -61,7 +61,8 @@ describe('왕관 요새 승리 규칙', () => {
     expect(normal.crownHold).toBeUndefined();
   });
 
-  it('왕관 요새를 3턴 연속 보유하면 승리한다', () => {
+  it('왕관 요새를 연속 보유 턴 수만큼 보유하면 승리한다', () => {
+    const need = SCENARIOS['crown-heart'].crownHoldTurns!;
     const state = makeState({ scenario: 'crown-heart' });
     state.crownHold = { owner: null, turns: 0 };
     const crown = tileAt(state, 2, 2)!;
@@ -69,10 +70,10 @@ describe('왕관 요새 승리 규칙', () => {
     crown.owner = 'crimson';
     addUnit(state, { faction: 'azure', q: 0, r: 0 });
     addUnit(state, { faction: 'crimson', q: 4, r: 4 });
-    for (let round = 1; round <= 3; round++) {
+    for (let round = 1; round <= need; round++) {
       state.current = 'violet'; // 마지막 세력 페이즈 종료 → 라운드 종료
       advancePhase(state);
-      if (round < 3) {
+      if (round < need) {
         expect(state.over).toBe(false);
         expect(state.crownHold!.turns).toBe(round);
       }
