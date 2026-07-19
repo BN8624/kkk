@@ -63,6 +63,24 @@ describe('캠페인 미션 문서', () => {
     }
   });
 
+  it('미션1은 공용 병종 중심, 미션2는 고유 병종 1기 소개, 미션3은 고유 병종 활용 가능', () => {
+    for (const c of CAMPAIGNS) {
+      const m1 = c.missions[0].scenario;
+      const m2 = c.missions[1].scenario;
+      const m3 = c.missions[2].scenario;
+      // 미션1: 고유 강제 없음
+      expect(m1.rules.uniqueUnits).not.toBe(true);
+      expect(m1.units.every((u) => !['guardian', 'raider', 'crossbow'].includes(u.type))).toBe(true);
+      // 미션2: 해당 왕국 고유 1기 + uniqueUnits
+      expect(m2.rules.uniqueUnits).toBe(true);
+      const uniqueOfFaction =
+        c.faction === 'azure' ? 'guardian' : c.faction === 'crimson' ? 'raider' : 'crossbow';
+      expect(m2.units.filter((u) => u.faction === c.faction && u.type === uniqueOfFaction)).toHaveLength(1);
+      // 미션3: 생산 가능(uniqueUnits)
+      expect(m3.rules.uniqueUnits).toBe(true);
+    }
+  });
+
   it('미션 id·시나리오 id가 중복되지 않고 승리 조건 구성이 서로 다르다', () => {
     const ids = ALL_MISSIONS.map((m) => m.id);
     expect(new Set(ids).size).toBe(ids.length);

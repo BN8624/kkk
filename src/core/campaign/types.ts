@@ -37,6 +37,12 @@ export interface MissionProgress {
   lastPlayed: string;
   /** 누적 도전 횟수(v1.5 이전 기록에는 없을 수 있음) */
   attempts?: number;
+  /**
+   * 기록이 쌓인 콘텐츠 규칙 에포크.
+   * 없으면 2.2 이전(legacy). 2.2 고유 병종 규칙 이후 기록은 '2.2'.
+   * 기존 won/별/완료 이력은 삭제하지 않는다.
+   */
+  contentEpoch?: string;
 }
 
 export interface CampaignProgressV1 {

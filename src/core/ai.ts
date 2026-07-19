@@ -473,7 +473,7 @@ function actUnit(
 
   // 약탈대: 빈 마을·후방 거점 점령 우선, 수호대 거점 정면 돌파 회피
   if (unit.type === 'raider') {
-    if (tryCapture(state, unit, an, issue)) return;
+    if (tryCapture(state, unit, an, issue, 0)) return;
     if (tryAttack(state, unit, an, profile, issue)) return;
     tryAdvance(state, unit, an, profile, issue);
     return;
@@ -495,14 +495,15 @@ function actUnit(
         return;
       }
     }
-    if (tryCapture(state, unit, an, issue)) return;
+    if (tryCapture(state, unit, an, issue, 0)) return;
     tryAdvance(state, unit, an, profile, issue);
     return;
   }
 
-  // 공용 병종 공격 역할: 공격 → 점령 → 전진
+  // 공용 병종: 고가치 빈 거점(승리 목표) 점령을 소모 교전보다 우선
+  if (tryCapture(state, unit, an, issue, 100)) return;
   if (tryAttack(state, unit, an, profile, issue)) return;
-  if (tryCapture(state, unit, an, issue)) return;
+  if (tryCapture(state, unit, an, issue, 0)) return;
   tryAdvance(state, unit, an, profile, issue);
 }
 
@@ -655,7 +656,17 @@ function retreatToSafety(state: GameState, unit: Unit, an: Analysis, issue: Issu
   issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
 }
 
-function tryCapture(state: GameState, unit: Unit, an: Analysis, issue: IssueFn): boolean {
+/**
+ * 도달 가능한 적/중립 거점 점령.
+ * minObjectiveValue > 0이면 그 가치 이상 목표만 후보(승리 목표 우선 점령용).
+ */
+function tryCapture(
+  state: GameState,
+  unit: Unit,
+  an: Analysis,
+  issue: IssueFn,
+  minObjectiveValue = 0,
+): boolean {
   if (unit.moved) return false;
   const reach = movementRange(state, unit);
   let best: { key: string; value: number } | null = null;
@@ -665,7 +676,9 @@ function tryCapture(state: GameState, unit: Unit, an: Analysis, issue: IssueFn):
     const tile = tileAt(state, e.q, e.r);
     if (!tile?.building || tile.owner === unit.faction) continue;
     const objective = an.objectives.find((o) => o.q === e.q && o.r === e.r);
-    let value = (objective?.value ?? 50) * 2 - e.cost;
+    const objValue = objective?.value ?? 50;
+    if (objValue < minObjectiveValue) continue;
+    let value = objValue * 2 - e.cost;
     // 약탈대: 점령 보상·빈 마을 우선
     if (unit.type === 'raider') {
       value += 30;

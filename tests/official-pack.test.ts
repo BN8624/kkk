@@ -23,6 +23,20 @@ describe('공식 시나리오 팩', () => {
     expect(officialScenarioById('no-such')).toBeNull();
   });
 
+  it('최소 세 전장에서 각 고유 병종(수호대·약탈대·쇠뇌대)이 시작 배치된다', () => {
+    const types = new Set(OFFICIAL_SCENARIOS.flatMap((s) => s.units.map((u) => u.type)));
+    expect(types.has('guardian')).toBe(true);
+    expect(types.has('raider')).toBe(true);
+    expect(types.has('crossbow')).toBe(true);
+    const withUnique = OFFICIAL_SCENARIOS.filter((s) =>
+      s.units.some((u) => u.type === 'guardian' || u.type === 'raider' || u.type === 'crossbow'),
+    );
+    expect(withUnique.length).toBeGreaterThanOrEqual(3);
+    for (const s of withUnique) {
+      expect(s.rules.uniqueUnits).toBe(true);
+    }
+  });
+
   it.each(OFFICIAL_SCENARIOS.map((s) => [s.id, s] as const))(
     '%s — 구조 검증·품질 검사 PASS',
     (_id, doc) => {

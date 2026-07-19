@@ -73,6 +73,9 @@ export interface MissionResult {
 }
 
 /** 미션 결과를 반영한 새 진행을 돌려준다(최고 기록 단조 갱신, 최단 턴은 승리 기준). */
+/** 현재 캠페인 콘텐츠 규칙 에포크(고유 병종 통합 이후). */
+export const CAMPAIGN_CONTENT_EPOCH = '2.2';
+
 export function recordMissionResult(
   progress: CampaignProgressV1,
   missionId: string,
@@ -89,9 +92,17 @@ export function recordMissionResult(
     bestSurvivors: Math.max(prev?.bestSurvivors ?? 0, result.survivors),
     lastPlayed: result.playedAt,
     attempts: (prev?.attempts ?? 0) + 1,
+    // 새 기록은 2.2 규칙. 기존 최고 기록 필드는 유지(초기화하지 않음)
+    contentEpoch: CAMPAIGN_CONTENT_EPOCH,
   };
   if (next.bestTurns === Number.POSITIVE_INFINITY) next.bestTurns = null;
   return { version: 1, missions: { ...progress.missions, [missionId]: next } };
+}
+
+/** 2.2 이전 규칙에서 쌓인 기록인지(표시용 legacy 구분). */
+export function isLegacyMissionProgress(m: MissionProgress | undefined): boolean {
+  if (!m) return false;
+  return m.contentEpoch !== CAMPAIGN_CONTENT_EPOCH && (m.won || m.attempts !== undefined);
 }
 
 /** 해금 판정: 첫 미션이거나 선행 미션을 승리했으면 열린다. */

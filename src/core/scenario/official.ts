@@ -33,7 +33,7 @@ function lightningDuel(): ScenarioDocumentV1 {
     board: { cols: 6, rows: 6, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('azure', ['crimson'], { azure: 20, crimson: 20 }),
     units,
-    rules: { maxTurns: 6, turnLimit: 'score' },
+    rules: { maxTurns: 6, turnLimit: 'score', uniqueUnits: true },
     victoryConditions: [{ type: 'conquest' }],
     defeatConditions: [{ type: 'human-eliminated' }],
     starConditions: [
@@ -94,7 +94,7 @@ function grandContinent(): ScenarioDocumentV1 {
       ...squad('crimson', [[16, 3], [17, 4], [18, 3], [15, 2]]),
       ...squad('violet', [[16, 16], [17, 15], [18, 16], [15, 17]]),
     ],
-    rules: { maxTurns: 30, turnLimit: 'score' },
+    rules: { maxTurns: 30, turnLimit: 'score', uniqueUnits: true },
     victoryConditions: [{ type: 'conquest' }],
     defeatConditions: [{ type: 'human-eliminated' }],
     starConditions: [
@@ -136,19 +136,21 @@ function narrowBridge(): ScenarioDocumentV1 {
     { faction: 'crimson', type: 'infantry', ...b.at(9, 4) },
     { faction: 'crimson', type: 'infantry', ...b.at(9, 3) },
     { faction: 'crimson', type: 'archer', ...b.at(10, 3) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(8, 4) },
+    // 약탈대 시연: 측면 침투·점령 압박
+    { faction: 'crimson', type: 'raider', ...b.at(8, 4) },
   ];
 
   return {
     schemaVersion: 1,
     id: 'official-narrow-bridge',
     title: '외나무 다리',
-    description: '두 세력 결투. 강을 가르는 좁은 다리를 두고 정면으로 맞붙는다.',
+    description:
+      '두 세력 결투. 진홍 약탈대가 숲 우회와 점령으로 다리를 압박한다.',
     author: '세 왕관의 섬',
     board: { cols: 12, rows: 8, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('azure', ['crimson'], { azure: 25, crimson: 25 }),
     units,
-    rules: { maxTurns: 14, turnLimit: 'score' },
+    rules: { maxTurns: 14, turnLimit: 'score', uniqueUnits: true },
     victoryConditions: [{ type: 'conquest' }],
     defeatConditions: [{ type: 'human-eliminated' }],
     starConditions: [
@@ -176,15 +178,16 @@ function ringFortress(): ScenarioDocumentV1 {
     .set(8, 8, { building: 'village' });
 
   const units: ScenarioUnitSetup[] = [
-    { faction: 'violet', type: 'infantry', ...b.at(5, 5) },
+    // 쇠뇌대 시연: 성문 접근 중장을 관통 사격
+    { faction: 'violet', type: 'crossbow', ...b.at(5, 5) },
     { faction: 'violet', type: 'infantry', ...b.at(4, 5) },
     { faction: 'violet', type: 'infantry', ...b.at(6, 5) },
     { faction: 'violet', type: 'archer', ...b.at(5, 4) },
     { faction: 'violet', type: 'archer', ...b.at(4, 6) },
-    { faction: 'azure', type: 'infantry', ...b.at(1, 5) },
+    { faction: 'azure', type: 'guardian', ...b.at(1, 5) },
     { faction: 'azure', type: 'infantry', ...b.at(1, 4) },
     { faction: 'azure', type: 'archer', ...b.at(0, 4) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(9, 4) },
+    { faction: 'crimson', type: 'raider', ...b.at(9, 4) },
     { faction: 'crimson', type: 'infantry', ...b.at(9, 5) },
     { faction: 'crimson', type: 'archer', ...b.at(10, 4) },
   ];
@@ -193,12 +196,13 @@ function ringFortress(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'official-ring-fortress',
     title: '원형 요새',
-    description: '중앙 요새 방어전. 해자의 동서 성문으로 밀려오는 두 군대를 막고 12턴을 버텨라.',
+    description:
+      '중앙 요새 방어전. 자원 쇠뇌대가 성문을 조준하고, 청람 수호대·진홍 약탈대가 맞선다.',
     author: '세 왕관의 섬',
     board: { cols: 11, rows: 11, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('violet', ['azure', 'crimson'], { violet: 15, azure: 30, crimson: 30 }),
     units,
-    rules: { maxTurns: 12, turnLimit: 'defeat' },
+    rules: { maxTurns: 12, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'survive-turns', turns: 12 }],
     defeatConditions: [{ type: 'lose-building', at: b.at(5, 5) }, { type: 'human-eliminated' }],
     starConditions: [
@@ -234,10 +238,10 @@ function goldenRoad(): ScenarioDocumentV1 {
   const units: ScenarioUnitSetup[] = [
     { faction: 'violet', type: 'infantry', ...b.at(1, 4) },
     { faction: 'violet', type: 'infantry', ...b.at(1, 3) },
-    { faction: 'violet', type: 'archer', ...b.at(0, 3) },
+    { faction: 'violet', type: 'crossbow', ...b.at(0, 3) },
     { faction: 'violet', type: 'cavalry', ...b.at(2, 4) },
     { faction: 'azure', type: 'infantry', ...b.at(12, 4) },
-    { faction: 'azure', type: 'infantry', ...b.at(12, 5) },
+    { faction: 'azure', type: 'guardian', ...b.at(12, 5) },
     { faction: 'azure', type: 'archer', ...b.at(13, 5) },
     { faction: 'azure', type: 'cavalry', ...b.at(12, 3) },
   ];
@@ -251,7 +255,7 @@ function goldenRoad(): ScenarioDocumentV1 {
     board: { cols: 14, rows: 9, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('violet', ['azure'], { violet: 20, azure: 25 }),
     units,
-    rules: { maxTurns: 14, turnLimit: 'defeat' },
+    rules: { maxTurns: 14, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'reach-score', score: 90 }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
     starConditions: [
@@ -281,12 +285,13 @@ function kingsEscort(): ScenarioDocumentV1 {
 
   const units: ScenarioUnitSetup[] = [
     { faction: 'azure', type: 'infantry', ...b.at(1, 3), tag: 'king' },
-    { faction: 'azure', type: 'infantry', ...b.at(2, 3) },
+    // 수호대 시연: 왕 옆에서 수호 태세로 호위
+    { faction: 'azure', type: 'guardian', ...b.at(2, 3) },
     { faction: 'azure', type: 'infantry', ...b.at(3, 4) },
     { faction: 'azure', type: 'archer', ...b.at(1, 2) },
     { faction: 'azure', type: 'cavalry', ...b.at(2, 4) },
     { faction: 'crimson', type: 'infantry', ...b.at(5, 1) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(6, 2) },
+    { faction: 'crimson', type: 'raider', ...b.at(6, 2) },
     { faction: 'crimson', type: 'archer', ...b.at(7, 1) },
   ];
 
@@ -294,12 +299,13 @@ function kingsEscort(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'official-kings-escort',
     title: '왕의 호위',
-    description: '호위전. 왕을 잃지 않고 동쪽 성소를 점령하라. 왕이 쓰러지면 원정은 끝난다.',
+    description:
+      '호위전. 수호대가 왕을 지키며 동쪽 성소를 점령하라. 왕이 쓰러지면 원정은 끝난다.',
     author: '세 왕관의 섬',
     board: { cols: 12, rows: 7, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('azure', ['crimson'], { azure: 25, crimson: 15 }),
     units,
-    rules: { maxTurns: 12, turnLimit: 'defeat' },
+    rules: { maxTurns: 12, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [
       {
         type: 'all-of',

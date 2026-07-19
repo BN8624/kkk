@@ -253,6 +253,7 @@ export const KO = {
   'campaign.title': '캠페인',
   'campaign.subtitle': '세 왕국의 이야기를 미션으로 플레이합니다',
   'campaign.locked': '선행 미션 승리 시 해금',
+  'campaign.legacyRecord': '이전 규칙 기록',
   'campaign.best': '최고 {score}점 · 최단 {turns}턴',
   'campaign.inProgress': '도전 중',
   'campaign.notStarted': '미도전',

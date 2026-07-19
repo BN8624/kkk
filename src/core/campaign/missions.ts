@@ -269,6 +269,8 @@ function azureMission2(): ScenarioDocumentV1 {
     { faction: 'azure', type: 'infantry', ...b.at(5, 5) },
     { faction: 'azure', type: 'archer', ...b.at(4, 4) },
     { faction: 'azure', type: 'infantry', ...b.at(4, 6) },
+    // 수호대 최초 소개: 수도를 지키며 수호 태세를 익힌다(돌파 병력과 분리)
+    { faction: 'azure', type: 'guardian', ...b.at(4, 5) },
     { faction: 'azure', type: 'cavalry', ...b.at(4, 3) },
     { faction: 'crimson', type: 'cavalry', ...b.at(3, 2) },
     { faction: 'crimson', type: 'infantry', ...b.at(4, 2) },
@@ -281,11 +283,12 @@ function azureMission2(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'campaign-azure-2',
     title: '포위망 돌파',
-    description: '포위를 뚫고 남쪽 보급 마을을 확보하라.',
+    description:
+      '포위를 뚫고 남쪽 보급 마을을 확보하라. 수호대는 이동하지 않으면 방어 +2(수호 태세)를 얻는다.',
     board: { cols: 9, rows: 12, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('azure', ['crimson', 'violet'], { crimson: 15, violet: 15 }),
     units,
-    rules: { maxTurns: 12, turnLimit: 'defeat' },
+    rules: { maxTurns: 12, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'capture-building', at: b.at(4, 11) }],
     // 돌파전: 본진을 버리고서라도 남쪽으로 뚫으면 이긴다(수도 상실은 패배가 아니다)
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
@@ -319,15 +322,15 @@ function azureMission3(): ScenarioDocumentV1 {
 
   const units: ScenarioUnitSetup[] = [
     { faction: 'azure', type: 'infantry', ...b.at(1, 5) },
-    { faction: 'azure', type: 'infantry', ...b.at(5, 5) },
+    { faction: 'azure', type: 'guardian', ...b.at(5, 5) },
     { faction: 'azure', type: 'infantry', ...b.at(9, 5) },
     { faction: 'azure', type: 'archer', ...b.at(1, 3) },
     { faction: 'azure', type: 'archer', ...b.at(9, 3) },
     { faction: 'azure', type: 'cavalry', ...b.at(5, 3) },
     { faction: 'crimson', type: 'cavalry', ...b.at(2, 8) },
     { faction: 'crimson', type: 'infantry', ...b.at(3, 8) },
-    { faction: 'crimson', type: 'infantry', ...b.at(4, 8) },
-    { faction: 'violet', type: 'archer', ...b.at(8, 8) },
+    { faction: 'crimson', type: 'raider', ...b.at(4, 8) },
+    { faction: 'violet', type: 'crossbow', ...b.at(8, 8) },
     { faction: 'violet', type: 'infantry', ...b.at(7, 8) },
     { faction: 'violet', type: 'cavalry', ...b.at(9, 8) },
   ];
@@ -336,11 +339,11 @@ function azureMission3(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'campaign-azure-3',
     title: '세 개의 성문',
-    description: '세 성문 마을을 하나도 잃지 않고 12턴을 버텨라.',
+    description: '세 성문 마을을 하나도 잃지 않고 12턴을 버텨라. 수호대 생산·주둔으로 성문을 굳혀라.',
     board: { cols: 11, rows: 11, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('azure', ['crimson', 'violet'], { crimson: 35, violet: 35 }),
     units,
-    rules: { maxTurns: 12, turnLimit: 'defeat' },
+    rules: { maxTurns: 12, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'survive-turns', turns: 12 }],
     defeatConditions: [
       { type: 'lose-building', at: b.at(1, 5) },
@@ -380,7 +383,8 @@ function crimsonMission2(): ScenarioDocumentV1 {
   const units: ScenarioUnitSetup[] = [
     { faction: 'crimson', type: 'cavalry', ...b.at(1, 6) },
     { faction: 'crimson', type: 'cavalry', ...b.at(2, 7) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(1, 8) },
+    // 약탈대 최초 소개: 숲 우회·점령 시 금 +5
+    { faction: 'crimson', type: 'raider', ...b.at(1, 8) },
     { faction: 'crimson', type: 'infantry', ...b.at(2, 6) },
     { faction: 'crimson', type: 'archer', ...b.at(1, 7) },
     { faction: 'azure', type: 'infantry', ...b.at(3, 3) },
@@ -393,11 +397,12 @@ function crimsonMission2(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'campaign-crimson-2',
     title: '끊어진 보급로',
-    description: '청람의 보급 마을 3곳을 10턴 안에 점령해 보급로를 끊어라.',
+    description:
+      '청람의 보급 마을 3곳을 10턴 안에 점령하라. 약탈대는 숲 1·산 2로 우회하고 점령 시 금 +5를 얻는다.',
     board: { cols: 12, rows: 10, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('crimson', ['azure'], { azure: 35 }),
     units,
-    rules: { maxTurns: 10, turnLimit: 'defeat' },
+    rules: { maxTurns: 10, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'capture-count', building: 'village', count: 3 }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
     starConditions: [
@@ -433,26 +438,27 @@ function crimsonMission3(): ScenarioDocumentV1 {
 
   const units: ScenarioUnitSetup[] = [
     { faction: 'crimson', type: 'cavalry', ...b.at(4, 9) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(6, 9) },
+    { faction: 'crimson', type: 'raider', ...b.at(6, 9) },
     { faction: 'crimson', type: 'infantry', ...b.at(5, 9) },
     { faction: 'crimson', type: 'archer', ...b.at(5, 11) },
+    // 대응 병력은 공용 중심 — 고유 병종 과다 배치는 AI 대체 승리율을 무너뜨림
     { faction: 'azure', type: 'infantry', ...b.at(1, 2) },
-    { faction: 'azure', type: 'infantry', ...b.at(2, 2) },
+    { faction: 'azure', type: 'guardian', ...b.at(2, 2), hp: 10 },
     { faction: 'azure', type: 'archer', ...b.at(1, 3) },
     { faction: 'violet', type: 'archer', ...b.at(9, 2) },
     { faction: 'violet', type: 'infantry', ...b.at(8, 2) },
-    { faction: 'violet', type: 'cavalry', ...b.at(9, 3) },
+    { faction: 'violet', type: 'crossbow', ...b.at(9, 3), hp: 7 },
   ];
 
   return {
     schemaVersion: 1,
     id: 'campaign-crimson-3',
     title: '왕관 사냥',
-    description: '중앙 언덕의 왕관을 3턴 연속 보유하는 세력이 섬을 가진다.',
+    description: '중앙 언덕의 왕관을 3턴 연속 보유하라. 약탈대로 후방·왕관 경합을 노려라.',
     board: { cols: 11, rows: 12, tiles: b.tiles, source: { kind: 'fixed' } },
-    factions: factions('crimson', ['azure', 'violet'], { azure: 30, violet: 30 }),
+    factions: factions('crimson', ['azure', 'violet'], { azure: 20, violet: 20 }),
     units,
-    rules: { maxTurns: 14, turnLimit: 'defeat' },
+    rules: { maxTurns: 14, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'hold-building', at: b.at(5, 5), turns: 3 }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
     // 별점 근거(품질 매트릭스): 10턴 제한은 100%, 처치 ≥5는 92% 달성이었다 — 5턴 선점·처치 8로 조인다
@@ -488,11 +494,12 @@ function violetMission2(): ScenarioDocumentV1 {
 
   const units: ScenarioUnitSetup[] = [
     { faction: 'violet', type: 'archer', ...b.at(1, 3) },
-    { faction: 'violet', type: 'archer', ...b.at(1, 5) },
+    // 쇠뇌대 최초 소개: 기본 방어 최대 2 관통
+    { faction: 'violet', type: 'crossbow', ...b.at(1, 5) },
     { faction: 'violet', type: 'infantry', ...b.at(2, 4) },
     { faction: 'violet', type: 'cavalry', ...b.at(1, 4) },
     { faction: 'azure', type: 'infantry', ...b.at(8, 3) },
-    { faction: 'azure', type: 'infantry', ...b.at(10, 4) },
+    { faction: 'azure', type: 'guardian', ...b.at(10, 4) },
     { faction: 'azure', type: 'archer', ...b.at(9, 4) },
   ];
 
@@ -500,11 +507,12 @@ function violetMission2(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'campaign-violet-2',
     title: '황금의 길',
-    description: '가도의 마을들을 확보해 12턴 안에 75점에 도달하라.',
+    description:
+      '가도의 마을들을 확보해 12턴 안에 75점에 도달하라. 쇠뇌대는 대상의 기본 방어를 최대 2 무시한다.',
     board: { cols: 12, rows: 8, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('violet', ['azure'], { azure: 30 }),
     units,
-    rules: { maxTurns: 12, turnLimit: 'defeat' },
+    rules: { maxTurns: 12, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'reach-score', score: 75 }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
     // 별점 근거(품질 매트릭스): 금 ≥30은 97% 달성으로 승리와 사실상 동일했다 — 금 60으로 경제 운영을 요구한다
@@ -541,14 +549,14 @@ function violetMission3(): ScenarioDocumentV1 {
 
   const units: ScenarioUnitSetup[] = [
     { faction: 'violet', type: 'archer', ...b.at(4, 9) },
-    { faction: 'violet', type: 'archer', ...b.at(6, 9) },
+    { faction: 'violet', type: 'crossbow', ...b.at(6, 9) },
     { faction: 'violet', type: 'infantry', ...b.at(5, 9) },
     { faction: 'violet', type: 'infantry', ...b.at(3, 9) },
     { faction: 'violet', type: 'cavalry', ...b.at(7, 9) },
-    { faction: 'azure', type: 'infantry', ...b.at(2, 3) },
+    { faction: 'azure', type: 'guardian', ...b.at(2, 3) },
     { faction: 'azure', type: 'infantry', ...b.at(3, 3) },
     { faction: 'azure', type: 'archer', ...b.at(2, 4) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(8, 3) },
+    { faction: 'crimson', type: 'raider', ...b.at(8, 3) },
     { faction: 'crimson', type: 'infantry', ...b.at(7, 3) },
     { faction: 'crimson', type: 'archer', ...b.at(8, 4) },
   ];
@@ -557,11 +565,11 @@ function violetMission3(): ScenarioDocumentV1 {
     schemaVersion: 1,
     id: 'campaign-violet-3',
     title: '왕관의 심장',
-    description: '두 왕국의 수도를 모두 점령해 섬의 심장을 차지하라.',
+    description: '두 왕국의 수도를 모두 점령하라. 쇠뇌대로 수호대·중장을 압박하라.',
     board: { cols: 11, rows: 12, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('violet', ['azure', 'crimson'], { azure: 0, crimson: 0 }),
     units,
-    rules: { maxTurns: 18, turnLimit: 'defeat' },
+    rules: { maxTurns: 18, turnLimit: 'defeat', uniqueUnits: true },
     victoryConditions: [{ type: 'conquest' }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
     // 별점 근거(품질 매트릭스): 16턴 제한 94%·생존 4기 100%로 사실상 고정 3별이었다 — 10턴 정복·손실 ≤5로 조인다
@@ -604,7 +612,8 @@ export const CAMPAIGNS: CampaignDocument[] = [
       {
         id: 'azure-3',
         title: '세 개의 성문',
-        intro: '연합군이 성벽의 세 성문을 동시에 두드린다. 하나도 내줄 수 없다.',
+        intro:
+          '연합군이 세 성문을 두드린다. 수호대를 생산·주둔시켜 하나도 내주지 마라.',
         scenario: azureMission3(),
         requires: 'azure-2',
         completionText: '세 성문이 모두 버텼다. 최후의 방벽은 무너지지 않았다.',
@@ -629,7 +638,8 @@ export const CAMPAIGNS: CampaignDocument[] = [
       {
         id: 'crimson-2',
         title: '끊어진 보급로',
-        intro: '청람의 가도를 따라 보급 마을이 늘어서 있다. 셋을 모두 끊으면 방벽은 굶는다.',
+        intro:
+          '약탈대가 합류했다 — 숲 1·산 2 이동, 점령 시 금 +5. 보급 마을 셋을 끊어라.',
         scenario: crimsonMission2(),
         requires: 'crimson-1',
         completionText: '가도가 침묵했다. 청람의 방벽은 이제 보급 없이 싸운다.',
@@ -637,7 +647,8 @@ export const CAMPAIGNS: CampaignDocument[] = [
       {
         id: 'crimson-3',
         title: '왕관 사냥',
-        intro: '왕관이 중앙 언덕에 모습을 드러냈다. 세 세력 중 가장 빠른 자가 가진다.',
+        intro:
+          '왕관이 중앙 언덕에 모습을 드러냈다. 약탈대로 후방과 왕관 경합을 노려라.',
         scenario: crimsonMission3(),
         requires: 'crimson-2',
         completionText: '왕관은 붉은 손에 들렸다. 사냥은 끝났다.',
@@ -662,7 +673,8 @@ export const CAMPAIGNS: CampaignDocument[] = [
       {
         id: 'violet-2',
         title: '황금의 길',
-        intro: '가도의 마을들이 주인을 기다린다. 활시위보다 곳간이 먼저 차야 한다.',
+        intro:
+          '쇠뇌대가 합류했다 — 대상의 기본 방어를 최대 2 무시. 가도의 곳간을 채워라.',
         scenario: violetMission2(),
         requires: 'violet-1',
         completionText: '황금의 길이 후국의 깃발 아래 놓였다.',
@@ -670,7 +682,8 @@ export const CAMPAIGNS: CampaignDocument[] = [
       {
         id: 'violet-3',
         title: '왕관의 심장',
-        intro: '마지막 원정이다. 두 왕국의 수도를 모두 취하면 섬의 심장이 후국의 것이 된다.',
+        intro:
+          '마지막 원정이다. 쇠뇌대로 수호대와 중장을 압박해 두 수도를 취해라.',
         scenario: violetMission3(),
         requires: 'violet-2',
         completionText: '섬의 심장이 별 아래 놓였다. 세 왕관의 전쟁이 끝났다.',

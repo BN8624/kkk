@@ -255,6 +255,7 @@ export const EN: Record<keyof typeof KO, string> = {
   'campaign.title': 'Campaign',
   'campaign.subtitle': 'Play through the stories of the three kingdoms.',
   'campaign.locked': 'Win the previous mission to unlock.',
+  'campaign.legacyRecord': 'Pre-2.2 record',
   'campaign.best': 'Best {score} pts · Fastest {turns} turns',
   'campaign.inProgress': 'In progress',
   'campaign.notStarted': 'Not attempted',

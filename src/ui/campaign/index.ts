@@ -1,4 +1,5 @@
 // 한 줄 목적: 캠페인 선택 화면과 미션 도입 화면(짧은 도입·별 조건·기록)을 렌더링한다
+import { isLegacyMissionProgress } from '../../core/campaign/progress';
 import type { CampaignDocument, CampaignMission, MissionProgress } from '../../core/campaign/types';
 import { campaignText, factionName, missionText, t } from '../../i18n';
 import { describeStar } from '../editor';
@@ -40,8 +41,11 @@ export function showCampaignScreen(
               <span class="rp-sub">${escapeHtml(t('campaign.locked'))}</span></div>
             </div>`;
           }
+          const legacy = isLegacyMissionProgress(p ?? undefined)
+            ? ` · ${t('campaign.legacyRecord')}`
+            : '';
           const sub = p?.won
-            ? `${starsHtml(p.bestStars)} · ${t('campaign.best', { score: p.bestScore, turns: p.bestTurns ?? 0 })}`
+            ? `${starsHtml(p.bestStars)} · ${t('campaign.best', { score: p.bestScore, turns: p.bestTurns ?? 0 })}${legacy}`
             : (p ? t('campaign.inProgress') : t('campaign.notStarted'));
           return `
           <div class="rp-item" data-m="${escapeHtml(mv.mission.id)}">
