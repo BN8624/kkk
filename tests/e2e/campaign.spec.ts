@@ -22,6 +22,8 @@ test('캠페인: 선택→도입→출정하면 캠페인 게임이 시작되고
   await expect(page.getByText('청람 왕국 — 최후의 방벽')).toBeVisible();
   await expect(page.getByText('진홍 공국 — 붉은 기치')).toBeVisible();
   await expect(page.getByText('자원 후국 — 별의 화살')).toBeVisible();
+  // 후속 미션은 잠겨 있다
+  await expect(page.getByText('🔒 2. 포위망 돌파')).toBeVisible();
 
   // 남쪽 관문 도입 화면: 도입 문구와 별 조건이 보인다
   await page.getByRole('button', { name: '1. 남쪽 관문' }).click();

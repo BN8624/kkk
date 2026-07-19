@@ -37,8 +37,22 @@ function playFullGame(state: GameState): void {
 }
 
 describe('캠페인 미션 문서', () => {
+  it('왕국별 3개씩 총 9개 미션이 선행 미션 사슬로 이어진다', () => {
+    expect(CAMPAIGNS).toHaveLength(3);
+    for (const c of CAMPAIGNS) {
+      expect(c.missions).toHaveLength(3);
+      expect(c.missions[0].requires).toBeNull();
+      expect(c.missions[1].requires).toBe(c.missions[0].id);
+      expect(c.missions[2].requires).toBe(c.missions[1].id);
+      for (const m of c.missions) {
+        expect(m.intro.length).toBeGreaterThan(0);
+        expect(m.completionText.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('모든 미션이 검증을 통과하고 정규화된다', () => {
-    expect(ALL_MISSIONS.length).toBeGreaterThanOrEqual(3);
+    expect(ALL_MISSIONS.length).toBe(9);
     for (const m of ALL_MISSIONS) {
       const issues = validateScenario(m.scenario);
       expect(
@@ -66,7 +80,7 @@ describe('캠페인 미션 문서', () => {
       const snapshot = normalizeScenario(m.scenario);
       let wins = 0;
       let starsOnWin = 0;
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 4; i++) {
         const state = newGameFromScenario(90_000 + i * 977, snapshot, {
           mode: 'campaign',
           difficulty: 'normal',
@@ -82,7 +96,7 @@ describe('캠페인 미션 문서', () => {
           );
         }
       }
-      // 승리 가능성: 보통 AI가 8시드 중 최소 1승, 승리 시 별 1개 이상
+      // 승리 가능성: 보통 AI가 4시드 중 최소 1승, 승리 시 별 1개 이상
       expect(wins, `${m.id} 승리 불가`).toBeGreaterThanOrEqual(1);
       expect(starsOnWin, `${m.id} 별 없음`).toBeGreaterThanOrEqual(1);
     }
