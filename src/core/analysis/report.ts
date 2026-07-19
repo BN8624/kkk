@@ -1,7 +1,7 @@
 // 한 줄 목적: 플레이 분석 결과를 JSON·Markdown·CSV 보고서 텍스트로 만든다(개인 식별 정보 없음)
 import { GAME_VERSION } from '../replay';
-import { UNIT_NAMES } from '../data';
 import type { UnitTypeId } from '../types';
+import { t, unitName } from '../../i18n';
 import { aggregateAnalyses, lossReason, type AggregateAnalysis } from './aggregate';
 import { coachAggregate, coachSingleGame } from './coaching';
 import type { ReplayAnalysis } from './replay-metrics';
@@ -14,7 +14,7 @@ export interface ReportFilters {
 const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
 
 function outcomeWord(o: 'win' | 'lose' | 'draw'): string {
-  return o === 'win' ? '승리' : o === 'lose' ? '패배' : '무승부';
+  return o === 'win' ? t('result.win') : o === 'lose' ? t('result.lose') : t('result.draw');
 }
 
 /** JSON 보고서(기계 판독용). 브라우저 정보·개인 식별 정보는 포함하지 않는다. */
@@ -93,34 +93,37 @@ export function reportCsv(list: ReplayAnalysis[]): string {
 export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): string {
   const agg: AggregateAnalysis = aggregateAnalyses(list);
   const lines: string[] = [];
-  lines.push('# 세 왕관의 섬 — 플레이테스트 보고서');
+  lines.push(`# ${t('report.title')}`);
   lines.push('');
-  lines.push(`- 게임 버전: ${GAME_VERSION}`);
-  lines.push(`- 분석한 리플레이: ${agg.games}판`);
-  lines.push(`- 필터: ${filters.description}`);
-  lines.push(`- 승/패/무: ${agg.wins}/${agg.losses}/${agg.draws} (승률 ${agg.winRate}%)`);
-  lines.push(`- 평균 종료 턴: ${agg.avgTurns} · 평균 점수: ${agg.avgScore}`);
-  if (agg.starTotal > 0) lines.push(`- 별 획득: ${agg.totalStars}/${agg.starTotal}`);
+  lines.push(`- ${t('report.gameVersion')}: ${GAME_VERSION}`);
+  lines.push(`- ${t('report.replays')}: ${t('format.games', { n: agg.games })}`);
+  lines.push(`- ${t('report.filters')}: ${filters.description}`);
+  lines.push(
+    `- ${t('report.record')}: ${agg.wins}/${agg.losses}/${agg.draws} (${t('report.winRate', { rate: agg.winRate })})`,
+  );
+  lines.push(`- ${t('report.averages', { turns: agg.avgTurns, score: agg.avgScore })}`);
+  if (agg.starTotal > 0) lines.push(`- ${t('report.stars')}: ${agg.totalStars}/${agg.starTotal}`);
   lines.push('');
 
-  lines.push('## 병과 사용(생산 비율)');
+  lines.push(`## ${t('report.unitUsage')}`);
   lines.push('');
   for (const t of UNIT_TYPES) {
-    lines.push(`- ${UNIT_NAMES[t]}: ${agg.productionShare[t]}%`);
+    lines.push(`- ${unitName(t)}: ${agg.productionShare[t]}%`);
   }
   lines.push('');
 
   if (agg.commonLossReasons.length > 0) {
-    lines.push('## 주요 패배 원인');
+    lines.push(`## ${t('report.lossReasons')}`);
     lines.push('');
-    for (const r of agg.commonLossReasons) lines.push(`- ${r.reason}: ${r.count}회`);
+    for (const r of agg.commonLossReasons)
+      lines.push(`- ${r.reason}: ${t('analysis.count', { n: r.count })}`);
     lines.push('');
   }
 
   if (agg.byScenario.length > 0) {
-    lines.push('## 시나리오별 기록');
+    lines.push(`## ${t('report.scenarioRecords')}`);
     lines.push('');
-    lines.push('| 시나리오 | 판 수 | 승리 | 평균 턴 | 평균 점수 |');
+    lines.push(t('report.scenarioHeader'));
     lines.push('| --- | ---: | ---: | ---: | ---: |');
     for (const g of agg.byScenario) {
       lines.push(`| ${g.label} | ${g.games} | ${g.wins} | ${g.avgTurns} | ${g.avgScore} |`);
@@ -129,9 +132,9 @@ export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): 
   }
 
   if (agg.byFaction.length > 0) {
-    lines.push('## 왕국별 기록');
+    lines.push(`## ${t('report.factionRecords')}`);
     lines.push('');
-    lines.push('| 왕국 | 판 수 | 승리 | 평균 턴 |');
+    lines.push(t('report.factionHeader'));
     lines.push('| --- | ---: | ---: | ---: |');
     for (const g of agg.byFaction) lines.push(`| ${g.label} | ${g.games} | ${g.wins} | ${g.avgTurns} |`);
     lines.push('');
@@ -139,7 +142,7 @@ export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): 
 
   const campaignGames = list.filter((a) => a.config.mode === 'campaign');
   if (campaignGames.length > 0) {
-    lines.push('## 캠페인 별점 분포');
+    lines.push(`## ${t('report.campaignStars')}`);
     lines.push('');
     const byMission = new Map<string, ReplayAnalysis[]>();
     for (const a of campaignGames) {
@@ -156,15 +159,15 @@ export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): 
 
   const coaching = coachAggregate(agg);
   if (coaching.length > 0) {
-    lines.push('## 개선 후보');
+    lines.push(`## ${t('report.improvements')}`);
     lines.push('');
     for (const c of coaching) lines.push(`- ${c.text}`);
     lines.push('');
   }
 
-  lines.push('## 게임별 요약');
+  lines.push(`## ${t('report.gameSummary')}`);
   lines.push('');
-  lines.push('| 리플레이 | 시나리오 | 결과 | 턴 | 점수 | 별 | 비고 |');
+  lines.push(t('report.gameHeader'));
   lines.push('| --- | --- | --- | ---: | ---: | ---: | --- |');
   for (const a of list) {
     const note = a.outcome === 'lose' ? lossReason(a) : coachSingleGame(a)[0]?.text ?? '';
@@ -173,7 +176,7 @@ export function reportMarkdown(list: ReplayAnalysis[], filters: ReportFilters): 
     );
   }
   lines.push('');
-  lines.push(`원본 리플레이 ID: ${list.map((a) => a.replayId).join(', ')}`);
+  lines.push(t('report.sourceIds', { ids: list.map((a) => a.replayId).join(', ') }));
   lines.push('');
   return lines.join('\n');
 }

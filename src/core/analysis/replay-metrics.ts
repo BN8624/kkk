@@ -1,13 +1,14 @@
 // 한 줄 목적: 리플레이 한 판을 재실행하며 전체·전투·지도·경제·별점 지표와 턴별 주요 사건을 계산한다
 import { executeCommand } from '../command';
 import { unitAt, unitsOf } from '../board';
-import { BUILDING_NAMES, FACTION_NAMES, MAX_UNITS_PER_FACTION, UNIT_NAMES } from '../data';
+import { MAX_UNITS_PER_FACTION } from '../data';
 import { attackTargets, forecastAttack, unitCost } from '../game';
 import { hexDistance } from '../hex';
 import { replayInitialState, type ReplayDocument } from '../replay';
 import { starsEarned } from '../scenario/objectives';
 import type { StarCondition } from '../scenario/types';
 import type { Axial, FactionId, GameConfig, GameState, UnitTypeId } from '../types';
+import { buildingName, factionName, localizedScenarioName, t, unitName } from '../../i18n';
 
 // ---------------- 결과 타입 ----------------
 
@@ -153,42 +154,42 @@ function reviewStar(state: GameState, c: StarCondition, earned: boolean): StarRe
   let note: string;
   switch (c.type) {
     case 'win':
-      note = earned ? '승리 달성' : '승리하지 못했습니다';
+      note = t(earned ? 'analysis.star.winEarned' : 'analysis.star.winMissed');
       break;
     case 'win-within-turns':
       note = earned
-        ? `${c.turns}턴 안에 승리(${turns}턴)`
+        ? t('analysis.star.turnsEarned', { target: c.turns, actual: turns })
         : state.winner === me
-          ? `${turns}턴에 승리 — ${turns - c.turns}턴 늦었습니다`
-          : `승리하지 못했습니다(목표 ${c.turns}턴 이내)`;
+          ? t('analysis.star.turnsLate', { actual: turns, late: turns - c.turns })
+          : t('analysis.star.turnsMissed', { target: c.turns });
       break;
     case 'units-alive-at-least':
       note = earned
-        ? `생존 유닛 ${alive}기(목표 ${c.count}기 이상)`
-        : `생존 유닛 ${alive}기 — ${c.count - alive}기 부족`;
+        ? t('analysis.star.aliveEarned', { actual: alive, target: c.count })
+        : t('analysis.star.aliveMissed', { actual: alive, gap: c.count - alive });
       break;
     case 'units-lost-at-most':
       note = earned
-        ? `손실 ${stats.lost}기(허용 ${c.count}기 이하)`
-        : `손실 ${stats.lost}기 — ${stats.lost - c.count}기 초과`;
+        ? t('analysis.star.lostEarned', { actual: stats.lost, target: c.count })
+        : t('analysis.star.lostMissed', { actual: stats.lost, gap: stats.lost - c.count });
       break;
     case 'buildings-captured-at-least':
       note = earned
-        ? `점령 ${stats.captured}곳(목표 ${c.count}곳 이상)`
-        : `점령 ${stats.captured}곳 — ${c.count - stats.captured}곳 부족`;
+        ? t('analysis.star.capturedEarned', { actual: stats.captured, target: c.count })
+        : t('analysis.star.capturedMissed', { actual: stats.captured, gap: c.count - stats.captured });
       break;
     case 'kills-at-least':
       note = earned
-        ? `처치 ${stats.kills}기(목표 ${c.count}기 이상)`
-        : `처치 ${stats.kills}기 — ${c.count - stats.kills}기 부족`;
+        ? t('analysis.star.killsEarned', { actual: stats.kills, target: c.count })
+        : t('analysis.star.killsMissed', { actual: stats.kills, gap: c.count - stats.kills });
       break;
     case 'unit-alive':
-      note = earned ? `지정 유닛(${c.tag}) 생존` : `지정 유닛(${c.tag})을 잃었습니다`;
+      note = t(earned ? 'analysis.star.unitEarned' : 'analysis.star.unitMissed', { tag: c.tag });
       break;
     case 'gold-at-least':
       note = earned
-        ? `보유 금 ${gold}(목표 ${c.amount} 이상)`
-        : `보유 금 ${gold} — ${c.amount - gold} 부족`;
+        ? t('analysis.star.goldEarned', { actual: gold, target: c.amount })
+        : t('analysis.star.goldMissed', { actual: gold, gap: c.amount - gold });
       break;
   }
   return { condition: c, earned, note };
@@ -295,7 +296,10 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
 
       const r = executeCommand(state, command);
       if (!r.ok) {
-        return { ok: false, reason: `명령 재생 실패(seq ${command.seq}: ${r.reason ?? 'invalid'})` };
+        return {
+          ok: false,
+          reason: t('analysis.error.command', { seq: command.seq, reason: r.reason ?? 'invalid' }),
+        };
       }
 
       if (isHumanCmd) {
@@ -350,7 +354,7 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
               timeline.push({
                 turn: state.turn,
                 kind: 'loss',
-                text: `${UNIT_NAMES[type]}을(를) 잃었습니다`,
+                text: t('analysis.event.unitLost', { unit: unitName(type) }),
               });
             } else if (isHumanCmd) {
               kills++;
@@ -359,7 +363,10 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
               timeline.push({
                 turn: state.turn,
                 kind: 'kill',
-                text: `${FACTION_NAMES[ev.faction]} ${UNIT_NAMES[type]} 처치`,
+                text: t('analysis.event.unitDefeated', {
+                  faction: factionName(ev.faction),
+                  unit: unitName(type),
+                }),
               });
             }
             if (attackContext) {
@@ -370,17 +377,20 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
           }
           case 'building-captured':
             if (ev.newOwner === me) {
-              captures.push({ turn: state.turn, building: BUILDING_NAMES[ev.building] });
+              captures.push({ turn: state.turn, building: buildingName(ev.building) });
               timeline.push({
                 turn: state.turn,
                 kind: 'capture',
-                text: `${BUILDING_NAMES[ev.building]} 점령`,
+                text: t('analysis.event.captured', { building: buildingName(ev.building) }),
               });
             } else if (ev.prevOwner === me) {
               timeline.push({
                 turn: state.turn,
                 kind: 'capture',
-                text: `${BUILDING_NAMES[ev.building]}을(를) ${FACTION_NAMES[ev.newOwner]}에 빼앗겼습니다`,
+                text: t('analysis.event.buildingLost', {
+                  building: buildingName(ev.building),
+                  faction: factionName(ev.newOwner),
+                }),
               });
             }
             break;
@@ -393,7 +403,11 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
               timeline.push({
                 turn: state.turn,
                 kind: 'crown',
-                text: `${FACTION_NAMES[ev.owner]} 왕관 보유 ${ev.turns}/${ev.required}턴`,
+                text: t('analysis.event.crownHeld', {
+                  faction: factionName(ev.owner),
+                  turns: ev.turns,
+                  required: ev.required,
+                }),
               });
             }
             break;
@@ -408,7 +422,11 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
               );
               if (threat) {
                 capitalThreatTurn = ev.turn;
-                timeline.push({ turn: ev.turn, kind: 'capital-threat', text: '수도가 위협받기 시작했습니다' });
+                timeline.push({
+                  turn: ev.turn,
+                  kind: 'capital-threat',
+                  text: t('analysis.event.capitalThreat'),
+                });
               }
             }
             let stagnant = 0;
@@ -420,7 +438,11 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
             break;
           }
           case 'objective-completed':
-            timeline.push({ turn: state.turn, kind: 'objective', text: '승리 목표 달성' });
+            timeline.push({
+              turn: state.turn,
+              kind: 'objective',
+              text: t('analysis.event.objective'),
+            });
             break;
           case 'game-ended':
             timeline.push({
@@ -428,10 +450,10 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
               kind: 'end',
               text:
                 ev.winner === 'draw'
-                  ? '무승부로 종료'
+                  ? t('analysis.event.draw')
                   : ev.winner === me
-                    ? '승리로 종료'
-                    : `${FACTION_NAMES[ev.winner]} 승리로 종료`,
+                    ? t('analysis.event.humanWin')
+                    : t('analysis.event.factionWin', { faction: factionName(ev.winner) }),
             });
             break;
           default:
@@ -453,7 +475,7 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
       gameVersion: doc.gameVersion,
       createdAt: doc.createdAt,
       config: { ...doc.initialConfig },
-      scenarioTitle: doc.scenario.title,
+      scenarioTitle: localizedScenarioName(doc.initialConfig.scenario, doc.scenario.title),
       outcome: doc.result.winner === 'draw' ? 'draw' : doc.result.winner === me ? 'win' : 'lose',
       winner: doc.result.winner,
       turns,
@@ -497,6 +519,6 @@ export function analyzeReplay(doc: ReplayDocument): AnalyzeResult {
     };
     return { ok: true, analysis };
   } catch {
-    return { ok: false, reason: '분석 중 내부 오류가 발생했습니다' };
+    return { ok: false, reason: t('analysis.error.internal') };
   }
 }

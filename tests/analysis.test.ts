@@ -1,5 +1,5 @@
 // 한 줄 목적: 리플레이 분석 지표·합산·규칙 코칭·보고서 내보내기가 실제 게임 리플레이로 정합함을 검증한다
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { runAiTurn } from '../src/core/ai';
 import { newGame } from '../src/core/game';
 import { buildReplayDocument, type ReplayDocument } from '../src/core/replay';
@@ -8,6 +8,9 @@ import { aggregateAnalyses } from '../src/core/analysis/aggregate';
 import { coachAggregate, coachSingleGame } from '../src/core/analysis/coaching';
 import { reportCsv, reportJson, reportMarkdown } from '../src/core/analysis/report';
 import type { BuiltinScenarioId, FactionId, GameState } from '../src/core/types';
+import { setLocale } from '../src/i18n';
+
+afterEach(() => setLocale('ko'));
 
 function playFullGame(state: GameState): void {
   let guard = 0;
@@ -143,5 +146,18 @@ describe('보고서 내보내기', () => {
     const csv = reportCsv(analyses).split('\n');
     expect(csv[0]).toContain('replayId');
     expect(csv.length).toBe(analyses.length + 1);
+  });
+
+  it('영어 보고서·코칭·사건 설명에 한국어가 남지 않는다', () => {
+    setLocale('en');
+    const doc = makeReplay(77, 'broken-strait', 'crimson');
+    const result = analyzeReplay(doc);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const md = reportMarkdown([result.analysis], { description: 'All' });
+    const coaching = coachSingleGame(result.analysis).map((note) => note.text).join('\n');
+    const timeline = result.analysis.timeline.map((event) => event.text).join('\n');
+    expect(md).toContain('# Three Crowns Island — Playtest Report');
+    expect(`${md}\n${coaching}\n${timeline}`).not.toMatch(/[가-힣]/);
   });
 });

@@ -76,4 +76,10 @@ test('영어 모바일 일일 도전·기록·공식 전장', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Replays' })).toBeVisible();
   await expect(page.getByText('No saved replays.')).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.getByRole('button', { name: 'Play Analysis' }).click();
+  await expect(page.getByRole('heading', { name: 'Play Analysis' })).toBeVisible();
+  await expect(page.getByText('No replays match these filters.')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
 });

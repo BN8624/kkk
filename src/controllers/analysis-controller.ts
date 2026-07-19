@@ -5,11 +5,16 @@ import { analyzeReplay, type ReplayAnalysis } from '../core/analysis/replay-metr
 import { reportCsv, reportJson, reportMarkdown, type ReportFilters } from '../core/analysis/report';
 import { missionByScenarioId } from '../core/campaign/missions';
 import { loadCampaignProgress } from '../core/campaign/progress';
-import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
 import { REPLAY_MAX_IMPORT_BYTES, upgradeStoredReplay, type ReplayDocument } from '../core/replay';
 import { checkReplayCompatibility } from '../core/replay-compat';
 import { decodeReplayDocument } from '../core/replay-decode';
-import { replayCompatibilityReason } from '../i18n';
+import {
+  difficultyName,
+  factionName,
+  localizedScenarioName,
+  replayCompatibilityReason,
+  t,
+} from '../i18n';
 import { documentStore } from '../storage/idb';
 import {
   showAnalysisListScreen,
@@ -27,12 +32,17 @@ interface LoadedReplay {
   doc: ReplayDocument;
 }
 
-const MODE_NAMES: Record<string, string> = {
-  quick: '빠른 전투',
-  daily: '일일 도전',
-  campaign: '캠페인',
-  custom: '커스텀',
-};
+function modeName(mode: string): string {
+  switch (mode) {
+    case 'quick':
+    case 'daily':
+    case 'campaign':
+    case 'custom':
+      return t(`analysis.mode.${mode}`);
+    default:
+      return mode;
+  }
+}
 
 function download(filename: string, text: string, mime: string): void {
   const blob = new Blob([text], { type: mime });
@@ -54,7 +64,7 @@ export class AnalysisController implements AppController {
 
   async showLab(): Promise<void> {
     const token = this.ctx.enterMode('analysis');
-    this.ctx.overlay.show('<p class="subtitle">불러오는 중…</p>');
+    this.ctx.overlay.show(`<p class="subtitle">${t('library.loading')}</p>`);
     this.loaded = [];
     try {
       const summaries = await documentStore().list('replays');
@@ -84,12 +94,17 @@ export class AnalysisController implements AppController {
 
   private filterDescription(): string {
     const parts: string[] = [];
-    if (this.filters.mode !== 'all') parts.push(`모드: ${MODE_NAMES[this.filters.mode]}`);
-    if (this.filters.faction !== 'all') parts.push(`왕국: ${FACTION_NAMES[this.filters.faction]}`);
+    if (this.filters.mode !== 'all')
+      parts.push(`${t('analysis.filter.mode')}: ${modeName(this.filters.mode)}`);
+    if (this.filters.faction !== 'all')
+      parts.push(`${t('analysis.filter.faction')}: ${factionName(this.filters.faction)}`);
     if (this.filters.difficulty !== 'all')
-      parts.push(`난이도: ${DIFFICULTY_NAMES[this.filters.difficulty]}`);
-    if (this.filters.scenario !== 'all') parts.push(`시나리오: ${this.filters.scenario}`);
-    return parts.length > 0 ? parts.join(' · ') : '전체';
+      parts.push(
+        `${t('analysis.filter.difficulty')}: ${difficultyName(this.filters.difficulty)}`,
+      );
+    if (this.filters.scenario !== 'all')
+      parts.push(`${t('analysis.filter.scenario')}: ${this.filters.scenario}`);
+    return parts.length > 0 ? parts.join(' · ') : t('analysis.all');
   }
 
   private renderList(): void {
@@ -98,16 +113,23 @@ export class AnalysisController implements AppController {
       const me = doc.initialConfig.humanFaction;
       return {
         id,
-        title: doc.scenario.title || doc.initialConfig.scenario,
-        sub: `${FACTION_NAMES[me]} · ${DIFFICULTY_NAMES[doc.initialConfig.difficulty]} · ${
-          MODE_NAMES[doc.initialConfig.mode] ?? doc.initialConfig.mode
-        } · ${doc.result.turns}턴 · ${doc.result.score}점`,
+        title: localizedScenarioName(
+          doc.initialConfig.scenario,
+          doc.scenario.title || doc.initialConfig.scenario,
+        ),
+        sub: t('analysis.listSub', {
+          faction: factionName(me),
+          difficulty: difficultyName(doc.initialConfig.difficulty),
+          mode: modeName(doc.initialConfig.mode),
+          turns: doc.result.turns,
+          score: doc.result.score,
+        }),
         outcome:
-          doc.result.winner === me ? '승리' : doc.result.winner === 'draw' ? '무승부' : '패배',
+          doc.result.winner === me ? 'win' : doc.result.winner === 'draw' ? 'draw' : 'lose',
         selected: this.selected.has(id),
       };
     });
-    const scenarioOptions = [...new Map(this.loaded.map(({ doc }) => [doc.initialConfig.scenario, doc.scenario.title || doc.initialConfig.scenario])).entries()].map(
+    const scenarioOptions = [...new Map(this.loaded.map(({ doc }) => [doc.initialConfig.scenario, localizedScenarioName(doc.initialConfig.scenario, doc.scenario.title || doc.initialConfig.scenario)])).entries()].map(
       ([id, name]) => ({ id, name }),
     );
     showAnalysisListScreen(this.ctx.overlay, items, this.filters, scenarioOptions, {
@@ -142,7 +164,7 @@ export class AnalysisController implements AppController {
     if (!entry) return;
     const analysis = this.analysisOf(id, entry.doc);
     if (!analysis) {
-      this.ctx.hud.toast('이 리플레이는 현재 규칙으로 분석할 수 없습니다');
+      this.ctx.hud.toast(t('analysis.notSupported'));
       return;
     }
     this.showSingle(entry.doc, analysis);
@@ -154,12 +176,21 @@ export class AnalysisController implements AppController {
     if (!found) return null;
     const progress = loadCampaignProgress().missions[found.mission.id];
     if (!progress) return null;
-    const parts = [`도전 ${progress.attempts ?? '-'}회`, `최고 ${'★'.repeat(progress.bestStars)}${progress.bestStars === 0 ? '없음' : ''}`];
+    const parts = [
+      t('analysis.campaignAttempts', { n: progress.attempts ?? '-' }),
+      t('analysis.campaignBest', {
+        stars: progress.bestStars > 0 ? '★'.repeat(progress.bestStars) : t('analysis.noStars'),
+      }),
+    ];
     if (progress.bestScore > 0) {
       const diff = analysis.score - progress.bestScore;
-      parts.push(diff >= 0 ? `최고 점수와 동률·경신(${progress.bestScore})` : `최고 점수까지 ${-diff}점`);
+      parts.push(
+        diff >= 0
+          ? t('analysis.tiedBest', { score: progress.bestScore })
+          : t('analysis.toBest', { score: -diff }),
+      );
     }
-    return `캠페인 기록 — ${parts.join(' · ')}`;
+    return t('analysis.campaignRecord', { details: parts.join(' · ') });
   }
 
   private showSingle(doc: ReplayDocument, analysis: ReplayAnalysis): void {
@@ -202,11 +233,11 @@ export class AnalysisController implements AppController {
     }
     if (!token.alive || canceled) return;
     if (analyses.length === 0) {
-      this.ctx.hud.toast('분석 가능한 리플레이가 없습니다');
+      this.ctx.hud.toast(t('analysis.noneAvailable'));
       this.renderList();
       return;
     }
-    if (skipped > 0) this.ctx.hud.toast(`${skipped}판은 현재 규칙으로 분석할 수 없어 제외했습니다`);
+    if (skipped > 0) this.ctx.hud.toast(t('analysis.skipped', { n: skipped }));
     const agg = aggregateAnalyses(analyses);
     showMultiAnalysisScreen(this.ctx.overlay, agg, coachAggregate(agg), {
       onExport: (format) => this.export(analyses, format),
@@ -217,7 +248,7 @@ export class AnalysisController implements AppController {
   /** 외부 리플레이 파일을 보관하지 않고 분석만 한다. */
   private async importAndAnalyze(file: File): Promise<void> {
     if (file.size > REPLAY_MAX_IMPORT_BYTES) {
-      this.ctx.hud.toast('파일이 너무 큽니다');
+      this.ctx.hud.toast(t('replay.fileTooLarge'));
       return;
     }
     const token = this.ctx.currentToken();
@@ -225,7 +256,7 @@ export class AnalysisController implements AppController {
     if (!token.alive) return;
     const decoded = decodeReplayDocument(text ?? '');
     if (!decoded.ok) {
-      this.ctx.hud.toast(decoded.issues[0]?.message ?? '리플레이 형식이 아닙니다');
+      this.ctx.hud.toast(t('replay.invalidFormat'));
       return;
     }
     const compat = checkReplayCompatibility(decoded.value);
@@ -236,7 +267,7 @@ export class AnalysisController implements AppController {
     const doc = compat.migrated ?? decoded.value;
     const r = analyzeReplay(doc);
     if (!r.ok) {
-      this.ctx.hud.toast(`분석할 수 없습니다: ${r.reason}`);
+      this.ctx.hud.toast(t('analysis.failed', { reason: r.reason }));
       return;
     }
     this.showSingle(doc, r.analysis);

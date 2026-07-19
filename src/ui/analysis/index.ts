@@ -1,9 +1,9 @@
 // 한 줄 목적: 플레이 분석(기록실) 화면 — 대상 선택·단일 분석·다중 통계를 보드게임 기록실 풍으로 렌더링한다
-import { UNIT_NAMES } from '../../core/data';
 import type { UnitTypeId } from '../../core/types';
 import type { AggregateAnalysis } from '../../core/analysis/aggregate';
 import type { CoachingNote } from '../../core/analysis/coaching';
 import type { ReplayAnalysis, TurnEventNote } from '../../core/analysis/replay-metrics';
+import { factionName, t, unitName } from '../../i18n';
 import { escapeHtml, resultTableHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -15,7 +15,7 @@ export interface AnalysisListItem {
   id: string;
   title: string;
   sub: string;
-  outcome: '승리' | '패배' | '무승부';
+  outcome: 'win' | 'lose' | 'draw';
   selected: boolean;
 }
 
@@ -45,57 +45,63 @@ export function showAnalysisListScreen(
   const selectedCount = items.filter((i) => i.selected).length;
   const rows = items
     .map((it) => {
-      const cls = it.outcome === '승리' ? 'win' : it.outcome === '패배' ? 'lose' : '';
+      const cls = it.outcome === 'win' ? 'win' : it.outcome === 'lose' ? 'lose' : '';
+      const outcome =
+        it.outcome === 'win'
+          ? t('result.win')
+          : it.outcome === 'draw'
+            ? t('result.draw')
+            : t('result.lose');
       return `
       <div class="rp-item" data-id="${escapeHtml(it.id)}">
-        <label class="an-check"><input type="checkbox" data-act="sel" ${it.selected ? 'checked' : ''} aria-label="분석 대상 선택"></label>
+        <label class="an-check"><input type="checkbox" data-act="sel" ${it.selected ? 'checked' : ''} aria-label="${escapeHtml(t('analysis.selectTarget'))}"></label>
         <button class="rp-main" data-act="open">
           <span class="rp-title"><b>${escapeHtml(it.title)}</b>
-            <span class="rp-outcome ${cls}">${it.outcome}</span></span>
+            <span class="rp-outcome ${cls}">${escapeHtml(outcome)}</span></span>
           <span class="rp-sub">${escapeHtml(it.sub)}</span>
         </button>
       </div>`;
     })
     .join('');
   const sel = (name: string, value: string, options: [string, string][]): string =>
-    `<select data-filter="${name}" aria-label="${name} 필터">${options
+    `<select data-filter="${name}" aria-label="${escapeHtml(t('analysis.filterAria', { name: t(`analysis.filter.${name as 'mode' | 'faction' | 'difficulty' | 'scenario'}`) }))}">${options
       .map(([v, label]) => `<option value="${escapeHtml(v)}"${v === value ? ' selected' : ''}>${escapeHtml(label)}</option>`)
       .join('')}</select>`;
   const root = overlay.show(`
-      <h1 style="font-size:24px;">플레이 분석</h1>
-      <p class="subtitle" style="font-size:12.5px;">내 리플레이에서 승패의 이유를 찾습니다 (이 브라우저 안에서만 분석)</p>
+      <h1 style="font-size:24px;">${escapeHtml(t('analysis.title'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('analysis.subtitle'))}</p>
       <div class="an-filters">
         ${sel('mode', filters.mode, [
-          ['all', '모든 모드'],
-          ['quick', '빠른 전투'],
-          ['campaign', '캠페인'],
-          ['daily', '일일 도전'],
-          ['custom', '커스텀'],
+          ['all', t('analysis.allModes')],
+          ['quick', t('analysis.mode.quick')],
+          ['campaign', t('analysis.mode.campaign')],
+          ['daily', t('analysis.mode.daily')],
+          ['custom', t('analysis.mode.custom')],
         ])}
         ${sel('faction', filters.faction, [
-          ['all', '모든 왕국'],
-          ['azure', '남색'],
-          ['crimson', '진홍'],
-          ['violet', '보라'],
+          ['all', t('analysis.allFactions')],
+          ['azure', factionName('azure')],
+          ['crimson', factionName('crimson')],
+          ['violet', factionName('violet')],
         ])}
         ${sel('difficulty', filters.difficulty, [
-          ['all', '모든 난이도'],
-          ['easy', '쉬움'],
-          ['normal', '보통'],
-          ['hard', '어려움'],
+          ['all', t('analysis.allDifficulties')],
+          ['easy', t('difficulty.easy')],
+          ['normal', t('difficulty.normal')],
+          ['hard', t('difficulty.hard')],
         ])}
         ${sel('scenario', filters.scenario, [
-          ['all', '모든 시나리오'],
+          ['all', t('analysis.allScenarios')],
           ...scenarioOptions.map((s): [string, string] => [s.id, s.name]),
         ])}
       </div>
-      <div class="rp-list">${rows || '<p class="subtitle">조건에 맞는 리플레이가 없습니다.<br>게임을 끝까지 플레이하면 자동으로 기록됩니다.</p>'}</div>
+      <div class="rp-list">${rows || `<p class="subtitle">${escapeHtml(t('analysis.empty'))}<br>${escapeHtml(t('analysis.emptyHint'))}</p>`}</div>
       <input type="file" id="an-import-file" accept=".json,application/json" style="display:none">
       <div style="display:flex; gap:8px; width:min(300px,82vw);">
         <button class="big-btn" style="width:auto;flex:2;" id="btn-analyze" ${items.length === 0 ? 'disabled' : ''}>
-          ${selectedCount > 0 ? `선택한 ${selectedCount}판 분석` : '전체 분석'}</button>
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-an-import">가져오기</button>
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-back">뒤로</button>
+          ${escapeHtml(selectedCount > 0 ? t('analysis.selected', { n: selectedCount }) : t('analysis.allGames'))}</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-an-import">${escapeHtml(t('replay.import'))}</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-back">${escapeHtml(t('common.back'))}</button>
       </div>`);
   for (const row of root.querySelectorAll<HTMLElement>('.rp-item')) {
     const id = row.dataset.id!;
@@ -128,9 +134,9 @@ export function showAnalysisProgressScreen(
   onCancel: () => void,
 ): void {
   overlay.show(`
-      <h1 style="font-size:22px;">분석 중…</h1>
-      <p class="subtitle">${done}/${total} 리플레이</p>
-      <button class="sub-btn" id="btn-cancel">취소</button>`);
+      <h1 style="font-size:22px;">${escapeHtml(t('analysis.analyzing'))}</h1>
+      <p class="subtitle">${escapeHtml(t('analysis.progress', { done, total }))}</p>
+      <button class="sub-btn" id="btn-cancel">${escapeHtml(t('common.cancel'))}</button>`);
   overlay.bind({ 'btn-cancel': onCancel });
 }
 
@@ -149,9 +155,9 @@ function noteIcon(kind: CoachingNote['kind']): string {
 function timelineRow(ev: TurnEventNote): string {
   return `
     <div class="an-ev">
-      <span class="an-ev-turn">${ev.turn}턴</span>
+      <span class="an-ev-turn">${escapeHtml(t('analysis.turn', { n: ev.turn }))}</span>
       <span class="an-ev-text">${escapeHtml(ev.text)}</span>
-      <button class="an-ev-open" data-turn="${ev.turn}" aria-label="${ev.turn}턴 리플레이 보기">보기</button>
+      <button class="an-ev-open" data-turn="${ev.turn}" aria-label="${escapeHtml(t('analysis.openTurnAria', { n: ev.turn }))}">${escapeHtml(t('analysis.view'))}</button>
     </div>`;
 }
 
@@ -162,30 +168,30 @@ export function showSingleAnalysisScreen(
   campaignNote: string | null,
   handlers: SingleAnalysisHandlers,
 ): void {
-  const word = a.outcome === 'win' ? '승리' : a.outcome === 'lose' ? '패배' : '무승부';
+  const word = a.outcome === 'win' ? t('result.win') : a.outcome === 'lose' ? t('result.lose') : t('result.draw');
   const summary = resultTableHtml([
-    { label: '결과', value: `${word} · ${a.turns}턴 · ${a.score}점` },
-    ...(a.starTotal > 0 ? [{ label: '별점', value: `${'★'.repeat(a.stars)}${'☆'.repeat(Math.max(0, a.starTotal - a.stars))}` }] : []),
-    { label: '행동', value: `이동 ${a.moves} · 공격 ${a.attacks} · 생산 ${a.productions}` },
-    { label: '전투', value: `처치 ${a.kills} · 손실 ${a.lostUnits} · 피해 ${a.damageDealt}/${a.damageTaken}` },
-    { label: '경제', value: `수입 ${a.totalIncome} · 지출 ${a.productionSpend} · 종료 금 ${a.goldAtEnd}` },
-    { label: '이동 거리', value: `${a.moveDistance}칸` },
+    { label: t('analysis.result'), value: t('analysis.resultValue', { outcome: word, turns: a.turns, score: a.score }) },
+    ...(a.starTotal > 0 ? [{ label: t('analysis.stars'), value: `${'★'.repeat(a.stars)}${'☆'.repeat(Math.max(0, a.starTotal - a.stars))}` }] : []),
+    { label: t('analysis.actions'), value: t('analysis.actionsValue', { moves: a.moves, attacks: a.attacks, productions: a.productions }) },
+    { label: t('analysis.combat'), value: t('analysis.combatValue', { kills: a.kills, losses: a.lostUnits, dealt: a.damageDealt, taken: a.damageTaken }) },
+    { label: t('analysis.economy'), value: t('analysis.economyValue', { income: a.totalIncome, spend: a.productionSpend, gold: a.goldAtEnd }) },
+    { label: t('analysis.moveDistance'), value: t('analysis.tiles', { n: a.moveDistance }) },
   ]);
   const stars =
     a.starReviews.length > 0
-      ? `<div class="an-block"><h2>별점 검토</h2>${a.starReviews
+      ? `<div class="an-block"><h2>${escapeHtml(t('analysis.starReview'))}</h2>${a.starReviews
           .map((s) => `<p class="an-line">${s.earned ? '★' : '☆'} ${escapeHtml(s.note)}</p>`)
           .join('')}</div>`
       : '';
   const notes =
     coaching.length > 0
-      ? `<div class="an-block"><h2>기록관의 조언</h2>${coaching
+      ? `<div class="an-block"><h2>${escapeHtml(t('analysis.advice'))}</h2>${coaching
           .map((c) => `<p class="an-line">${noteIcon(c.kind)} ${escapeHtml(c.text)}</p>`)
           .join('')}</div>`
       : '';
   const timeline =
     a.timeline.length > 0
-      ? `<div class="an-block"><h2>턴별 주요 사건</h2>${a.timeline.map(timelineRow).join('')}</div>`
+      ? `<div class="an-block"><h2>${escapeHtml(t('analysis.timeline'))}</h2>${a.timeline.map(timelineRow).join('')}</div>`
       : '';
   const root = overlay.show(`
       <h1 style="font-size:22px;">${escapeHtml(a.scenarioTitle)}</h1>
@@ -200,7 +206,7 @@ export function showSingleAnalysisScreen(
         <button class="sub-btn" style="width:auto;flex:1;" id="btn-ex-md">Markdown</button>
         <button class="sub-btn" style="width:auto;flex:1;" id="btn-ex-csv">CSV</button>
       </div>
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   for (const btn of root.querySelectorAll<HTMLButtonElement>('.an-ev-open')) {
     btn.addEventListener('click', () => handlers.onOpenTurn(Number(btn.dataset.turn)));
   }
@@ -226,48 +232,48 @@ export function showMultiAnalysisScreen(
   handlers: MultiAnalysisHandlers,
 ): void {
   const summary = resultTableHtml([
-    { label: '분석 판 수', value: `${agg.games}판` },
-    { label: '승 / 패 / 무', value: `${agg.wins} / ${agg.losses} / ${agg.draws} (승률 ${agg.winRate}%)` },
-    { label: '평균 종료 턴', value: `${agg.avgTurns}턴` },
-    { label: '평균 점수', value: `${agg.avgScore}점` },
-    ...(agg.starTotal > 0 ? [{ label: '별 획득', value: `${agg.totalStars}/${agg.starTotal}` }] : []),
+    { label: t('analysis.gamesAnalyzed'), value: t('format.games', { n: agg.games }) },
+    { label: t('analysis.record'), value: t('analysis.recordValue', { wins: agg.wins, losses: agg.losses, draws: agg.draws, rate: agg.winRate }) },
+    { label: t('analysis.avgTurns'), value: t('format.turns', { n: agg.avgTurns }) },
+    { label: t('analysis.avgScore'), value: t('format.points', { n: agg.avgScore }) },
+    ...(agg.starTotal > 0 ? [{ label: t('analysis.starsEarned'), value: `${agg.totalStars}/${agg.starTotal}` }] : []),
     {
-      label: '병과 생산 비율',
-      value: UNIT_TYPES.map((t) => `${UNIT_NAMES[t]} ${agg.productionShare[t]}%`).join(' · '),
+      label: t('analysis.productionShare'),
+      value: UNIT_TYPES.map((type) => `${unitName(type)} ${agg.productionShare[type]}%`).join(' · '),
     },
   ]);
   const groups = (title: string, rows: { label: string; games: number; wins: number; avgTurns: number }[]): string =>
     rows.length > 0
-      ? `<div class="an-block"><h2>${title}</h2>${rows
+      ? `<div class="an-block"><h2>${escapeHtml(title)}</h2>${rows
           .map(
             (g) =>
-              `<p class="an-line">${escapeHtml(g.label)} — ${g.games}판 · ${g.wins}승 · 평균 ${g.avgTurns}턴</p>`,
+              `<p class="an-line">${escapeHtml(g.label)} — ${escapeHtml(t('analysis.groupRow', { games: g.games, wins: g.wins, turns: g.avgTurns }))}</p>`,
           )
           .join('')}</div>`
       : '';
   const lossReasons =
     agg.commonLossReasons.length > 0
-      ? `<div class="an-block"><h2>반복되는 패배 원인</h2>${agg.commonLossReasons
-          .map((r) => `<p class="an-line">✧ ${escapeHtml(r.reason)} · ${r.count}회</p>`)
+      ? `<div class="an-block"><h2>${escapeHtml(t('analysis.commonLosses'))}</h2>${agg.commonLossReasons
+          .map((r) => `<p class="an-line">✧ ${escapeHtml(r.reason)} · ${escapeHtml(t('analysis.count', { n: r.count }))}</p>`)
           .join('')}</div>`
       : '';
   const trend = agg.trend
-    ? `<div class="an-block"><h2>최근 5판 vs 이전 5판</h2>
-        <p class="an-line">승률 ${agg.trend.previousWinRate}% → ${agg.trend.recentWinRate}%</p>
-        <p class="an-line">평균 턴 ${agg.trend.previousAvgTurns} → ${agg.trend.recentAvgTurns}</p></div>`
+    ? `<div class="an-block"><h2>${escapeHtml(t('analysis.trend'))}</h2>
+        <p class="an-line">${escapeHtml(t('analysis.winRateTrend', { before: agg.trend.previousWinRate, after: agg.trend.recentWinRate }))}</p>
+        <p class="an-line">${escapeHtml(t('analysis.turnTrend', { before: agg.trend.previousAvgTurns, after: agg.trend.recentAvgTurns }))}</p></div>`
     : '';
   const notes =
     coaching.length > 0
-      ? `<div class="an-block"><h2>기록관의 조언</h2>${coaching
+      ? `<div class="an-block"><h2>${escapeHtml(t('analysis.advice'))}</h2>${coaching
           .map((c) => `<p class="an-line">${noteIcon(c.kind)} ${escapeHtml(c.text)}</p>`)
           .join('')}</div>`
       : '';
   overlay.show(`
-      <h1 style="font-size:22px;">전적 분석</h1>
+      <h1 style="font-size:22px;">${escapeHtml(t('analysis.recordAnalysis'))}</h1>
       ${summary}
-      ${groups('왕국별 기록', agg.byFaction)}
-      ${groups('시나리오별 기록', agg.byScenario)}
-      ${groups('난이도별 기록', agg.byDifficulty)}
+      ${groups(t('analysis.byFaction'), agg.byFaction)}
+      ${groups(t('analysis.byScenario'), agg.byScenario)}
+      ${groups(t('analysis.byDifficulty'), agg.byDifficulty)}
       ${lossReasons}
       ${trend}
       ${notes}
@@ -276,7 +282,7 @@ export function showMultiAnalysisScreen(
         <button class="sub-btn" style="width:auto;flex:1;" id="btn-ex-md">Markdown</button>
         <button class="sub-btn" style="width:auto;flex:1;" id="btn-ex-csv">CSV</button>
       </div>
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   overlay.bind({
     'btn-ex-json': () => handlers.onExport('json'),
     'btn-ex-md': () => handlers.onExport('md'),

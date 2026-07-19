@@ -1,6 +1,7 @@
 // 한 줄 목적: 여러 리플레이 분석을 합산해 승률·평균 턴·왕국/시나리오별 기록·추세 비교를 계산한다
-import type { FactionId, UnitTypeId } from '../types';
+import type { UnitTypeId } from '../types';
 import type { ReplayAnalysis } from './replay-metrics';
+import { difficultyName, factionName, t } from '../../i18n';
 
 export interface GroupRecord {
   key: string;
@@ -72,12 +73,12 @@ function avg(nums: number[]): number {
 /** 패배 한 판의 대표 원인 문자열(규칙 기반). */
 export function lossReason(a: ReplayAnalysis): string {
   if (a.outcome !== 'lose') return '';
-  if (a.capitalThreatTurn !== null && a.lostUnits >= 3) return '수도 압박 속 병력 소모';
-  if (a.unfavorableTrades >= 2) return '불리한 교환 반복';
-  if (a.idleProductionTurns >= 2) return '생산 미활용';
-  if (a.lostUnits > a.kills + 1) return '병력 열세(손실 과다)';
-  if (a.idleUnitTurns >= a.turns) return '유닛 미활용(행동 없는 턴 다수)';
-  return '목표 달성 실패';
+  if (a.capitalThreatTurn !== null && a.lostUnits >= 3) return t('analysis.loss.capital');
+  if (a.unfavorableTrades >= 2) return t('analysis.loss.trade');
+  if (a.idleProductionTurns >= 2) return t('analysis.loss.production');
+  if (a.lostUnits > a.kills + 1) return t('analysis.loss.units');
+  if (a.idleUnitTurns >= a.turns) return t('analysis.loss.idle');
+  return t('analysis.loss.objective');
 }
 
 /** 여러 분석의 합산. 빈 목록도 안전하게 처리한다. */
@@ -116,12 +117,6 @@ export function aggregateAnalyses(list: ReplayAnalysis[]): AggregateAnalysis {
     };
   }
 
-  const FACTION_LABELS: Record<FactionId, string> = {
-    azure: '남색 왕국',
-    crimson: '진홍 왕국',
-    violet: '보라 왕국',
-  };
-
   return {
     games: list.length,
     wins,
@@ -135,7 +130,7 @@ export function aggregateAnalyses(list: ReplayAnalysis[]): AggregateAnalysis {
     byFaction: groupBy(
       list,
       (a) => a.config.humanFaction,
-      (a) => FACTION_LABELS[a.config.humanFaction],
+      (a) => factionName(a.config.humanFaction),
     ),
     byScenario: groupBy(
       list,
@@ -145,7 +140,7 @@ export function aggregateAnalyses(list: ReplayAnalysis[]): AggregateAnalysis {
     byDifficulty: groupBy(
       list,
       (a) => a.config.difficulty,
-      (a) => ({ easy: '쉬움', normal: '보통', hard: '어려움' })[a.config.difficulty],
+      (a) => difficultyName(a.config.difficulty),
     ),
     productionShare,
     commonLossReasons: [...reasonCounts.entries()]
