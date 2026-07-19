@@ -277,6 +277,13 @@ export function injectSharedStyles(): void {
 .ed-pick-banner button { border: 1px solid #8a6d14; border-radius: 8px; background: #f2ead8; height: 30px; padding: 0 10px; }
 .tp-bar { top: calc(env(safe-area-inset-top, 0px) + 100px); }
 .tp-line { font-size: 13.5px; padding: 3px 2px; color: #2b2416; }
+.cp-kingdom { font-size: 13.5px; margin-bottom: -6px; display: flex; gap: 8px; align-items: baseline; }
+.cp-stars { color: #8a6d14; font-weight: bold; }
+.cp-locked { opacity: .55; }
+.cp-locked .rp-main { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 12px; }
+.cp-intro { max-width: min(320px, 84vw); line-height: 1.55; }
+.cp-star-list { display: flex; flex-direction: column; gap: 4px; }
+.cp-star-line { font-size: 13px; color: #4f4636; }
 .ed-import-text {
   width: min(300px, 82vw); border: 1.5px solid #8a6d14; border-radius: 11px; padding: 9px 11px;
   font-size: 13px; font-family: ui-monospace, monospace; background: #faf5e8; color: #2b2416; resize: vertical;

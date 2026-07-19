@@ -27,6 +27,19 @@ import { EditorController, type EditorTool } from './editor/controller';
 import { cloneBuiltinDocument, emptyDocument, randomDocument } from './editor/new-doc';
 import { clone } from './editor/ops';
 import { decodeShareCode, encodeShareCode, shareUrlFromCode } from './editor/share';
+import { CAMPAIGNS, missionByScenarioId } from './core/campaign/missions';
+import {
+  earnedStars,
+  isMissionUnlocked,
+  loadCampaignProgress,
+  nextMission,
+  recordMissionResult,
+  saveCampaignProgress,
+} from './core/campaign/progress';
+import type { CampaignDocument, CampaignMission } from './core/campaign/types';
+import { starsEarned } from './core/scenario/objectives';
+import { showCampaignScreen, showMissionIntroScreen, type CampaignView } from './ui/campaign';
+import { escapeHtml } from './ui/shared/dom';
 import { normalizeScenario } from './core/scenario/normalize';
 import { isPlayable, parseScenarioDocument, validateScenario } from './core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from './core/scenario/types';
@@ -206,13 +219,12 @@ class App {
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
       saveSummary: summary,
-      // 캠페인 메뉴는 해당 단계가 실제로 완성되면 켠다
-      features: { campaign: false, scenarios: true, editor: true, replays: true },
+      features: { campaign: true, scenarios: true, editor: true, replays: true },
       handlers: {
         onContinue: () => this.continueGame(),
         onNewGame: () => this.startNewGame(),
         onDaily: () => this.showDaily(),
-        onCampaign: () => {},
+        onCampaign: () => this.showCampaign(),
         onScenarios: () => void this.showCustomScenarios(),
         onEditor: () => void this.showEditorHome(),
         onReplays: () => void this.showReplayArchive(),
@@ -873,6 +885,85 @@ class App {
       /* 저장소 접근 실패: 초안 없이 표시 */
     }
     return drafts;
+  }
+
+  // ---------------- 캠페인 ----------------
+
+  private showCampaign(): void {
+    this.mode = 'campaign';
+    const progress = loadCampaignProgress();
+    const views: CampaignView[] = CAMPAIGNS.map((campaign) => ({
+      campaign,
+      stars: earnedStars(campaign, progress),
+      missions: campaign.missions.map((mission) => ({
+        mission,
+        unlocked: isMissionUnlocked(campaign, progress, mission.id),
+        progress: progress.missions[mission.id] ?? null,
+      })),
+    }));
+    showCampaignScreen(this.overlay, views, {
+      onMission: (m) => this.showMissionIntro(m),
+      onBack: () => this.toTitle(),
+    });
+  }
+
+  private showMissionIntro(mission: CampaignMission): void {
+    const progress = loadCampaignProgress();
+    showMissionIntroScreen(this.overlay, mission, progress.missions[mission.id] ?? null, {
+      onStart: () => this.startCampaignMission(mission),
+      onBack: () => this.showCampaign(),
+    });
+  }
+
+  private startCampaignMission(mission: CampaignMission): void {
+    let state: GameState;
+    try {
+      state = newGameFromScenario(Date.now() >>> 0, normalizeScenario(mission.scenario), {
+        mode: 'campaign',
+        difficulty: 'normal',
+      });
+    } catch {
+      this.hud.toast('미션을 시작할 수 없습니다');
+      return;
+    }
+    this.launch(state);
+  }
+
+  /** 캠페인 결과: 진행 저장 반영 후 완료 문구·별·다음 미션을 보여 준다. */
+  private showCampaignResult(
+    state: GameState,
+    campaign: CampaignDocument,
+    mission: CampaignMission,
+    stars: number,
+  ): void {
+    const me = state.config.humanFaction;
+    const won = state.winner === me;
+    const word = won ? '승리' : state.winner === 'draw' ? '무승부' : '패배';
+    const starTotal = mission.scenario.starConditions?.length ?? 3;
+    const next = nextMission(campaign, mission.id);
+    const nextUnlocked = next
+      ? isMissionUnlocked(campaign, loadCampaignProgress(), next.id)
+      : false;
+    this.overlay.show(`
+      <h1 class="result-word ${won ? 'win' : 'lose'}" style="font-size:34px;">${word}</h1>
+      <p class="subtitle cp-intro">${escapeHtml(won ? mission.completionText : mission.intro)}</p>
+      <p class="subtitle">${'★'.repeat(stars)}${'☆'.repeat(Math.max(0, starTotal - stars))} · ${Math.min(state.turn, state.maxTurns)}턴 · ${factionScore(state, me)}점</p>
+      ${won && next && nextUnlocked ? '<button class="big-btn" id="cp-next">다음 미션</button>' : ''}
+      <button class="${won && next && nextUnlocked ? 'sub-btn' : 'big-btn'}" id="cp-retry">다시 도전</button>
+      ${this.lastReplay ? '<button class="sub-btn" id="cp-replay">리플레이 보기</button>' : ''}
+      <button class="sub-btn" id="cp-campaign">캠페인 목록</button>
+      <button class="sub-btn" id="cp-title">타이틀로</button>`);
+    this.overlay.bind({
+      'cp-next': () => {
+        if (next) this.showMissionIntro(next);
+      },
+      'cp-retry': () => this.startCampaignMission(mission),
+      'cp-replay': () => {
+        if (this.lastReplay) this.openPlayback(this.lastReplay);
+      },
+      'cp-campaign': () => this.showCampaign(),
+      'cp-title': () => this.toTitle(),
+    });
   }
 
   /** 커스텀 시나리오 보관함: 저장된 초안을 일반 게임으로 플레이한다. */
@@ -1695,6 +1786,31 @@ class App {
     );
     saveRecords(outcome.records);
     this.saveReplay(state);
+
+    // 캠페인: 진행(별·최고 기록·해금)을 반영하고 전용 결과 화면을 연다
+    if (state.config.mode === 'campaign') {
+      const found = missionByScenarioId(state.config.scenario);
+      if (found) {
+        const me = state.config.humanFaction;
+        const won = state.winner === me;
+        const stars = starsEarned(state).filter(Boolean).length;
+        saveCampaignProgress(
+          recordMissionResult(loadCampaignProgress(), found.mission.id, {
+            won,
+            stars,
+            score: factionScore(state, me),
+            turns: Math.min(state.turn, state.maxTurns),
+            survivors: state.units.filter((u) => u.faction === me).length,
+            playedAt: new Date().toISOString(),
+          }),
+        );
+        window.setTimeout(
+          () => this.showCampaignResult(state, found.campaign, found.mission, won ? stars : 0),
+          700,
+        );
+        return;
+      }
+    }
 
     window.setTimeout(() => this.showResult(state, outcome), 700);
   }
