@@ -201,6 +201,8 @@ export const EN: Record<keyof typeof KO, string> = {
   'play.hint.done': 'This unit has finished acting this turn.',
   'play.attackBonus': 'Ability/modifier attack +{n}',
   'play.defenseBonus': 'Enemy terrain/building defense +{n}',
+  'play.piercing': 'Armor piercing: {n}',
+  'play.braceStance': 'Guardian stance: defense +{n}',
   'play.capture': 'Captured {building}!{bonus}',
   'play.captureGold': ' (+{n} gold)',
   'play.enemyDefeated': 'Enemy unit defeated!',

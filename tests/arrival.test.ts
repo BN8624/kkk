@@ -24,8 +24,8 @@ describe('earliestArrival — 실제 지형 이동 비용 기반', () => {
     const tiles = grid(8, 1);
     const start = offsetToAxial(0, 0);
     // move 5: 5칸까지 1턴, 6칸은 2턴
-    expect(earliestArrival(tiles, start, offsetToAxial(5, 0), 5)!.turns).toBe(1);
-    expect(earliestArrival(tiles, start, offsetToAxial(6, 0), 5)!.turns).toBe(2);
+    expect(earliestArrival(tiles, start, offsetToAxial(5, 0), 5, 'cavalry')!.turns).toBe(1);
+    expect(earliestArrival(tiles, start, offsetToAxial(6, 0), 5, 'cavalry')!.turns).toBe(2);
   });
 
   it('단순 거리÷이동력이 아니라 숲 비용을 반영한다', () => {
@@ -34,16 +34,16 @@ describe('earliestArrival — 실제 지형 이동 비용 기반', () => {
     const tiles = grid(6, 1, forest);
     const start = offsetToAxial(0, 0);
     // 평원이라면 3칸=1턴이지만 숲이라 3칸째는 2턴
-    expect(earliestArrival(tiles, start, offsetToAxial(3, 0), 5)!.turns).toBe(2);
-    expect(earliestArrival(tiles, start, offsetToAxial(2, 0), 5)!.turns).toBe(1);
+    expect(earliestArrival(tiles, start, offsetToAxial(3, 0), 5, 'cavalry')!.turns).toBe(2);
+    expect(earliestArrival(tiles, start, offsetToAxial(2, 0), 5, 'cavalry')!.turns).toBe(1);
   });
 
   it('기병(이동력 5)이 궁병(이동력 2)보다 빨리 도착한다', () => {
     const tiles = grid(8, 1);
     const start = offsetToAxial(0, 0);
     const target = offsetToAxial(5, 0);
-    const cav = earliestArrival(tiles, start, target, UNIT_STATS.cavalry.move)!;
-    const arc = earliestArrival(tiles, start, target, UNIT_STATS.archer.move)!;
+    const cav = earliestArrival(tiles, start, target, UNIT_STATS.cavalry.move, 'cavalry')!;
+    const arc = earliestArrival(tiles, start, target, UNIT_STATS.archer.move, 'archer')!;
     expect(cav.turns).toBeLessThan(arc.turns);
   });
 
@@ -51,21 +51,25 @@ describe('earliestArrival — 실제 지형 이동 비용 기반', () => {
     // (1,0)이 산이라 유일 통로가 막히면 도달 불가
     const tiles = grid(3, 1, { '1,0': 'mountain' });
     const start = offsetToAxial(0, 0);
-    expect(earliestArrival(tiles, start, offsetToAxial(2, 0), UNIT_STATS.archer.move)).toBeNull();
+    expect(earliestArrival(tiles, start, offsetToAxial(2, 0), UNIT_STATS.archer.move, 'archer')).toBeNull();
     // 보병(move 3)은 산 진입 가능
-    expect(earliestArrival(tiles, start, offsetToAxial(2, 0), UNIT_STATS.infantry.move)).not.toBeNull();
+    expect(
+      earliestArrival(tiles, start, offsetToAxial(2, 0), UNIT_STATS.infantry.move, 'infantry'),
+    ).not.toBeNull();
   });
 
   it('물은 어떤 병과도 통과하지 못한다', () => {
     const tiles = grid(3, 1, { '1,0': 'water' });
     const start = offsetToAxial(0, 0);
-    expect(earliestArrival(tiles, start, offsetToAxial(2, 0), UNIT_STATS.cavalry.move)).toBeNull();
+    expect(
+      earliestArrival(tiles, start, offsetToAxial(2, 0), UNIT_STATS.cavalry.move, 'cavalry'),
+    ).toBeNull();
   });
 
   it('경로는 출발지에서 목표까지 연속으로 복원된다', () => {
     const tiles = grid(6, 1);
     const start = offsetToAxial(0, 0);
-    const res = earliestArrival(tiles, start, offsetToAxial(4, 0), 5)!;
+    const res = earliestArrival(tiles, start, offsetToAxial(4, 0), 5, 'cavalry')!;
     expect(res.path[0]).toEqual(start);
     expect(res.path[res.path.length - 1]).toEqual(offsetToAxial(4, 0));
   });

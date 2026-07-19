@@ -1,5 +1,14 @@
 // 한 줄 목적: 병종 정본 레지스트리와 로스터·특성 조회 공용 함수를 제공한다
-import type { FactionId, GameState, UnitDefinition, UnitTrait, UnitTypeId } from './types';
+import { TERRAIN_RULES } from './data';
+import { DOCTRINES } from './doctrines';
+import type {
+  FactionId,
+  GameState,
+  TerrainId,
+  UnitDefinition,
+  UnitTrait,
+  UnitTypeId,
+} from './types';
 
 export const UNIT_DEFS: Record<UnitTypeId, UnitDefinition> = {
   infantry: {
@@ -128,4 +137,35 @@ export function producibleUnits(state: GameState, faction: FactionId): UnitTypeI
     if (def.faction === null) return true;
     return allowUnique && def.faction === faction;
   });
+}
+
+// 유닛 병종 특성을 반영한 타일 진입 비용. terrain-mobility 특성이 지형 비용을 낮춘다.
+export function movementCostForUnit(type: UnitTypeId, terrain: TerrainId): number {
+  if (terrain === 'water') return Infinity; // 특성으로도 통과 불가
+  if (terrain === 'plains') return 1;
+  const mobility = unitTrait(type, 'terrain-mobility');
+  if (mobility) {
+    if (terrain === 'forest') return mobility.forestCost;
+    if (terrain === 'mountain') return mobility.mountainCost;
+  }
+  return TERRAIN_RULES[terrain].cost;
+}
+
+// 이 유닛이 건물 타일을 점령했을 때의 총 추가 금과 내역. plunder 특성이 세력 교리 보너스에 중첩된다.
+export interface CaptureReward {
+  doctrineGold: number;
+  plunderGold: number;
+  total: number;
+}
+
+export function captureRewardForUnit(faction: FactionId, unitType: UnitTypeId): CaptureReward {
+  const doctrineGold = DOCTRINES[faction].captureGold;
+  const plunder = unitTrait(unitType, 'plunder');
+  const plunderGold = plunder?.bonusGold ?? 0;
+  return { doctrineGold, plunderGold, total: doctrineGold + plunderGold };
+}
+
+// 방어 관통: 대상 병종 기본 방어만 최대 amount까지 무시. 없으면 0.
+export function unitArmorPiercing(type: UnitTypeId): number {
+  return unitTrait(type, 'armor-piercing')?.amount ?? 0;
 }

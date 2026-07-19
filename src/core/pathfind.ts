@@ -1,7 +1,8 @@
 // 한 줄 목적: 지형 비용을 반영한 이동 가능 범위 계산과 경로 복원을 제공한다
-import { TERRAIN_RULES, UNIT_STATS } from './data';
+import { UNIT_STATS } from './data';
 import { hexKey, neighbors } from './hex';
 import type { Axial, GameState, Tile, Unit } from './types';
+import { movementCostForUnit } from './units';
 
 export interface ReachEntry {
   q: number;
@@ -37,11 +38,11 @@ export function movementRange(state: GameState, unit: Unit): Map<string, ReachEn
       const nk = hexKey(n.q, n.r);
       const tile = tiles.get(nk);
       if (!tile) continue;
-      const rule = TERRAIN_RULES[tile.terrain];
-      if (!Number.isFinite(rule.cost)) continue;
+      const enterCost = movementCostForUnit(unit.type, tile.terrain);
+      if (!Number.isFinite(enterCost)) continue;
       const occ = occupied.get(nk);
       if (occ && occ.faction !== unit.faction) continue; // 적 유닛 통과 불가
-      const nextCost = current.cost + rule.cost;
+      const nextCost = current.cost + enterCost;
       if (nextCost > stats.move) continue;
       const existing = reach.get(nk);
       if (existing && existing.cost <= nextCost) continue;

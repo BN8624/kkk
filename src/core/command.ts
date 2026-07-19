@@ -106,7 +106,7 @@ export type GameEvent =
       faction: FactionId;
       delta: number;
       gold: number;
-      reason: 'capture-bonus' | 'production';
+      reason: 'capture-bonus' | 'plunder' | 'production';
     }
   | {
       type: 'unit-attacked';
@@ -264,14 +264,26 @@ function execMove(state: GameState, cmd: MoveUnitCommand): CommandExecutionResul
       newOwner: cmd.faction,
       byUnitId: cmd.unitId,
     });
-    const bonus = state.factions[cmd.faction].gold - goldBefore;
-    if (bonus > 0) {
+    // 교리·약탈 금을 구분 이벤트로 남긴다(총액은 goldAfter와 일치)
+    let runningGold = goldBefore;
+    if (r.doctrineGold && r.doctrineGold > 0) {
+      runningGold += r.doctrineGold;
       events.push({
         type: 'gold-changed',
         faction: cmd.faction,
-        delta: bonus,
-        gold: state.factions[cmd.faction].gold,
+        delta: r.doctrineGold,
+        gold: runningGold,
         reason: 'capture-bonus',
+      });
+    }
+    if (r.plunderGold && r.plunderGold > 0) {
+      runningGold += r.plunderGold;
+      events.push({
+        type: 'gold-changed',
+        faction: cmd.faction,
+        delta: r.plunderGold,
+        gold: runningGold,
+        reason: 'plunder',
       });
     }
   }

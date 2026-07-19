@@ -199,6 +199,8 @@ export const KO = {
   'play.hint.done': '이번 턴 행동을 마친 유닛입니다',
   'play.attackBonus': '능력·수정자 공격 +{n}',
   'play.defenseBonus': '상대 지형·거점 방어 +{n}',
+  'play.piercing': '기본 방어 관통: {n}',
+  'play.braceStance': '수호 태세: 방어 +{n}',
   'play.capture': '{building} 점령!{bonus}',
   'play.captureGold': ' (+{n}금)',
   'play.enemyDefeated': '적 유닛 처치!',

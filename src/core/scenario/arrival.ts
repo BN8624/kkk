@@ -1,8 +1,9 @@
 // 한 줄 목적: 정본 지형 이동 비용을 재사용해 세력별 목표 타일 실제 최초 도착 턴을 계산한다
-import { FACTION_IDS, TERRAIN_RULES, UNIT_STATS } from '../data';
+import { FACTION_IDS, UNIT_STATS } from '../data';
 import { HEX_DIRS, hexKey } from '../hex';
 import type { GeneratedMap } from '../map';
 import type { Axial, FactionId, Tile, UnitTypeId } from '../types';
+import { movementCostForUnit } from '../units';
 import { startUnitPlacements } from './placement';
 
 /** 다턴 최단 도착 결과. turns는 목표 타일에 처음 서는 이동 턴(첫 이동 페이즈 도달=1). */
@@ -21,7 +22,7 @@ interface Label {
 /**
  * 시작 타일에서 목표 타일까지 실제 지형 이동 비용을 반영한 최소 이동 턴을 계산한다.
  *
- * - 정본 TERRAIN_RULES 비용을 그대로 재사용한다(평원 1·숲 2·산 3·물 불가).
+ * - 정본 movementCostForUnit 비용을 재사용한다(공용 병종: 평원 1·숲 2·산 3·물 불가).
  * - 매 턴 이동력 예산을 초과할 수 없고, 부족하면 다음 턴으로 넘어간다(잔여 예산 이월 없음).
  * - 한 턴 예산으로도 진입 불가한 지형(예: 궁병 move 2 < 산 3)은 통과하지 않는다.
  *
@@ -33,6 +34,7 @@ export function earliestArrival(
   start: Axial,
   target: Axial,
   move: number,
+  unitType: UnitTypeId,
 ): ArrivalResult | null {
   const startKey = hexKey(start.q, start.r);
   const targetKey = hexKey(target.q, target.r);
@@ -62,7 +64,7 @@ export function earliestArrival(
       const nk = hexKey(cq + d.q, cr + d.r);
       const tile = tiles.get(nk);
       if (!tile) continue;
-      const cost = TERRAIN_RULES[tile.terrain].cost;
+      const cost = movementCostForUnit(unitType, tile.terrain);
       if (!Number.isFinite(cost)) continue; // 물: 진입 불가
       if (cost > move) continue; // 한 턴 예산으로도 진입 불가
 
@@ -90,7 +92,7 @@ export function earliestArrival(
     const [q, r] = key.split(',').map(Number);
     path.push({ q, r });
     const lbl: Label = best.get(key)!;
-    if (lbl.prev) totalCost += TERRAIN_RULES[tiles.get(key)!.terrain].cost;
+    if (lbl.prev) totalCost += movementCostForUnit(unitType, tiles.get(key)!.terrain);
     key = lbl.prev;
   }
   path.reverse();
@@ -128,7 +130,7 @@ export interface ObjectiveArrivalReport {
 export function analyzeObjectiveArrival(map: GeneratedMap, target: Axial): ObjectiveArrivalReport {
   const tiles = new Map(map.tiles.map((t) => [hexKey(t.q, t.r), t]));
   const perUnit: UnitArrival[] = startUnitPlacements(map).map((p) => {
-    const res = earliestArrival(tiles, p.at, target, UNIT_STATS[p.type].move);
+    const res = earliestArrival(tiles, p.at, target, UNIT_STATS[p.type].move, p.type);
     return {
       faction: p.faction,
       unitType: p.type,

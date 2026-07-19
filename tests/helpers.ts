@@ -68,6 +68,8 @@ export function addUnit(
     moved: partial.moved ?? false,
     attacked: partial.attacked ?? false,
   };
+  if (partial.movedThisTurn !== undefined) unit.movedThisTurn = partial.movedThisTurn;
+  if (partial.tag !== undefined) unit.tag = partial.tag;
   state.units.push(unit);
   return unit;
 }

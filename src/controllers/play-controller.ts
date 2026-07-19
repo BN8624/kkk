@@ -499,6 +499,8 @@ export class PlayController implements AppController, PlaySession {
     if (fc.damage.atkBonus > 0) notes.push(t('play.attackBonus', { n: fc.damage.atkBonus }));
     const defTotal = fc.damage.terrainDef + fc.damage.doctrineDef;
     if (defTotal > 0) notes.push(t('play.defenseBonus', { n: defTotal }));
+    if (fc.damage.pierced > 0) notes.push(t('play.piercing', { n: fc.damage.pierced }));
+    if (fc.damage.braceDef > 0) notes.push(t('play.braceStance', { n: fc.damage.braceDef }));
     this.ctx.hud.showForecast({
       attackerName: unitName(attacker.type),
       defenderName: `${factionName(defender.faction)} ${unitName(defender.type)}`,
@@ -532,9 +534,14 @@ export class PlayController implements AppController, PlaySession {
     if (captured) {
       sfx.capture();
       await this.scene?.animateCapture(captured.at, captured.building !== 'village');
-      const gold = findEvent(result.events, 'gold-changed');
-      const bonus =
-        gold && gold.reason === 'capture-bonus' ? t('play.captureGold', { n: gold.delta }) : '';
+      const goldParts = result.events
+        .filter(
+          (e): e is Extract<(typeof result.events)[number], { type: 'gold-changed' }> =>
+            e.type === 'gold-changed' &&
+            (e.reason === 'capture-bonus' || e.reason === 'plunder'),
+        )
+        .map((e) => t('play.captureGold', { n: e.delta }));
+      const bonus = goldParts.join('');
       this.ctx.hud.toast(
         t('play.capture', { building: buildingName(captured.building), bonus }),
       );

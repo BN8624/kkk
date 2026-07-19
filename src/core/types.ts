@@ -36,6 +36,11 @@ export interface Unit {
   hp: number;
   moved: boolean;
   attacked: boolean;
+  /**
+   * 이번 턴에 이동 명령으로 좌표가 바뀌었는지(정본 행동 상태).
+   * 공격은 설정하지 않으며, 생산 유닛은 생산 턴에 true로 둔다. 저장 호환을 위해 선택적.
+   */
+  movedThisTurn?: boolean;
   /** 시나리오 조건(unit-alive·unit-dies)이 참조하는 태그 */
   tag?: string;
 }

@@ -38,7 +38,12 @@ import type {
   Unit,
   UnitTypeId,
 } from './types';
-import { producibleUnits } from './units';
+import {
+  captureRewardForUnit,
+  producibleUnits,
+  unitArmorPiercing,
+  unitTrait,
+} from './units';
 
 export const DEFAULT_CONFIG: GameConfig = {
   mode: 'quick',
@@ -201,10 +206,22 @@ export interface DamageBreakdown {
   base: number;
   atkBonus: number;
   defense: number;
+  /** 관통으로 무시된 대상 기본 방어(지형·건물·교리·brace는 관통 안 함) */
+  pierced: number;
   terrainDef: number;
   doctrineDef: number;
+  /** 수호 태세(brace) 방어 보너스 */
+  braceDef: number;
   total: number;
 }
+
+// 수호 태세: brace 특성 유닛이 이번 턴에 이동하지 않았으면 방어 보너스.
+export function braceDefBonus(unit: Unit): number {
+  const brace = unitTrait(unit.type, 'brace');
+  if (brace && !unit.movedThisTurn) return brace.defenseBonus;
+  return 0;
+}
+
 
 interface DamageOpts {
   /** 공격자가 이 위치에서 공격한다고 가정(이동 후 공격 예측용) */
@@ -234,10 +251,15 @@ export function damageBreakdown(
   // 일일 수정자: 날카로운 화살(모든 궁병 공격 +1, 반격 포함)
   if (state.config.modifier === 'sharp-arrows' && attacker.type === 'archer') atkBonus += 1;
   const defense = UNIT_STATS[defender.type].def;
+  const pierced = Math.min(unitArmorPiercing(attacker.type), defense);
   const terrainDef = terrainDefBonus(defTile);
   const doctrineDef = doctrineDefBonus(defender, defTile);
-  const total = Math.max(1, base + atkBonus - defense - terrainDef - doctrineDef);
-  return { base, atkBonus, defense, terrainDef, doctrineDef, total };
+  const braceDef = braceDefBonus(defender);
+  const total = Math.max(
+    1,
+    base + atkBonus - (defense - pierced) - terrainDef - doctrineDef - braceDef,
+  );
+  return { base, atkBonus, defense, pierced, terrainDef, doctrineDef, braceDef, total };
 }
 
 export interface AttackForecast {
@@ -273,8 +295,12 @@ export interface MoveResult {
   ok: boolean;
   path?: Axial[];
   captured?: Tile;
-  /** 점령 교리 보너스로 즉시 획득한 금 */
+  /** 점령 시 즉시 획득한 총 금(교리+약탈) */
   bonusGold?: number;
+  /** 세력 교리 점령 보너스 */
+  doctrineGold?: number;
+  /** 약탈(plunder) 특성 추가 금 */
+  plunderGold?: number;
   reason?: string;
 }
 
@@ -291,19 +317,32 @@ export function moveUnit(state: GameState, unitId: number, dest: Axial): MoveRes
   unit.q = dest.q;
   unit.r = dest.r;
   unit.moved = true;
+  unit.movedThisTurn = true;
 
   let captured: Tile | undefined;
   let bonusGold = 0;
+  let doctrineGold = 0;
+  let plunderGold = 0;
   const tile = tileAt(state, dest.q, dest.r)!;
   if (tile.building && tile.owner !== unit.faction) {
     tile.owner = unit.faction;
     captured = tile;
     state.stats[unit.faction].captured++;
-    bonusGold = DOCTRINES[unit.faction].captureGold;
+    const reward = captureRewardForUnit(unit.faction, unit.type);
+    doctrineGold = reward.doctrineGold;
+    plunderGold = reward.plunderGold;
+    bonusGold = reward.total;
     if (bonusGold > 0) state.factions[unit.faction].gold += bonusGold;
     evaluateVictory(state);
   }
-  return { ok: true, path, captured, bonusGold: bonusGold || undefined };
+  return {
+    ok: true,
+    path,
+    captured,
+    bonusGold: bonusGold || undefined,
+    doctrineGold: doctrineGold || undefined,
+    plunderGold: plunderGold || undefined,
+  };
 }
 
 /** 현 위치에서 공격 가능한 적 유닛 목록을 반환한다. */
@@ -394,6 +433,7 @@ export function produceUnit(
   const unit = spawnUnit(state, faction, type, at);
   unit.moved = true;
   unit.attacked = true; // 생산 턴에는 행동 불가
+  unit.movedThisTurn = true; // 생산 턴 brace 미발동
   state.stats[faction].produced++;
   return { ok: true, unit };
 }
@@ -533,6 +573,7 @@ export function advancePhase(state: GameState): void {
   for (const u of state.units) {
     u.moved = false;
     u.attacked = false;
+    u.movedThisTurn = false;
   }
   // hold-building 승리 조건(왕관의 심장 등): 라운드 종료 시 연속 보유 판정(대칭)
   const hold = holdVictoryCondition(state);
