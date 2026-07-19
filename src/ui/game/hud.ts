@@ -3,8 +3,14 @@ import { UNIT_STATS } from '../../core/data';
 import { factionScore } from '../../core/game';
 import { crownStatus } from '../../core/scenario/crown-status';
 import type { FactionId, GameState, Tile, Unit, UnitTypeId } from '../../core/types';
+import { isUniqueUnit, unitDefinition } from '../../core/units';
 import { factionName, t, terrainName, unitName, victoryConditionText } from '../../i18n';
 import { COIN_SVG, EMBLEM_SVG, FACTION_CSS, GEAR_SVG, el, button, escapeHtml } from '../shared/dom';
+import {
+  traitPanelLines,
+  traitProdSummaries,
+  unitRoleText,
+} from './unit-ability-text';
 
 export interface HudHandlers {
   onEndTurn: () => void;
@@ -177,12 +183,22 @@ export class Hud {
         hp: unit.hp,
         maxHp: s.hp,
       });
+      const role = unitRoleText(unit.type);
+      const abilities = traitPanelLines(unit);
+      const abilityHtml =
+        role || abilities.length > 0
+          ? `<div class="unit-abilities">
+              ${role ? `<div class="unit-role">${escapeHtml(role)}</div>` : ''}
+              ${abilities.map((line) => `<div class="unit-trait">${escapeHtml(line)}</div>`).join('')}
+            </div>`
+          : '';
       html = `<h3><span class="dot" style="background:${FACTION_CSS[unit.faction]}"></span>
         ${escapeHtml(factionName(unit.faction))} ${escapeHtml(unitName(unit.type))}</h3>
         <div class="stats">
           <span>${escapeHtml(t('hud.hp', { current: unit.hp, max: s.hp }))}</span><span>${escapeHtml(t('hud.attackStat', { n: s.atk }))}</span>
           <span>${escapeHtml(t('hud.defenseStat', { n: s.def }))}</span><span>${escapeHtml(t('hud.moveStat', { n: s.move }))}</span><span>${escapeHtml(t('hud.rangeStat', { n: s.range }))}</span>
-        </div>`;
+        </div>
+        ${abilityHtml}`;
     } else if (tile) {
       this.selectionStatus = t('a11y.selectedTile', { terrain: terrainName(tile.terrain) });
       html = `<h3>${escapeHtml(terrainName(tile.terrain))}</h3>`;
@@ -289,19 +305,39 @@ export class Hud {
 
   // ---------------- 생산 시트 ----------------
 
-  showProduction(buildingName: string, gold: number, costFor: (t: UnitTypeId) => number): void {
+  showProduction(
+    buildingName: string,
+    gold: number,
+    types: UnitTypeId[],
+    costFor: (t: UnitTypeId) => number,
+  ): void {
     this.productionReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const card = (type: UnitTypeId) => {
       const s = UNIT_STATS[type];
-      return `<button class="prod-card" data-type="${type}" ${gold >= costFor(type) ? '' : 'disabled'}>
+      const unique = isUniqueUnit(type);
+      const home = unitDefinition(type).faction;
+      const badge =
+        unique && home
+          ? `<span class="badge" style="background:${FACTION_CSS[home]}" aria-hidden="true">${EMBLEM_SVG[home]}</span>`
+          : '';
+      const role = unitRoleText(type);
+      const summaries = traitProdSummaries(type);
+      const uniqueBlock =
+        unique && (role || summaries.length > 0)
+          ? `<span class="role">${role ? escapeHtml(role) : ''}</span>
+             ${summaries.map((line) => `<span class="trait-sum">${escapeHtml(line)}</span>`).join('')}`
+          : '';
+      return `<button class="prod-card${unique ? ' unique' : ''}" data-type="${type}" ${gold >= costFor(type) ? '' : 'disabled'}>
+        ${badge}
         <b>${escapeHtml(unitName(type))}</b>
         <span class="cost">${COIN_SVG}${costFor(type)}</span>
         <span class="mini">${escapeHtml(t('hud.attackStat', { n: s.atk }))} · ${escapeHtml(t('hud.defenseStat', { n: s.def }))}<br>${escapeHtml(t('hud.moveStat', { n: s.move }))} · ${escapeHtml(t('hud.rangeStat', { n: s.range }))}</span>
+        ${uniqueBlock}
       </button>`;
     };
     this.productionSheet.innerHTML = `
       <h3>${escapeHtml(t('hud.production', { building: buildingName }))} <span class="gold">${COIN_SVG}${gold}</span></h3>
-      <div class="prod-cards">${card('infantry')}${card('archer')}${card('cavalry')}</div>
+      <div class="prod-cards">${types.map(card).join('')}</div>
       <button class="close-btn">${escapeHtml(t('common.close'))}</button>`;
     for (const btn of this.productionSheet.querySelectorAll<HTMLButtonElement>('.prod-card')) {
       btn.addEventListener('click', () => this.handlers.onProduce(btn.dataset.type as UnitTypeId));

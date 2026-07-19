@@ -3,6 +3,15 @@ import Phaser from 'phaser';
 import type { FactionId, TerrainId, UnitTypeId } from '../core/types';
 import { EXTERNAL_ASSETS } from './external-assets';
 
+/** 공용 병종 — 전 세력 토큰 생성 */
+const SHARED_UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
+/** 고유 병종 — 소속 세력만 토큰 생성(units.ts 진영과 일치, 순환 import 회피) */
+const UNIQUE_UNIT_HOME: Partial<Record<UnitTypeId, FactionId>> = {
+  guardian: 'azure',
+  raider: 'crimson',
+  crossbow: 'violet',
+};
+
 export type AssetId =
   | `terrain.${TerrainId}`
   | `building.capital.${FactionId}`
@@ -33,14 +42,19 @@ export function allAssetIds(): AssetId[] {
   const ids: AssetId[] = [];
   const terrains: TerrainId[] = ['plains', 'forest', 'mountain', 'water'];
   const factions: FactionId[] = ['azure', 'crimson', 'violet'];
-  const units: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
   for (const t of terrains) ids.push(`terrain.${t}`);
   for (const f of factions) ids.push(`building.capital.${f}`);
   ids.push('building.village.neutral');
   for (const f of factions) ids.push(`building.village.${f}`);
   ids.push('building.crown.neutral');
   for (const f of factions) ids.push(`building.crown.${f}`);
-  for (const u of units) for (const f of factions) ids.push(`unit.${u}.${f}`);
+  // 공용 3종은 전 세력, 고유 3종은 소속 세력만(불필요한 조합 텍스처 생성 금지)
+  for (const u of SHARED_UNIT_TYPES) {
+    for (const f of factions) ids.push(`unit.${u}.${f}`);
+  }
+  for (const [u, home] of Object.entries(UNIQUE_UNIT_HOME) as [UnitTypeId, FactionId][]) {
+    ids.push(`unit.${u}.${home}`);
+  }
   ids.push('ui.highlight.move', 'ui.highlight.attack', 'ui.ring.select');
   return ids;
 }
@@ -489,6 +503,7 @@ function drawClassIcon(
   ctx.fillStyle = IVORY;
   ctx.lineWidth = s * 0.14;
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   if (type === 'infantry') {
     // 검: 칼날 + 코등이 + 손잡이
     ctx.beginPath();
@@ -535,7 +550,7 @@ function drawClassIcon(
     ctx.lineTo(cx + s * 0.32, cy + s * 0.14);
     ctx.closePath();
     ctx.fill();
-  } else {
+  } else if (type === 'cavalry') {
     // 기병: 말 머리 실루엣
     ctx.beginPath();
     ctx.moveTo(cx - s * 0.42, cy + s * 0.55);
@@ -547,6 +562,106 @@ function drawClassIcon(
     ctx.lineTo(cx + s * 0.46, cy + s * 0.06);
     ctx.lineTo(cx + s * 0.16, cy - s * 0.02);
     ctx.lineTo(cx + s * 0.2, cy + s * 0.55);
+    ctx.closePath();
+    ctx.fill();
+  } else if (type === 'guardian') {
+    // 수호대: 세로 타워 방패 + 짧은 창(보병 검과 구분)
+    ctx.fillStyle = IVORY;
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.42, cy - s * 0.55);
+    ctx.lineTo(cx + s * 0.42, cy - s * 0.55);
+    ctx.lineTo(cx + s * 0.42, cy + s * 0.12);
+    ctx.quadraticCurveTo(cx + s * 0.42, cy + s * 0.48, cx, cy + s * 0.62);
+    ctx.quadraticCurveTo(cx - s * 0.42, cy + s * 0.48, cx - s * 0.42, cy + s * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(43,36,22,0.35)';
+    ctx.lineWidth = s * 0.08;
+    ctx.stroke();
+    // 짧은 창이 방패 위로
+    ctx.strokeStyle = IVORY;
+    ctx.lineWidth = s * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.28, cy + s * 0.35);
+    ctx.lineTo(cx + s * 0.28, cy - s * 0.72);
+    ctx.stroke();
+    ctx.fillStyle = IVORY;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.28, cy - s * 0.78);
+    ctx.lineTo(cx + s * 0.4, cy - s * 0.55);
+    ctx.lineTo(cx + s * 0.16, cy - s * 0.55);
+    ctx.closePath();
+    ctx.fill();
+  } else if (type === 'raider') {
+    // 약탈대: 경장 횃불 + 단검(기병 말머리와 구분)
+    ctx.lineWidth = s * 0.14;
+    // 횃불 자루
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.22, cy + s * 0.55);
+    ctx.lineTo(cx - s * 0.08, cy - s * 0.05);
+    ctx.stroke();
+    // 불꽃
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.28, cy - s * 0.05);
+    ctx.quadraticCurveTo(cx - s * 0.02, cy - s * 0.55, cx + s * 0.12, cy - s * 0.08);
+    ctx.quadraticCurveTo(cx + s * 0.02, cy - s * 0.28, cx - s * 0.08, cy - s * 0.02);
+    ctx.quadraticCurveTo(cx - s * 0.18, cy - s * 0.32, cx - s * 0.28, cy - s * 0.05);
+    ctx.closePath();
+    ctx.fill();
+    // 단검
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.08, cy + s * 0.42);
+    ctx.lineTo(cx + s * 0.42, cy - s * 0.28);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.02, cy + s * 0.18);
+    ctx.lineTo(cx + s * 0.22, cy + s * 0.32);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.32, cy - s * 0.38);
+    ctx.lineTo(cx + s * 0.5, cy - s * 0.22);
+    ctx.lineTo(cx + s * 0.36, cy - s * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    // 약탈 자루(작은 주머니)
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 0.08, cy + s * 0.48, s * 0.18, s * 0.14, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // 쇠뇌대: 수평 활대 + 개머리판(궁병 활과 구분)
+    ctx.lineWidth = s * 0.16;
+    // 총신/개머리판
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.55, cy + s * 0.08);
+    ctx.lineTo(cx + s * 0.42, cy + s * 0.08);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.55, cy + s * 0.08);
+    ctx.lineTo(cx - s * 0.62, cy + s * 0.38);
+    ctx.stroke();
+    // 수평 활대(prod)
+    ctx.lineWidth = s * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.05, cy - s * 0.42);
+    ctx.lineTo(cx + s * 0.05, cy + s * 0.55);
+    ctx.stroke();
+    // 현
+    ctx.lineWidth = s * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.05, cy - s * 0.38);
+    ctx.lineTo(cx - s * 0.12, cy + s * 0.08);
+    ctx.lineTo(cx + s * 0.05, cy + s * 0.5);
+    ctx.stroke();
+    // 볼트 촉
+    ctx.lineWidth = s * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.2, cy + s * 0.08);
+    ctx.lineTo(cx + s * 0.58, cy + s * 0.08);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.48, cy - s * 0.12);
+    ctx.lineTo(cx + s * 0.68, cy + s * 0.08);
+    ctx.lineTo(cx + s * 0.48, cy + s * 0.28);
     ctx.closePath();
     ctx.fill();
   }

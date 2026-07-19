@@ -9,6 +9,7 @@ import { loadRecords, recordGame, saveRecords, type RecordOutcome } from '../cor
 import { clearSave, loadGame, saveGame, saveSettings } from '../core/save';
 import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
 import type { Axial, FactionId, GameState, ScenarioId, Tile, Unit, UnitTypeId } from '../core/types';
+import { producibleUnits } from '../core/units';
 import {
   buildingName,
   difficultyName,
@@ -612,7 +613,8 @@ export class PlayController implements AppController, PlaySession {
     this.ctx.hud.showProduction(
       buildingName(tile.building!),
       gold,
-      (t) => unitCost(this.human(), t),
+      producibleUnits(state, this.human()),
+      (ut) => unitCost(this.human(), ut),
     );
   }
 

@@ -162,6 +162,103 @@ test('생산: 수도에서 보병을 생산하면 금이 줄고 유닛이 늘어
   expect(after.units.filter((u) => u.faction === 'azure').length).toBe(3);
 });
 
+test('생산 시트: 청람은 수호대 포함·진홍은 수호대 없음(공용3+고유1)', async ({ page }) => {
+  // 청람: 공용 3 + 수호대
+  await startNewGame(page, 11);
+  let state = await getState(page);
+  let capital = state.tiles.find((t) => t.building === 'capital' && t.owner === 'azure')!;
+  await tapHex(page, capital.q, capital.r);
+  await expect(page.locator('.sheet')).toHaveClass(/show/);
+  await expect(page.locator('.prod-card')).toHaveCount(4);
+  await expect(page.locator('.prod-card[data-type="infantry"]')).toBeVisible();
+  await expect(page.locator('.prod-card[data-type="archer"]')).toBeVisible();
+  await expect(page.locator('.prod-card[data-type="cavalry"]')).toBeVisible();
+  await expect(page.locator('.prod-card[data-type="guardian"]')).toBeVisible();
+  await expect(page.locator('.prod-card[data-type="raider"]')).toHaveCount(0);
+  await expect(page.locator('.prod-card[data-type="guardian"] .badge')).toBeVisible();
+  await expect(page.locator('.prod-card[data-type="guardian"] .role')).toContainText('왕국 수비');
+  await page.locator('.sheet .close-btn').click();
+
+  // 진홍: 공용 3 + 약탈대 (수호대 없음). 청람 AI 턴이 끝난 뒤 조작한다.
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'three-crowns-settings',
+      JSON.stringify({ soundOn: false, tutorialDone: true }),
+    );
+  });
+  await page.goto('/?seed=12');
+  await page.getByRole('button', { name: '빠른 전투' }).click();
+  await page.locator('.fac-card[data-f="crimson"]').click();
+  await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
+  await page.waitForFunction(() => window.__tc?.state() !== null);
+  await page.waitForFunction(
+    () => {
+      const s = window.__tc?.state();
+      return !!s && s.current === 'crimson' && !window.__tc!.busy();
+    },
+    undefined,
+    { timeout: 120_000 },
+  );
+  await waitIdle(page);
+  state = await getState(page);
+  capital = state.tiles.find((t) => t.building === 'capital' && t.owner === 'crimson')!;
+  // 수도 위 유닛이 있으면 먼저 비우기 위해 빈 수도 타일 확인 — 유닛이 있으면 옆 빈 마을/수도 탐색
+  const occupied = new Set(state.units.filter((u) => u.faction === 'crimson').map((u) => `${u.q},${u.r}`));
+  let prodTile = capital;
+  if (occupied.has(`${capital.q},${capital.r}`)) {
+    const village = state.tiles.find(
+      (t) => t.building === 'village' && t.owner === 'crimson' && !occupied.has(`${t.q},${t.r}`),
+    );
+    expect(village).toBeTruthy();
+    prodTile = village!;
+  }
+  await tapHex(page, prodTile.q, prodTile.r);
+  await expect(page.locator('.sheet')).toHaveClass(/show/);
+  await expect(page.locator('.prod-card')).toHaveCount(4);
+  await expect(page.locator('.prod-card[data-type="raider"]')).toBeVisible();
+  await expect(page.locator('.prod-card[data-type="guardian"]')).toHaveCount(0);
+  await expect(page.locator('.prod-card[data-type="crossbow"]')).toHaveCount(0);
+});
+
+test('유닛 패널: 수호대 선택 시 수호 태세 문구와 활성 상태가 보인다', async ({ page }) => {
+  await startNewGame(page, 13);
+  // 수호대 비용 48 — 시작 금 40이므로 1라운드 수입 후 생산
+  await page.getByRole('button', { name: '턴 종료' }).click();
+  await page.waitForFunction(() => {
+    const s = window.__tc?.state();
+    return s !== null && s !== undefined && s.current === 'azure' && s.turn >= 2;
+  }, undefined, { timeout: 120_000 });
+  await waitIdle(page);
+
+  let state = await getState(page);
+  const capital = state.tiles.find((t) => t.building === 'capital' && t.owner === 'azure')!;
+  await tapHex(page, capital.q, capital.r);
+  await expect(page.locator('.prod-card[data-type="guardian"]')).toBeEnabled();
+  await page.locator('.prod-card[data-type="guardian"]').click();
+  await page.waitForFunction(() => {
+    const s = window.__tc?.state();
+    return !!s?.units.some((u) => (u as { type?: string }).type === 'guardian');
+  });
+
+  // 다음 인간 턴까지 진행(생산 턴 movedThisTurn 해제 → 수호 태세 활성)
+  for (let i = 0; i < 4; i++) {
+    await waitIdle(page);
+    state = await getState(page);
+    if (state.over) break;
+    const g = state.units.find((u) => (u as { type?: string }).type === 'guardian');
+    if (state.current === 'azure' && g && !g.moved) break;
+    await page.getByRole('button', { name: '턴 종료' }).click();
+  }
+  await waitIdle(page);
+  state = await getState(page);
+  const guardian = state.units.find((u) => (u as { type?: string }).type === 'guardian');
+  expect(guardian).toBeTruthy();
+  await tapHex(page, guardian!.q, guardian!.r);
+  await expect(page.locator('.unit-panel')).toHaveClass(/show/);
+  await expect(page.locator('.unit-panel .unit-abilities')).toContainText('수호 태세');
+  await expect(page.locator('.unit-panel .unit-abilities')).toContainText('수호 태세 활성');
+});
+
 function hexDist(a: { q: number; r: number }, b: { q: number; r: number }): number {
   const dq = a.q - b.q;
   const dr = a.r - b.r;

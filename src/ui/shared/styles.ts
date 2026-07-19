@@ -88,16 +88,41 @@ export function injectSharedStyles(): void {
 .sheet h3 { font-size: 17px; margin-bottom: 4px; display:flex; justify-content: space-between; align-items:center; }
 .sheet .gold { font-size: 14px; display: flex; align-items: center; gap: 5px; }
 .sheet .gold svg { width: 15px; height: 15px; }
-.prod-cards { display: flex; gap: 8px; margin-top: 10px; }
-.prod-card {
-  flex: 1; border: 1.5px solid #8a6d14; border-radius: 12px; background: #faf5e8;
-  padding: 10px 6px; text-align: center; font-size: 13px; color: #2b2416;
+.prod-cards {
+  display: flex; gap: 8px; margin-top: 10px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
 }
-.prod-card b { font-size: 15px; display: block; }
+.prod-card {
+  flex: 0 0 auto; min-width: 108px; width: min(122px, 42vw);
+  border: 1.5px solid #8a6d14; border-radius: 12px; background: #faf5e8;
+  padding: 10px 8px; text-align: center; font-size: 13px; color: #2b2416;
+  position: relative; white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+}
+.prod-card b { font-size: 15px; display: block; line-height: 1.25; }
 .prod-card .cost { color: #8a6d14; font-weight: bold; margin: 3px 0; display: flex; align-items: center; justify-content: center; gap: 3px; }
-.prod-card .cost svg { width: 13px; height: 13px; }
-.prod-card .mini { color: #6b6250; font-size: 11.5px; line-height: 1.5; }
+.prod-card .cost svg { width: 13px; height: 13px; flex: none; }
+.prod-card .mini { color: #6b6250; font-size: 11.5px; line-height: 1.45; display: block; }
+.prod-card .badge {
+  position: absolute; top: 6px; right: 6px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(43,36,22,.25);
+}
+.prod-card .badge svg { width: 12px; height: 12px; display: block; }
+.prod-card .role {
+  display: block; margin-top: 4px; font-size: 11px; color: #4a4237; font-weight: 600; line-height: 1.3;
+}
+.prod-card .trait-sum {
+  display: block; margin-top: 2px; font-size: 10.5px; color: #6b5b2a; line-height: 1.35;
+}
 .prod-card:disabled { opacity: .45; }
+.unit-abilities {
+  margin-top: 6px; display: flex; flex-direction: column; gap: 2px;
+  font-size: 12.5px; color: #4a4237; line-height: 1.4;
+}
+.unit-abilities .unit-role { font-weight: 600; }
+.unit-abilities .unit-trait { color: #5c5340; }
 .sheet .close-btn {
   margin-top: 10px; width: 100%; height: 44px; border-radius: 12px;
   border: 1.5px solid #8a6d14; background: #e5dbc2; font-size: 15px; color: #2b2416;
