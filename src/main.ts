@@ -26,11 +26,17 @@ import { ReplayPlayback } from './replay/playback';
 import { EditorController, type EditorTool } from './editor/controller';
 import { cloneBuiltinDocument, emptyDocument, randomDocument } from './editor/new-doc';
 import { clone } from './editor/ops';
+import { decodeShareCode, encodeShareCode, shareUrlFromCode } from './editor/share';
 import { normalizeScenario } from './core/scenario/normalize';
 import { isPlayable, parseScenarioDocument } from './core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1 } from './core/scenario/types';
 import { EditorScene, type EditorSceneCallbacks } from './render/EditorScene';
-import { EditorPanel, showEditorHomeScreen, type EditorDraftItem } from './ui/editor';
+import {
+  EditorPanel,
+  showEditorHomeScreen,
+  showImportTextScreen,
+  type EditorDraftItem,
+} from './ui/editor';
 import { TestPlayBar } from './ui/editor/testplay';
 import { newDocId } from './storage/docstore';
 import { documentStore } from './storage/idb';
@@ -148,6 +154,7 @@ class App {
     });
 
     this.toTitle();
+    void this.consumeShareHash();
 
     // E2E 테스트 브리지: 개발 모드·테스트 빌드에서만 노출한다(일반 배포판 미노출)
     if (import.meta.env.DEV || import.meta.env.VITE_TEST_BRIDGE === '1') {
@@ -852,6 +859,11 @@ class App {
             .catch(() => this.hud.toast('삭제하지 못했습니다'));
         },
         onImportFile: (file) => void this.importScenarioFile(file),
+        onImportText: () =>
+          showImportTextScreen(this.overlay, {
+            onSubmit: (text) => void this.importScenarioText(text),
+            onBack: () => void this.showEditorHome(),
+          }),
         onBack: () => this.toTitle(),
       },
     );
@@ -892,11 +904,58 @@ class App {
       this.hud.toast(issues[0]?.message ?? '시나리오 형식이 아닙니다');
       return;
     }
-    // 가져온 문서는 새 ID로 초안이 된다(내장·기존 문서를 덮어쓰지 않는다)
+    this.adoptImportedDocument(doc);
+  }
+
+  /** 붙여넣기 가져오기: JSON 텍스트 또는 공유 코드(TCS1)·공유 URL을 판별해 처리한다. */
+  private async importScenarioText(text: string): Promise<void> {
+    const t = text.trim();
+    if (!t) return;
+    let result: { doc: ScenarioDocumentV1 | null; issues: { message: string }[] };
+    if (t.startsWith('{')) {
+      if (t.length > SCENARIO_LIMITS.maxImportBytes) {
+        this.hud.toast('텍스트가 너무 큽니다');
+        return;
+      }
+      let raw: unknown = null;
+      try {
+        raw = JSON.parse(t);
+      } catch {
+        this.hud.toast('JSON을 읽을 수 없습니다');
+        return;
+      }
+      result = parseScenarioDocument(raw);
+    } else {
+      result = await decodeShareCode(t);
+    }
+    if (!result.doc) {
+      this.hud.toast(result.issues[0]?.message ?? '가져올 수 없습니다');
+      return;
+    }
+    this.adoptImportedDocument(result.doc);
+  }
+
+  /** 가져온 문서는 새 ID로 초안이 된다(내장·기존 문서를 덮어쓰지 않는다). */
+  private adoptImportedDocument(doc: ScenarioDocumentV1): void {
     const imported = clone(doc);
     imported.id = newDocId('custom');
     this.openEditorSession(imported);
     this.hud.toast('가져온 시나리오를 편집합니다 — 검증을 실행해 보세요');
+  }
+
+  /** 공유 URL(#s=코드)로 진입한 경우 문서를 확인 후 제작실에서 연다. */
+  private async consumeShareHash(): Promise<void> {
+    const hash = window.location.hash;
+    if (!hash.startsWith('#s=')) return;
+    // 새로 고침 시 재가져오기를 막기 위해 해시를 즉시 지운다
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    const { doc, issues } = await decodeShareCode(hash.slice(3));
+    if (!doc) {
+      this.hud.toast(issues[0]?.message ?? '공유 코드를 읽을 수 없습니다');
+      return;
+    }
+    if (!window.confirm(`공유된 시나리오 "${doc.title}"을(를) 제작실에서 열까요?`)) return;
+    this.adoptImportedDocument(doc);
   }
 
   /** 에디터 세션을 연다(문서의 id가 초안 키가 된다). */
@@ -1101,16 +1160,62 @@ class App {
     this.editorPanel.update(ed.tool, ed.options, ed.history.canUndo, ed.history.canRedo);
   }
 
+  /** 내보내기·공유 시트: JSON 파일·클립보드·압축 공유 코드·공유 URL. */
   private exportScenario(): void {
     const ed = this.editor;
     if (!ed) return;
-    const blob = new Blob([JSON.stringify(ed.doc, null, 1)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${ed.doc.id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.overlay.show(`
+      <h1 style="font-size:22px;">내보내기·공유</h1>
+      <p class="subtitle" style="font-size:12.5px;">받는 사람은 제작실의 "코드 가져오기"나 공유 URL로 엽니다</p>
+      <button class="big-btn" id="ex-file">JSON 파일 저장</button>
+      <button class="sub-btn" id="ex-copy-json">JSON 텍스트 복사</button>
+      <button class="sub-btn" id="ex-copy-code">공유 코드 복사</button>
+      <button class="sub-btn" id="ex-copy-url">공유 URL 복사</button>
+      <button class="sub-btn" id="ex-close">닫기</button>`);
+    this.overlay.bind({
+      'ex-file': () => {
+        const blob = new Blob([JSON.stringify(ed.doc, null, 1)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${ed.doc.id}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      'ex-copy-json': () =>
+        void this.copyShareText(JSON.stringify(ed.doc, null, 1), 'JSON을 복사했습니다'),
+      'ex-copy-code': () =>
+        void encodeShareCode(ed.doc).then((code) =>
+          this.copyShareText(code, '공유 코드를 복사했습니다'),
+        ),
+      'ex-copy-url': () =>
+        void encodeShareCode(ed.doc).then((code) => {
+          const base = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+          const url = shareUrlFromCode(code, base);
+          if (!url) {
+            this.hud.toast('문서가 커서 URL 공유가 어렵습니다 — 공유 코드를 사용하세요');
+            return;
+          }
+          return this.copyShareText(url, '공유 URL을 복사했습니다');
+        }),
+      'ex-close': () => this.overlay.hide(),
+    });
+  }
+
+  /** 클립보드 복사. 실패하면 수동 복사용 텍스트 상자를 보여 준다. */
+  private async copyShareText(text: string, okMessage: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.overlay.hide();
+      this.hud.toast(okMessage);
+    } catch {
+      const root = this.overlay.show(`
+        <h1 style="font-size:20px;">직접 복사하세요</h1>
+        <textarea class="ed-import-text" rows="6" readonly></textarea>
+        <button class="sub-btn" id="ex-close">닫기</button>`);
+      root.querySelector<HTMLTextAreaElement>('textarea')!.value = text;
+      this.overlay.bind({ 'ex-close': () => this.overlay.hide() });
+    }
   }
 
   /** 에디터에서 나간다(변경이 있으면 초안 저장 여부 확인, 자동 저장은 항상 남긴다). */

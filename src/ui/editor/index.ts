@@ -31,6 +31,8 @@ export interface EditorHomeHandlers {
   onOpenDraft: (id: string) => void;
   onDeleteDraft: (id: string) => void;
   onImportFile: (file: File) => void;
+  /** 공유 코드 또는 JSON 텍스트 붙여넣기 가져오기 화면 열기 */
+  onImportText: () => void;
   onBack: () => void;
 }
 
@@ -72,8 +74,9 @@ export function showEditorHomeScreen(
       <input type="file" id="ed-import-file" accept=".json,application/json" style="display:none">
       <div style="display:flex; gap:8px; width:min(300px,82vw);">
         <button class="sub-btn" style="width:auto;flex:1;" id="btn-import">JSON 가져오기</button>
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-back">뒤로</button>
-      </div>`);
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import-text">코드 가져오기</button>
+      </div>
+      <button class="sub-btn" id="btn-back">뒤로</button>`);
   for (const btn of root.querySelectorAll<HTMLButtonElement>('[data-builtin]')) {
     btn.addEventListener('click', () =>
       handlers.onCloneBuiltin(btn.dataset.builtin as 'three-crowns' | 'broken-strait' | 'crown-heart'),
@@ -94,6 +97,26 @@ export function showEditorHomeScreen(
     'btn-new-empty': handlers.onNewEmpty,
     'btn-new-random': handlers.onNewRandom,
     'btn-import': () => fileInput.click(),
+    'btn-import-text': handlers.onImportText,
+    'btn-back': handlers.onBack,
+  });
+}
+
+/** 공유 코드·JSON 텍스트 붙여넣기 가져오기 화면. */
+export function showImportTextScreen(
+  overlay: OverlayHost,
+  handlers: { onSubmit: (text: string) => void; onBack: () => void },
+): void {
+  const root = overlay.show(`
+      <h1 style="font-size:22px;">코드로 가져오기</h1>
+      <p class="subtitle" style="font-size:12.5px;">공유 코드(TCS1…)나 공유 URL, 시나리오 JSON을 붙여 넣으세요</p>
+      <textarea id="ed-import-text" class="ed-import-text" rows="6" spellcheck="false"
+        placeholder="TCS1.… 또는 { &quot;schemaVersion&quot;: 1, … }"></textarea>
+      <button class="big-btn" id="btn-import-go">가져오기</button>
+      <button class="sub-btn" id="btn-back">뒤로</button>`);
+  const area = root.querySelector<HTMLTextAreaElement>('#ed-import-text')!;
+  overlay.bind({
+    'btn-import-go': () => handlers.onSubmit(area.value),
     'btn-back': handlers.onBack,
   });
 }

@@ -277,6 +277,10 @@ export function injectSharedStyles(): void {
 .ed-pick-banner button { border: 1px solid #8a6d14; border-radius: 8px; background: #f2ead8; height: 30px; padding: 0 10px; }
 .tp-bar { top: calc(env(safe-area-inset-top, 0px) + 100px); }
 .tp-line { font-size: 13.5px; padding: 3px 2px; color: #2b2416; }
+.ed-import-text {
+  width: min(300px, 82vw); border: 1.5px solid #8a6d14; border-radius: 11px; padding: 9px 11px;
+  font-size: 13px; font-family: ui-monospace, monospace; background: #faf5e8; color: #2b2416; resize: vertical;
+}
 @media (orientation: landscape) {
   .hud-bottom { max-width: 640px; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
   .sheet { max-width: 560px; left: 50%; transform: translate(-50%, 110%); border-radius: 18px 18px 0 0; }
