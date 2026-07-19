@@ -111,10 +111,11 @@ function azureMission1(): ScenarioDocumentV1 {
     rules: { maxTurns: 10, turnLimit: 'defeat' },
     victoryConditions: [{ type: 'survive-turns', turns: 10 }],
     defeatConditions: [{ type: 'lose-building', at: b.at(4, 1) }, { type: 'human-eliminated' }],
+    // 별점 근거(품질 매트릭스): 파도 방어라 손실 ≤2는 달성 0%, 처치 ≥4는 100%였다 — 손실 6·처치 12로 실분포를 만든다
     starConditions: [
       { type: 'win' },
-      { type: 'units-lost-at-most', count: 2 },
-      { type: 'kills-at-least', count: 4 },
+      { type: 'units-lost-at-most', count: 6 },
+      { type: 'kills-at-least', count: 12 },
     ],
     metadata: { recommendedFaction: 'azure', tags: ['campaign'] },
   };
@@ -288,10 +289,11 @@ function azureMission2(): ScenarioDocumentV1 {
     victoryConditions: [{ type: 'capture-building', at: b.at(4, 11) }],
     // 돌파전: 본진을 버리고서라도 남쪽으로 뚫으면 이긴다(수도 상실은 패배가 아니다)
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
+    // 별점 근거(품질 매트릭스): 평균 승리 4.5턴이라 9턴 제한·생존 3기가 모두 트리비얼했다 — 4턴 돌파·손실 ≤1로 조인다
     starConditions: [
       { type: 'win' },
-      { type: 'win-within-turns', turns: 9 },
-      { type: 'units-alive-at-least', count: 3 },
+      { type: 'win-within-turns', turns: 4 },
+      { type: 'units-lost-at-most', count: 1 },
     ],
     metadata: { recommendedFaction: 'azure', tags: ['campaign'] },
   };
@@ -346,10 +348,11 @@ function azureMission3(): ScenarioDocumentV1 {
       { type: 'lose-building', at: b.at(9, 5) },
       { type: 'human-eliminated' },
     ],
+    // 별점 근거(품질 매트릭스): 연합 공세라 손실 ≤3은 8%, 처치 ≥6은 100%였다 — 손실 8·처치 12로 실분포를 만든다
     starConditions: [
       { type: 'win' },
-      { type: 'units-lost-at-most', count: 3 },
-      { type: 'kills-at-least', count: 6 },
+      { type: 'units-lost-at-most', count: 8 },
+      { type: 'kills-at-least', count: 12 },
     ],
     metadata: { recommendedFaction: 'azure', tags: ['campaign'] },
   };
@@ -452,10 +455,11 @@ function crimsonMission3(): ScenarioDocumentV1 {
     rules: { maxTurns: 14, turnLimit: 'defeat' },
     victoryConditions: [{ type: 'hold-building', at: b.at(5, 5), turns: 3 }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
+    // 별점 근거(품질 매트릭스): 10턴 제한은 100%, 처치 ≥5는 92% 달성이었다 — 5턴 선점·처치 8로 조인다
     starConditions: [
       { type: 'win' },
-      { type: 'win-within-turns', turns: 10 },
-      { type: 'kills-at-least', count: 5 },
+      { type: 'win-within-turns', turns: 5 },
+      { type: 'kills-at-least', count: 8 },
     ],
     metadata: { recommendedFaction: 'crimson', tags: ['campaign'] },
   };
@@ -503,9 +507,10 @@ function violetMission2(): ScenarioDocumentV1 {
     rules: { maxTurns: 12, turnLimit: 'defeat' },
     victoryConditions: [{ type: 'reach-score', score: 75 }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
+    // 별점 근거(품질 매트릭스): 금 ≥30은 97% 달성으로 승리와 사실상 동일했다 — 금 60으로 경제 운영을 요구한다
     starConditions: [
       { type: 'win' },
-      { type: 'gold-at-least', amount: 30 },
+      { type: 'gold-at-least', amount: 60 },
       { type: 'units-lost-at-most', count: 2 },
     ],
     metadata: { recommendedFaction: 'violet', tags: ['campaign'] },
@@ -559,10 +564,11 @@ function violetMission3(): ScenarioDocumentV1 {
     rules: { maxTurns: 18, turnLimit: 'defeat' },
     victoryConditions: [{ type: 'conquest' }],
     defeatConditions: [{ type: 'human-eliminated' }, { type: 'turn-limit' }],
+    // 별점 근거(품질 매트릭스): 16턴 제한 94%·생존 4기 100%로 사실상 고정 3별이었다 — 10턴 정복·손실 ≤5로 조인다
     starConditions: [
       { type: 'win' },
-      { type: 'win-within-turns', turns: 16 },
-      { type: 'units-alive-at-least', count: 4 },
+      { type: 'win-within-turns', turns: 10 },
+      { type: 'units-lost-at-most', count: 5 },
     ],
     metadata: { recommendedFaction: 'violet', tags: ['campaign'] },
   };
