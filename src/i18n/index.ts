@@ -108,6 +108,41 @@ export function modifierName(id: ModifierId): string {
   return t(`modifier.${id}.name`);
 }
 
+export function modifierDescription(id: ModifierId): string {
+  return t(`modifier.${id}.description`);
+}
+
+type OfficialScenarioId =
+  | 'official-lightning-duel'
+  | 'official-grand-continent'
+  | 'official-narrow-bridge'
+  | 'official-ring-fortress'
+  | 'official-golden-road'
+  | 'official-kings-escort';
+
+function knownOfficialScenarioId(id: string): OfficialScenarioId | null {
+  switch (id) {
+    case 'official-lightning-duel':
+    case 'official-grand-continent':
+    case 'official-narrow-bridge':
+    case 'official-ring-fortress':
+    case 'official-golden-road':
+    case 'official-kings-escort':
+      return id;
+    default:
+      return null;
+  }
+}
+
+export function officialScenarioText(
+  id: string,
+  field: 'title' | 'description',
+  fallback: string,
+): string {
+  const official = knownOfficialScenarioId(id);
+  return official ? t(`official.${official}.${field}`) : fallback;
+}
+
 type CampaignSlug = 'azure' | 'crimson' | 'violet';
 export type MissionId =
   | 'azure-1'

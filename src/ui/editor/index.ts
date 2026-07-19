@@ -131,37 +131,37 @@ export function showCustomScenarioListScreen(
   const draftRow = (d: EditorDraftItem) => `
       <div class="rp-item" data-id="${escapeHtml(d.id)}" data-kind="draft">
         <button class="rp-main" data-act="play">
-          <span class="rp-title"><b>${escapeHtml(d.title || '제목 없음')}</b></span>
-          <span class="rp-sub">${escapeHtml(d.updatedAt.slice(0, 10))} · 탭하여 플레이</span>
+          <span class="rp-title"><b>${escapeHtml(d.title || t('scenarios.untitled'))}</b></span>
+          <span class="rp-sub">${escapeHtml(d.updatedAt.slice(0, 10))} · ${escapeHtml(t('scenarios.tapToPlay'))}</span>
         </button>
       </div>`;
   const officialRow = (o: OfficialScenarioItem) => `
       <div class="rp-item" data-id="${escapeHtml(o.id)}" data-kind="official">
         <button class="rp-main" data-act="play-official">
-          <span class="rp-title"><b>${escapeHtml(o.title)}</b> <span class="hud-chip" style="font-size:11px;">공식</span></span>
+          <span class="rp-title"><b>${escapeHtml(o.title)}</b> <span class="hud-chip" style="font-size:11px;">${escapeHtml(t('scenarios.officialBadge'))}</span></span>
           <span class="rp-sub">${escapeHtml(o.description)}</span>
           <span class="rp-sub">${escapeHtml(o.recommended)}</span>
         </button>
-        <button class="rp-exit" data-act="clone" aria-label="${escapeHtml(o.title)} 복제 편집">복제</button>
+        <button class="rp-exit" data-act="clone" aria-label="${escapeHtml(t('scenarios.cloneAria', { title: o.title }))}">${escapeHtml(t('scenarios.clone'))}</button>
       </div>`;
   const section = (title: string, body: string) =>
-    `<h2 style="font-size:15px;margin:14px 0 6px;">${title}</h2>${body}`;
+    `<h2 style="font-size:15px;margin:14px 0 6px;">${escapeHtml(title)}</h2>${body}`;
   const root = overlay.show(`
-      <h1 style="font-size:24px;">커스텀 시나리오</h1>
-      <p class="subtitle" style="font-size:12.5px;">공식 전장은 복제해서 편집할 수 있습니다</p>
-      ${section('공식 전장', `<div class="rp-list">${data.officials.map(officialRow).join('')}</div>`)}
+      <h1 style="font-size:24px;">${escapeHtml(t('scenarios.title'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('scenarios.subtitle'))}</p>
+      ${section(t('scenarios.official'), `<div class="rp-list">${data.officials.map(officialRow).join('')}</div>`)}
       ${section(
-        '내 전장',
+        t('scenarios.mine'),
         data.mine.length > 0
           ? `<div class="rp-list">${data.mine.map(draftRow).join('')}</div>`
-          : '<p class="subtitle" style="font-size:12px;">아직 없습니다 — 제작실에서 만들어 보세요</p>',
+          : `<p class="subtitle" style="font-size:12px;">${escapeHtml(t('scenarios.emptyMine'))}</p>`,
       )}
       ${
         data.imported.length > 0
-          ? section('가져온 전장', `<div class="rp-list">${data.imported.map(draftRow).join('')}</div>`)
+          ? section(t('scenarios.imported'), `<div class="rp-list">${data.imported.map(draftRow).join('')}</div>`)
           : ''
       }
-      <button class="sub-btn" id="btn-back">뒤로</button>`);
+      <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   for (const row of root.querySelectorAll<HTMLElement>('.rp-item')) {
     const id = row.dataset.id!;
     row.querySelector('[data-act="play"]')?.addEventListener('click', () => handlers.onPlay(id));

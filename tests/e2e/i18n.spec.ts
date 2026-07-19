@@ -51,3 +51,23 @@ test('영어 모바일 캠페인 목록·미션 도입', async ({ page }) => {
   await page.getByRole('button', { name: 'Deploy' }).click();
   await expect(page.getByRole('button', { name: 'End Turn' })).toBeVisible();
 });
+
+test('영어 모바일 일일 도전·기록·공식 전장', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('three-crowns-locale', 'en'));
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Daily Challenge' }).click();
+  await expect(page.getByRole('button', { name: 'Start Challenge' })).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.getByRole('button', { name: 'Records' }).click();
+  await expect(page.getByText('Games played')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.getByRole('button', { name: 'Custom Scenarios' }).click();
+  await expect(page.getByText('Lightning Arena')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clone and edit Lightning Arena' })).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+});
