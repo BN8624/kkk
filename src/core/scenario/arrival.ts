@@ -3,7 +3,7 @@ import { FACTION_IDS, TERRAIN_RULES, UNIT_STATS } from '../data';
 import { HEX_DIRS, hexKey } from '../hex';
 import type { GeneratedMap } from '../map';
 import type { Axial, FactionId, Tile, UnitTypeId } from '../types';
-import { startUnitPlacements } from './builtin';
+import { startUnitPlacements } from './placement';
 
 /** 다턴 최단 도착 결과. turns는 목표 타일에 처음 서는 이동 턴(첫 이동 페이즈 도달=1). */
 interface ArrivalResult {
