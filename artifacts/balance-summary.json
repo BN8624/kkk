@@ -1,23 +1,23 @@
 {
-  "generatedAt": "2026-07-19T16:35:50.633Z",
-  "elapsedSec": 10.7,
+  "generatedAt": "2026-07-19T05:37:30.721Z",
+  "elapsedSec": 10.4,
   "totalGames": 1080,
   "seedsPerCombo": 40,
   "unfinishedGames": 0,
   "illegalGames": 0,
-  "draws": 5,
+  "draws": 3,
   "overallWinRates": {
-    "azure": 0.463,
-    "crimson": 0.305,
-    "violet": 0.228
+    "azure": 0.425,
+    "crimson": 0.339,
+    "violet": 0.233
   },
   "proxyWinRateByFaction": {
-    "azure": 0.519,
-    "crimson": 0.342,
-    "violet": 0.311
+    "azure": 0.567,
+    "crimson": 0.464,
+    "violet": 0.381
   },
   "proxyWinRateByDifficulty": {
-    "easy": 0.597,
+    "easy": 0.836,
     "normal": 0.353,
     "hard": 0.222
   },
@@ -26,14 +26,14 @@
       "difficulty": "easy",
       "games": 360,
       "endReasons": {
-        "conquest": 14,
+        "conquest": 53,
         "crown-hold": 120,
-        "turn-limit": 226,
+        "turn-limit": 187,
         "unfinished": 0
       },
-      "proxyWinRateTurnLimit": 0.752,
-      "proxyWinRateDecisive": 0.336,
-      "avgEndTurn": 9.96
+      "proxyWinRateTurnLimit": 0.989,
+      "proxyWinRateDecisive": 0.671,
+      "avgEndTurn": 9.67
     },
     {
       "difficulty": "normal",
@@ -68,15 +68,15 @@
       "games": 360,
       "seeds": 360,
       "winRates": {
-        "azure": 0.494,
-        "crimson": 0.222,
+        "azure": 0.472,
+        "crimson": 0.244,
         "violet": 0.275
       },
-      "avgEndTurn": 11.8,
+      "avgEndTurn": 11.75,
       "endReasons": {
-        "conquest": 36,
+        "conquest": 56,
         "crown-hold": 0,
-        "turn-limit": 324,
+        "turn-limit": 304,
         "unfinished": 0
       }
     },
@@ -85,15 +85,15 @@
       "games": 360,
       "seeds": 360,
       "winRates": {
-        "azure": 0.533,
-        "crimson": 0.225,
-        "violet": 0.236
+        "azure": 0.497,
+        "crimson": 0.261,
+        "violet": 0.242
       },
-      "avgEndTurn": 11.78,
+      "avgEndTurn": 11.72,
       "endReasons": {
-        "conquest": 41,
+        "conquest": 60,
         "crown-hold": 0,
-        "turn-limit": 319,
+        "turn-limit": 300,
         "unfinished": 0
       }
     },
@@ -102,11 +102,11 @@
       "games": 360,
       "seeds": 360,
       "winRates": {
-        "azure": 0.361,
-        "crimson": 0.467,
-        "violet": 0.172
+        "azure": 0.306,
+        "crimson": 0.511,
+        "violet": 0.183
       },
-      "avgEndTurn": 6.38,
+      "avgEndTurn": 6.18,
       "endReasons": {
         "conquest": 4,
         "crown-hold": 352,
@@ -116,18 +116,18 @@
     }
   ],
   "productionShare": {
-    "infantry": 0.628,
-    "archer": 0.333,
-    "cavalry": 0.039
+    "infantry": 0.643,
+    "archer": 0.306,
+    "cavalry": 0.051
   },
   "survivalRate": {
-    "infantry": 0.434,
-    "archer": 0.292,
-    "cavalry": 0.296
+    "infantry": 0.449,
+    "archer": 0.297,
+    "cavalry": 0.344
   },
-  "idlePhaseRate": 0.005,
-  "avgCapturesPerGame": 8.25,
-  "maxPhaseMs": 3.4,
+  "idlePhaseRate": 0.031,
+  "avgCapturesPerGame": 8.08,
+  "maxPhaseMs": 17,
   "pass": true,
   "failures": []
 }
