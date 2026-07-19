@@ -2,6 +2,7 @@
 import { MAX_UNITS_PER_FACTION, TERRAIN_RULES, UNIT_STATS } from '../data';
 import { hexDistance, hexKey } from '../hex';
 import type { Axial, FactionId } from '../types';
+import { factionName, t } from '../../i18n';
 import type {
   ScenarioDocumentV1,
   ScenarioTile,
@@ -179,10 +180,10 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
   const minV = Math.min(...strengths.map(totalValue));
   if (maxV > 0 && minV * 3 < maxV) {
     issues.push(
-      issue('strength-imbalance', 'warning', `세력 시작 전력(병력 가치+금) 격차가 3배를 넘습니다 (${minV} vs ${maxV}) — 의도한 비대칭인지 확인하세요`),
+      issue('strength-imbalance', 'warning', t('quality.strengthImbalance', { min: minV, max: maxV })),
     );
   } else if (maxV > 0 && minV * 2 < maxV) {
-    issues.push(issue('strength-gap', 'info', `세력 시작 전력 격차가 2배를 넘습니다 (${minV} vs ${maxV})`));
+    issues.push(issue('strength-gap', 'info', t('quality.strengthGap', { min: minV, max: maxV })));
   }
 
   // ---------- 수도 주변 방어 지형 ----------
@@ -197,7 +198,7 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
     }
     if (open >= 5)
       issues.push(
-        issue('capital-exposed', 'info', `${s.faction} 수도 주변에 방어 지형이 없습니다(개방 ${open}방향)`, { at: { q: cap.q, r: cap.r } }),
+        issue('capital-exposed', 'info', t('quality.capitalExposed', { faction: factionName(s.faction), open }), { at: { q: cap.q, r: cap.r } }),
       );
   }
 
@@ -230,11 +231,11 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
       const bestMove = Math.max(...Object.values(UNIT_STATS).map((s) => s.move));
       if (objectiveDistance > doc.rules.maxTurns * bestMove) {
         issues.push(
-          issue('objective-too-far', 'error', `핵심 목표까지 ${objectiveDistance}칸 — 최대 턴(${doc.rules.maxTurns}) 안에 도달할 수 없습니다`),
+          issue('objective-too-far', 'error', t('quality.objectiveTooFar', { distance: objectiveDistance, turns: doc.rules.maxTurns })),
         );
       } else if (objectiveDistance > doc.rules.maxTurns * 2) {
         issues.push(
-          issue('objective-far', 'warning', `핵심 목표까지 ${objectiveDistance}칸 — 제한 턴(${doc.rules.maxTurns}) 대비 멉니다`),
+          issue('objective-far', 'warning', t('quality.objectiveFar', { distance: objectiveDistance, turns: doc.rules.maxTurns })),
         );
       }
     }
@@ -258,7 +259,7 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
     }
     if (dominated === neutral.length && neutral.length >= 2)
       issues.push(
-        issue('free-buildings-one-sided', 'warning', `중립 거점 ${neutral.length}개가 모두 한 세력에 크게 가깝습니다 — 경제 경쟁이 없습니다`),
+        issue('free-buildings-one-sided', 'warning', t('quality.freeBuildingsOneSided', { count: neutral.length })),
       );
   }
 
@@ -277,10 +278,10 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
       estimatedFirstCombatTurn = Math.max(1, Math.ceil(minDist / 4));
       if (estimatedFirstCombatTurn > doc.rules.maxTurns)
         issues.push(
-          issue('no-combat-expected', 'warning', `첫 전투 예상 턴(${estimatedFirstCombatTurn})이 최대 턴(${doc.rules.maxTurns})보다 깁니다 — 전투 없이 끝날 수 있습니다`),
+          issue('no-combat-expected', 'warning', t('quality.noCombatExpected', { combatTurn: estimatedFirstCombatTurn, maxTurns: doc.rules.maxTurns })),
         );
       else if (estimatedFirstCombatTurn <= 1 && doc.rules.maxTurns >= 6)
-        issues.push(issue('instant-combat', 'info', '서로 적대하는 유닛이 시작부터 교전 거리 안에 있습니다'));
+        issues.push(issue('instant-combat', 'info', t('quality.instantCombat')));
     }
   }
 
@@ -301,7 +302,7 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
         others.length > 0 && others.every((o) => !mineReach.has(hexKey(o.q, o.r)));
       if (isolated)
         issues.push(
-          issue('faction-isolated', 'warning', `${f.id} 세력이 다른 세력과 지상으로 연결되어 있지 않습니다`),
+          issue('faction-isolated', 'warning', t('quality.factionIsolated', { faction: factionName(f.id) })),
         );
     }
   }
@@ -309,7 +310,7 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
   // ---------- 물 비율·미사용 영역·병목 ----------
   const waterRatio = total > 0 ? +(1 - land.size / total).toFixed(3) : 0;
   if (waterRatio > 0.4)
-    issues.push(issue('too-much-water', 'warning', `물 타일이 ${(waterRatio * 100).toFixed(0)}%입니다 — 전장이 지나치게 좁아질 수 있습니다`));
+    issues.push(issue('too-much-water', 'warning', t('quality.tooMuchWater', { percent: (waterRatio * 100).toFixed(0) })));
 
   const allStarts: Axial[] = [
     ...doc.units,
@@ -319,22 +320,22 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
   const unusedLandTiles = land.size - used.size;
   if (unusedLandTiles > land.size * 0.25)
     issues.push(
-      issue('unused-area', 'warning', `지상 타일의 ${Math.round((unusedLandTiles / land.size) * 100)}%가 어떤 유닛·거점에서도 닿지 않는 영역입니다`),
+      issue('unused-area', 'warning', t('quality.unusedAreaPercent', { percent: Math.round((unusedLandTiles / land.size) * 100) })),
     );
   else if (unusedLandTiles > 0)
-    issues.push(issue('unused-area', 'info', `닿지 않는 지상 타일이 ${unusedLandTiles}개 있습니다`));
+    issues.push(issue('unused-area', 'info', t('quality.unusedAreaCount', { count: unusedLandTiles })));
 
   const bottleneckCount = countBottlenecks(land);
   if (land.size > 0 && bottleneckCount > land.size * 0.2)
     issues.push(
-      issue('many-bottlenecks', 'info', `지상 단절점(병목)이 ${bottleneckCount}개입니다 — 좁은 통로 중심의 전장입니다`),
+      issue('many-bottlenecks', 'info', t('quality.manyBottlenecks', { count: bottleneckCount })),
     );
 
   // ---------- 승리 조건·지도 정합 ----------
   const flat = flattenVictory(doc.victoryConditions);
   if (flat.some((c) => c.type === 'reach-score') && neutral.length === 0)
     issues.push(
-      issue('score-no-expansion', 'warning', '점수 승리인데 중립 거점이 없습니다 — 점수 성장 수단이 전투뿐입니다'),
+      issue('score-no-expansion', 'warning', t('quality.scoreNoExpansion')),
     );
 
   // ---------- 별점 조건 달성 가능성 ----------
@@ -349,13 +350,13 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
     (doc.starConditions ?? []).forEach((c, i) => {
       const path = `starConditions[${i}]`;
       if (c.type === 'units-alive-at-least' && c.count > MAX_UNITS_PER_FACTION)
-        issues.push(issue('star-impossible', 'error', `생존 유닛 조건(${c.count})이 세력 최대 유닛 수(${MAX_UNITS_PER_FACTION})를 넘습니다`, { path }));
+        issues.push(issue('star-impossible', 'error', t('quality.starImpossibleUnits', { count: c.count, max: MAX_UNITS_PER_FACTION }), { path }));
       if (c.type === 'kills-at-least' && !enemyCanProduce && c.count > enemyUnits)
-        issues.push(issue('star-impossible', 'error', `처치 조건(${c.count})이 적 총 유닛 수(${enemyUnits})를 넘고 적은 생산할 수 없습니다`, { path }));
+        issues.push(issue('star-impossible', 'error', t('quality.starImpossibleKills', { count: c.count, enemies: enemyUnits }), { path }));
       if (c.type === 'units-lost-at-most' && c.count >= Math.max(humanUnits, 1) + doc.rules.maxTurns)
-        issues.push(issue('star-trivial', 'warning', `손실 조건(${c.count})이 지나치게 후해 사실상 항상 달성됩니다`, { path }));
+        issues.push(issue('star-trivial', 'warning', t('quality.starTrivialLoss', { count: c.count }), { path }));
       if (c.type === 'win-within-turns' && c.turns >= doc.rules.maxTurns)
-        issues.push(issue('star-trivial', 'warning', `제한 턴(${doc.rules.maxTurns}) 안 승리는 항상 별점 턴(${c.turns}) 안 승리입니다 — 승리와 동일한 조건입니다`, { path }));
+        issues.push(issue('star-trivial', 'warning', t('quality.starTrivialTurn', { maxTurns: doc.rules.maxTurns, starTurns: c.turns }), { path }));
     });
   }
 

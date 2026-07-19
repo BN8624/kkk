@@ -1,6 +1,5 @@
 // 한 줄 목적: 시나리오 제작실 UI(홈 화면·도구 팔레트·속성 시트·조건 편집·검증 패널)를 렌더링한다
-import { FACTION_NAMES, UNIT_NAMES } from '../../core/data';
-import { EVAL_POLICY_NAMES, type EvalPolicyId } from '../../core/eval/policies';
+import type { EvalPolicyId } from '../../core/eval/policies';
 import type { QualityTrialReport } from '../../core/eval/quality-trial';
 import type { QualityReport } from '../../core/scenario/quality';
 import type { EditorTool, EditorToolOptions } from '../../editor/controller';
@@ -15,7 +14,7 @@ import {
   type VictoryCondition,
 } from '../../core/scenario/types';
 import type { Axial, BuildingId, FactionId, UnitTypeId } from '../../core/types';
-import { factionName, t, unitName } from '../../i18n';
+import { buildingName, factionName, t, unitName } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -182,7 +181,7 @@ export function showImportTextScreen(
       <h1 style="font-size:22px;">${escapeHtml(t('editor.importTitle'))}</h1>
       <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('editor.importHelp'))}</p>
       <textarea id="ed-import-text" class="ed-import-text" rows="6" spellcheck="false"
-        placeholder="TCS1.… 또는 { &quot;schemaVersion&quot;: 1, … }"></textarea>
+        placeholder="${escapeHtml(t('editor.importPlaceholder'))}"></textarea>
       <button class="big-btn" id="btn-import-go">${escapeHtml(t('editor.import'))}</button>
       <button class="sub-btn" id="btn-back">${escapeHtml(t('common.back'))}</button>`);
   const area = root.querySelector<HTMLTextAreaElement>('#ed-import-text')!;
@@ -294,7 +293,7 @@ export class EditorPanel {
     (this.top.querySelector('#ed-redo') as HTMLButtonElement).disabled = !canRedo;
 
     const chip = (id: string, label: string, on: boolean, data: string) =>
-      `<button class="ed-chip ${on ? 'on' : ''}" data-${data}="${id}">${label}</button>`;
+      `<button class="ed-chip ${on ? 'on' : ''}" data-${data}="${id}">${escapeHtml(label)}</button>`;
     let sub = '';
     if (['plains', 'forest', 'mountain', 'water', 'erase'].includes(tool)) {
       sub = `<span class="ed-sub-label">${escapeHtml(t('editor.brush'))}</span>
@@ -401,13 +400,13 @@ export class EditorPanel {
   private openInfoSheet(): void {
     const doc = this.getDoc();
     const s = this.openSheet(`
-      <h3>문서 정보</h3>
-      <label class="ed-field">제목<input id="f-title" maxlength="${SCENARIO_LIMITS.maxTitleLen}" value="${escapeHtml(doc.title)}"></label>
-      <label class="ed-field">설명<textarea id="f-desc" maxlength="${SCENARIO_LIMITS.maxDescriptionLen}" rows="3">${escapeHtml(doc.description)}</textarea></label>
-      <label class="ed-field">제작자<input id="f-author" maxlength="${SCENARIO_LIMITS.maxAuthorLen}" value="${escapeHtml(doc.author ?? '')}"></label>
-      <div class="ed-row"><button class="close-btn" id="f-ok">적용</button><button class="close-btn" id="f-cancel">취소</button></div>`);
+      <h3>${escapeHtml(t('editor.documentInfo'))}</h3>
+      <label class="ed-field">${escapeHtml(t('editor.field.title'))}<input id="f-title" maxlength="${SCENARIO_LIMITS.maxTitleLen}" value="${escapeHtml(doc.title)}"></label>
+      <label class="ed-field">${escapeHtml(t('editor.field.description'))}<textarea id="f-desc" maxlength="${SCENARIO_LIMITS.maxDescriptionLen}" rows="3">${escapeHtml(doc.description)}</textarea></label>
+      <label class="ed-field">${escapeHtml(t('editor.field.author'))}<input id="f-author" maxlength="${SCENARIO_LIMITS.maxAuthorLen}" value="${escapeHtml(doc.author ?? '')}"></label>
+      <div class="ed-row"><button class="close-btn" id="f-ok">${escapeHtml(t('common.apply'))}</button><button class="close-btn" id="f-cancel">${escapeHtml(t('common.cancel'))}</button></div>`);
     s.querySelector('#f-ok')!.addEventListener('click', () => {
-      const title = (s.querySelector('#f-title') as HTMLInputElement).value.trim() || '제목 없음';
+      const title = (s.querySelector('#f-title') as HTMLInputElement).value.trim() || t('scenarios.untitled');
       const description = (s.querySelector('#f-desc') as HTMLTextAreaElement).value;
       const author = (s.querySelector('#f-author') as HTMLInputElement).value.trim();
       this.handlers.onMetaChange({ title, description, ...(author ? { author } : {}) });
@@ -419,20 +418,20 @@ export class EditorPanel {
   private openRulesSheet(): void {
     const doc = this.getDoc();
     const s = this.openSheet(`
-      <h3>규칙</h3>
-      <label class="ed-field">최대 턴 (${SCENARIO_LIMITS.maxTurnsMin}–${SCENARIO_LIMITS.maxTurnsMax})
+      <h3>${escapeHtml(t('editor.rules'))}</h3>
+      <label class="ed-field">${escapeHtml(t('editor.field.maxTurns', { min: SCENARIO_LIMITS.maxTurnsMin, max: SCENARIO_LIMITS.maxTurnsMax }))}
         <input id="f-turns" type="number" min="${SCENARIO_LIMITS.maxTurnsMin}" max="${SCENARIO_LIMITS.maxTurnsMax}" value="${doc.rules.maxTurns}"></label>
-      <label class="ed-field">제한 턴 판정
+      <label class="ed-field">${escapeHtml(t('editor.field.turnLimit'))}
         <select id="f-tl">
-          <option value="score" ${doc.rules.turnLimit === 'score' ? 'selected' : ''}>최고 점수 승리</option>
-          <option value="defeat" ${doc.rules.turnLimit === 'defeat' ? 'selected' : ''}>목표 미달성 시 패배</option>
+          <option value="score" ${doc.rules.turnLimit === 'score' ? 'selected' : ''}>${escapeHtml(t('editor.turnLimit.score'))}</option>
+          <option value="defeat" ${doc.rules.turnLimit === 'defeat' ? 'selected' : ''}>${escapeHtml(t('editor.turnLimit.defeat'))}</option>
         </select></label>
-      <label class="ed-field">왕국 교리
+      <label class="ed-field">${escapeHtml(t('editor.field.doctrines'))}
         <select id="f-doc">
-          <option value="on" ${doc.rules.doctrines !== false ? 'selected' : ''}>사용</option>
-          <option value="off" ${doc.rules.doctrines === false ? 'selected' : ''}>사용 안 함</option>
+          <option value="on" ${doc.rules.doctrines !== false ? 'selected' : ''}>${escapeHtml(t('editor.enabled'))}</option>
+          <option value="off" ${doc.rules.doctrines === false ? 'selected' : ''}>${escapeHtml(t('editor.disabled'))}</option>
         </select></label>
-      <div class="ed-row"><button class="close-btn" id="f-ok">적용</button><button class="close-btn" id="f-cancel">취소</button></div>`);
+      <div class="ed-row"><button class="close-btn" id="f-ok">${escapeHtml(t('common.apply'))}</button><button class="close-btn" id="f-cancel">${escapeHtml(t('common.cancel'))}</button></div>`);
     s.querySelector('#f-ok')!.addEventListener('click', () => {
       const maxTurns = Number((s.querySelector('#f-turns') as HTMLInputElement).value);
       const turnLimit = (s.querySelector('#f-tl') as HTMLSelectElement).value as 'score' | 'defeat';
@@ -447,22 +446,22 @@ export class EditorPanel {
     const doc = this.getDoc();
     const row = (f: ScenarioFactionSetup) => `
       <div class="ed-fac-row" data-f="${f.id}">
-        <b>${FACTION_NAMES[f.id]}</b>
+        <b>${escapeHtml(factionName(f.id))}</b>
         <select data-k="active">
-          <option value="on" ${f.active ? 'selected' : ''}>참여</option>
-          <option value="off" ${f.active ? '' : 'selected'}>비활성</option>
+          <option value="on" ${f.active ? 'selected' : ''}>${escapeHtml(t('editor.faction.active'))}</option>
+          <option value="off" ${f.active ? '' : 'selected'}>${escapeHtml(t('editor.faction.inactive'))}</option>
         </select>
         <select data-k="controller">
-          <option value="human" ${f.controller === 'human' ? 'selected' : ''}>인간</option>
-          <option value="ai" ${f.controller === 'ai' ? 'selected' : ''}>AI</option>
+          <option value="human" ${f.controller === 'human' ? 'selected' : ''}>${escapeHtml(t('editor.faction.human'))}</option>
+          <option value="ai" ${f.controller === 'ai' ? 'selected' : ''}>${escapeHtml(t('editor.faction.ai'))}</option>
         </select>
-        <input data-k="gold" type="number" min="0" max="500" placeholder="기본 금" value="${f.startGold ?? ''}" style="width:70px">
+        <input data-k="gold" type="number" min="0" max="500" placeholder="${escapeHtml(t('editor.faction.defaultGold'))}" value="${f.startGold ?? ''}" style="width:70px">
       </div>`;
     const s = this.openSheet(`
-      <h3>세력</h3>
-      <p class="ed-hint">인간은 정확히 하나여야 합니다. 시작 금을 비우면 왕국 기본값입니다.</p>
+      <h3>${escapeHtml(t('editor.factions'))}</h3>
+      <p class="ed-hint">${escapeHtml(t('editor.faction.hint'))}</p>
       ${doc.factions.map(row).join('')}
-      <button class="close-btn" id="f-close">닫기</button>`);
+      <button class="close-btn" id="f-close">${escapeHtml(t('common.close'))}</button>`);
     for (const rowEl of s.querySelectorAll<HTMLElement>('.ed-fac-row')) {
       const fid = rowEl.dataset.f as FactionId;
       const commit = () => {
@@ -484,13 +483,13 @@ export class EditorPanel {
   private openResizeSheet(): void {
     const doc = this.getDoc();
     const s = this.openSheet(`
-      <h3>지도 크기</h3>
-      <p class="ed-hint">${SCENARIO_LIMITS.minCols}×${SCENARIO_LIMITS.minRows} ~ ${SCENARIO_LIMITS.maxCols}×${SCENARIO_LIMITS.maxRows}. 줄이면 범위 밖 배치는 제거됩니다.</p>
+      <h3>${escapeHtml(t('editor.resize'))}</h3>
+      <p class="ed-hint">${escapeHtml(t('editor.resizeHint', { minCols: SCENARIO_LIMITS.minCols, minRows: SCENARIO_LIMITS.minRows, maxCols: SCENARIO_LIMITS.maxCols, maxRows: SCENARIO_LIMITS.maxRows }))}</p>
       <div class="ed-row">
-        <label class="ed-field">가로<input id="f-cols" type="number" min="${SCENARIO_LIMITS.minCols}" max="${SCENARIO_LIMITS.maxCols}" value="${doc.board.cols}"></label>
-        <label class="ed-field">세로<input id="f-rows" type="number" min="${SCENARIO_LIMITS.minRows}" max="${SCENARIO_LIMITS.maxRows}" value="${doc.board.rows}"></label>
+        <label class="ed-field">${escapeHtml(t('editor.columns'))}<input id="f-cols" type="number" min="${SCENARIO_LIMITS.minCols}" max="${SCENARIO_LIMITS.maxCols}" value="${doc.board.cols}"></label>
+        <label class="ed-field">${escapeHtml(t('editor.rows'))}<input id="f-rows" type="number" min="${SCENARIO_LIMITS.minRows}" max="${SCENARIO_LIMITS.maxRows}" value="${doc.board.rows}"></label>
       </div>
-      <div class="ed-row"><button class="close-btn" id="f-ok">적용</button><button class="close-btn" id="f-cancel">취소</button></div>`);
+      <div class="ed-row"><button class="close-btn" id="f-ok">${escapeHtml(t('common.apply'))}</button><button class="close-btn" id="f-cancel">${escapeHtml(t('common.cancel'))}</button></div>`);
     s.querySelector('#f-ok')!.addEventListener('click', () => {
       const cols = Number((s.querySelector('#f-cols') as HTMLInputElement).value);
       const rows = Number((s.querySelector('#f-rows') as HTMLInputElement).value);
@@ -514,19 +513,19 @@ export class EditorPanel {
         <span>${escapeHtml(text)}</span><button data-act="del">✕</button>
       </div>`;
     const s = this.openSheet(`
-      <h3>목표</h3>
+      <h3>${escapeHtml(t('editor.objectives'))}</h3>
       <div class="ed-cond-list">
-        <b>승리 조건</b>
+        <b>${escapeHtml(t('editor.victoryConditions'))}</b>
         ${current.victory.map((c, i) => item('victory', i, describeVictory(c))).join('')}
-        <button class="ed-add" data-add="victory">+ 승리 조건 추가</button>
-        <b>패배 조건</b>
+        <button class="ed-add" data-add="victory">${escapeHtml(t('editor.addVictory'))}</button>
+        <b>${escapeHtml(t('editor.defeatConditions'))}</b>
         ${current.defeat.map((c, i) => item('defeat', i, describeDefeat(c))).join('')}
-        <button class="ed-add" data-add="defeat">+ 패배 조건 추가</button>
-        <b>별점 조건 (최대 3)</b>
+        <button class="ed-add" data-add="defeat">${escapeHtml(t('editor.addDefeat'))}</button>
+        <b>${escapeHtml(t('editor.starConditions'))}</b>
         ${current.stars.map((c, i) => item('stars', i, describeStar(c))).join('')}
-        <button class="ed-add" data-add="stars">+ 별점 조건 추가</button>
+        <button class="ed-add" data-add="stars">${escapeHtml(t('editor.addStar'))}</button>
       </div>
-      <button class="close-btn" id="f-close">닫기</button>`);
+      <button class="close-btn" id="f-close">${escapeHtml(t('common.close'))}</button>`);
     for (const el of s.querySelectorAll<HTMLElement>('.ed-cond [data-act="del"]')) {
       el.addEventListener('click', () => {
         const cond = el.parentElement as HTMLElement;
@@ -554,39 +553,39 @@ export class EditorPanel {
     const types =
       kind === 'victory'
         ? [
-            ['conquest', '모든 수도 점령'],
-            ['capture-building', '지정 거점 점령'],
-            ['hold-building', '지정 거점 N턴 연속 보유'],
-            ['capture-count', '거점 종류 N개 보유'],
-            ['eliminate-faction', '지정 세력 제거'],
-            ['survive-turns', 'N턴까지 생존'],
-            ['reach-score', 'N점 달성'],
-            ['unit-alive', '태그 유닛 생존'],
+            ['conquest', t('editor.condition.conquest')],
+            ['capture-building', t('editor.condition.captureBuilding')],
+            ['hold-building', t('editor.condition.holdBuilding')],
+            ['capture-count', t('editor.condition.captureCount')],
+            ['eliminate-faction', t('editor.condition.eliminateFaction')],
+            ['survive-turns', t('editor.condition.surviveTurns')],
+            ['reach-score', t('editor.condition.reachScore')],
+            ['unit-alive', t('editor.condition.unitAlive')],
           ]
         : kind === 'defeat'
           ? [
-              ['human-eliminated', '내 세력 전멸'],
-              ['lose-building', '지정 거점 상실'],
-              ['enemy-captures', '적이 지정 거점 점령'],
-              ['unit-dies', '태그 유닛 사망'],
-              ['turn-limit', '제한 턴 초과'],
+              ['human-eliminated', t('editor.condition.humanEliminated')],
+              ['lose-building', t('editor.condition.loseBuilding')],
+              ['enemy-captures', t('editor.condition.enemyCaptures')],
+              ['unit-dies', t('editor.condition.unitDies')],
+              ['turn-limit', t('editor.condition.turnLimit')],
             ]
           : [
-              ['win', '승리'],
-              ['win-within-turns', 'N턴 이내 승리'],
-              ['units-alive-at-least', '아군 N기 이상 생존'],
-              ['units-lost-at-most', '유닛 손실 N기 이하'],
-              ['buildings-captured-at-least', '거점 N개 이상 점령'],
-              ['kills-at-least', '적 N기 이상 처치'],
-              ['unit-alive', '태그 유닛 생존'],
-              ['gold-at-least', 'N금 이상 보유'],
+              ['win', t('editor.condition.win')],
+              ['win-within-turns', t('editor.condition.winWithinTurns')],
+              ['units-alive-at-least', t('editor.condition.unitsAlive')],
+              ['units-lost-at-most', t('editor.condition.unitsLost')],
+              ['buildings-captured-at-least', t('editor.condition.buildingsCaptured')],
+              ['kills-at-least', t('editor.condition.kills')],
+              ['unit-alive', t('editor.condition.unitAlive')],
+              ['gold-at-least', t('editor.condition.gold')],
             ];
     const s = this.openSheet(`
-      <h3>조건 추가</h3>
+      <h3>${escapeHtml(t('editor.addCondition'))}</h3>
       <div class="ed-menu-grid">
-        ${types.map(([t, label]) => `<button data-t="${t}">${label}</button>`).join('')}
+        ${types.map(([type, label]) => `<button data-t="${type}">${escapeHtml(label)}</button>`).join('')}
       </div>
-      <button class="close-btn" id="f-back">뒤로</button>`);
+      <button class="close-btn" id="f-back">${escapeHtml(t('common.back'))}</button>`);
     for (const btn of s.querySelectorAll<HTMLButtonElement>('[data-t]')) {
       btn.addEventListener('click', () => void this.buildCondition(kind, btn.dataset.t!));
     }
@@ -598,21 +597,21 @@ export class EditorPanel {
     const doc = this.getDoc();
     const needAt = ['capture-building', 'hold-building', 'lose-building', 'enemy-captures'];
     const needCount: Record<string, [string, number]> = {
-      'hold-building': ['연속 보유 턴', 3],
-      'capture-count': ['거점 수', 2],
-      'survive-turns': ['생존 턴', 10],
-      'reach-score': ['목표 점수', 60],
-      'win-within-turns': ['턴 수', 8],
-      'units-alive-at-least': ['유닛 수', 3],
-      'units-lost-at-most': ['손실 상한', 2],
-      'buildings-captured-at-least': ['거점 수', 2],
-      'kills-at-least': ['처치 수', 5],
-      'gold-at-least': ['금액', 100],
+      'hold-building': [t('editor.prompt.holdTurns'), 3],
+      'capture-count': [t('editor.prompt.buildingCount'), 2],
+      'survive-turns': [t('editor.prompt.surviveTurns'), 10],
+      'reach-score': [t('editor.prompt.targetScore'), 60],
+      'win-within-turns': [t('editor.prompt.turns'), 8],
+      'units-alive-at-least': [t('editor.prompt.unitCount'), 3],
+      'units-lost-at-most': [t('editor.prompt.lossLimit'), 2],
+      'buildings-captured-at-least': [t('editor.prompt.buildingCount'), 2],
+      'kills-at-least': [t('editor.prompt.killCount'), 5],
+      'gold-at-least': [t('editor.prompt.gold'), 100],
     };
     let at: Axial | null = null;
     if (needAt.includes(type)) {
       this.closeSheet();
-      at = await this.handlers.requestTilePick('지도에서 대상 거점을 탭하세요');
+      at = await this.handlers.requestTilePick(t('editor.prompt.pickBuilding'));
       if (!at) return;
     }
     let count: number | undefined;
@@ -624,20 +623,20 @@ export class EditorPanel {
     }
     let faction: FactionId | undefined;
     if (type === 'eliminate-faction') {
-      const raw = window.prompt('제거할 세력 (azure/crimson/violet)', 'crimson');
+      const raw = window.prompt(t('editor.prompt.faction'), 'crimson');
       if (raw === null) return;
       if (!FACTIONS.includes(raw as FactionId)) return;
       faction = raw as FactionId;
     }
     let tag: string | undefined;
     if (type === 'unit-alive' || type === 'unit-dies') {
-      const raw = window.prompt('유닛 태그(선택 도구로 유닛에 태그를 지정하세요)', 'hero');
+      const raw = window.prompt(t('editor.prompt.unitTag'), 'hero');
       if (!raw) return;
       tag = raw.trim();
     }
     let building: BuildingId | undefined;
     if (type === 'capture-count') {
-      const raw = window.prompt('거점 종류 (capital/village/crown)', 'village');
+      const raw = window.prompt(t('editor.prompt.building'), 'village');
       if (raw === null || !['capital', 'village', 'crown'].includes(raw)) return;
       building = raw as BuildingId;
     }
@@ -658,20 +657,20 @@ export class EditorPanel {
   /** 선택 도구로 유닛을 탭했을 때의 속성 시트. */
   openUnitSheet(index: number, unit: ScenarioUnitSetup, maxHp: number): void {
     const s = this.openSheet(`
-      <h3>${FACTION_NAMES[unit.faction]} ${UNIT_NAMES[unit.type]} (${unit.q}, ${unit.r})</h3>
+      <h3>${escapeHtml(t('editor.unitTitle', { faction: factionName(unit.faction), unit: unitName(unit.type), q: unit.q, r: unit.r }))}</h3>
       <div class="ed-row">
         <label class="ed-field">HP (1–${maxHp})<input id="u-hp" type="number" min="1" max="${maxHp}" value="${unit.hp ?? maxHp}"></label>
-        <label class="ed-field">첫 턴 행동
+        <label class="ed-field">${escapeHtml(t('editor.unitFirstTurn'))}
           <select id="u-act">
-            <option value="on" ${unit.canAct !== false ? 'selected' : ''}>가능</option>
-            <option value="off" ${unit.canAct === false ? 'selected' : ''}>불가</option>
+            <option value="on" ${unit.canAct !== false ? 'selected' : ''}>${escapeHtml(t('editor.available'))}</option>
+            <option value="off" ${unit.canAct === false ? 'selected' : ''}>${escapeHtml(t('editor.unavailable'))}</option>
           </select></label>
       </div>
-      <label class="ed-field">태그(조건 연결용, 비우면 없음)<input id="u-tag" maxlength="16" value="${escapeHtml(unit.tag ?? '')}"></label>
+      <label class="ed-field">${escapeHtml(t('editor.unitTag'))}<input id="u-tag" maxlength="16" value="${escapeHtml(unit.tag ?? '')}"></label>
       <div class="ed-row">
-        <button class="close-btn" id="u-ok">적용</button>
-        <button class="close-btn" id="u-del" style="color:#a33636">삭제</button>
-        <button class="close-btn" id="u-cancel">닫기</button>
+        <button class="close-btn" id="u-ok">${escapeHtml(t('common.apply'))}</button>
+        <button class="close-btn" id="u-del" style="color:#a33636">${escapeHtml(t('editor.remove'))}</button>
+        <button class="close-btn" id="u-cancel">${escapeHtml(t('common.close'))}</button>
       </div>`);
     s.querySelector('#u-ok')!.addEventListener('click', () => {
       const hp = Math.min(maxHp, Math.max(1, Math.floor(Number((s.querySelector('#u-hp') as HTMLInputElement).value) || maxHp)));
@@ -696,7 +695,11 @@ export class EditorPanel {
 
   /** 검증 결과 패널. */
   showValidation(issues: ValidationIssue[]): void {
-    const sev = { error: '오류', warning: '경고', info: '정보' } as const;
+    const sev = {
+      error: t('editor.severity.error'),
+      warning: t('editor.severity.warning'),
+      info: t('editor.severity.info'),
+    } as const;
     const rows = issues
       .slice(0, 30)
       .map(
@@ -708,28 +711,32 @@ export class EditorPanel {
       )
       .join('');
     const s = this.openSheet(`
-      <h3>검증 결과 ${issues.length === 0 ? '— 문제 없음 ✓' : `(${issues.length}건)`}</h3>
-      <div class="ed-issue-list">${rows || '<p class="ed-hint">플레이 가능한 시나리오입니다.</p>'}</div>
-      <button class="close-btn" id="v-close">닫기</button>`);
+      <h3>${escapeHtml(t('editor.validationTitle', { summary: issues.length === 0 ? t('editor.validationClean') : t('editor.issueCount', { count: issues.length }) }))}</h3>
+      <div class="ed-issue-list">${rows || `<p class="ed-hint">${escapeHtml(t('editor.playable'))}</p>`}</div>
+      <button class="close-btn" id="v-close">${escapeHtml(t('common.close'))}</button>`);
     s.querySelector('#v-close')!.addEventListener('click', () => this.closeSheet());
   }
 
   /** 품질 보고서 패널: 전력 요약 지표와 품질 이슈를 보여 준다. */
   showQuality(report: QualityReport): void {
-    const sev = { error: '오류', warning: '경고', info: '정보' } as const;
+    const sev = {
+      error: t('editor.severity.error'),
+      warning: t('editor.severity.warning'),
+      info: t('editor.severity.info'),
+    } as const;
     const m = report.metrics;
     const strengthRows = m.factionStrengths
       .map(
         (s) =>
-          `<div class="ed-issue info">${FACTION_NAMES[s.faction]} — 유닛 ${s.unitCount}기(가치 ${s.unitValue}) · 금 ${s.startGold} · 수도 ${s.hasCapital ? '있음' : '없음'}</div>`,
+          `<div class="ed-issue info">${escapeHtml(t('editor.strength', { faction: factionName(s.faction), units: s.unitCount, value: s.unitValue, gold: s.startGold, capital: s.hasCapital ? t('editor.yes') : t('editor.no') }))}</div>`,
       )
       .join('');
     const facts = [
-      m.objectiveDistance !== null ? `핵심 목표 거리 ${m.objectiveDistance}칸` : null,
-      m.estimatedFirstCombatTurn !== null ? `첫 전투 예상 ${m.estimatedFirstCombatTurn}턴` : null,
-      `물 비율 ${(m.waterRatio * 100).toFixed(0)}%`,
-      `병목 ${m.bottleneckCount}곳`,
-      m.unusedLandTiles > 0 ? `미사용 지상 ${m.unusedLandTiles}칸` : null,
+      m.objectiveDistance !== null ? t('editor.metric.objectiveDistance', { n: m.objectiveDistance }) : null,
+      m.estimatedFirstCombatTurn !== null ? t('editor.metric.firstCombat', { n: m.estimatedFirstCombatTurn }) : null,
+      t('editor.metric.water', { n: (m.waterRatio * 100).toFixed(0) }),
+      t('editor.metric.bottlenecks', { n: m.bottleneckCount }),
+      m.unusedLandTiles > 0 ? t('editor.metric.unusedLand', { n: m.unusedLandTiles }) : null,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -743,27 +750,27 @@ export class EditorPanel {
       )
       .join('');
     const s = this.openSheet(`
-      <h3>품질 보고서 ${report.issues.length === 0 ? '— 특이 사항 없음 ✓' : `(${report.issues.length}건)`}</h3>
-      <p class="ed-hint">${facts}</p>
+      <h3>${escapeHtml(t('editor.qualityTitle', { summary: report.issues.length === 0 ? t('editor.qualityClean') : t('editor.issueCount', { count: report.issues.length }) }))}</h3>
+      <p class="ed-hint">${escapeHtml(facts)}</p>
       ${strengthRows}
       <div class="ed-issue-list">${rows}</div>
-      <button class="close-btn" id="q-close">닫기</button>`);
+      <button class="close-btn" id="q-close">${escapeHtml(t('common.close'))}</button>`);
     s.querySelector('#q-close')!.addEventListener('click', () => this.closeSheet());
   }
 
   /** AI 품질 시험 진행 패널을 열고, 진행 갱신 함수를 반환한다. */
   showTrialRunning(onCancel: () => void): (done: number, total: number) => void {
     const s = this.openSheet(`
-      <h3>AI 품질 시험</h3>
-      <p class="ed-hint" id="t-progress">평가 정책으로 자동 관전을 시작합니다…</p>
-      <button class="close-btn" id="t-cancel">중단</button>`);
+      <h3>${escapeHtml(t('editor.trialTitle'))}</h3>
+      <p class="ed-hint" id="t-progress">${escapeHtml(t('editor.trialStarting'))}</p>
+      <button class="close-btn" id="t-cancel">${escapeHtml(t('editor.stop'))}</button>`);
     s.querySelector('#t-cancel')!.addEventListener('click', () => {
       onCancel();
       this.closeSheet();
     });
     const label = s.querySelector('#t-progress')!;
     return (done, total) => {
-      label.textContent = `자동 관전 중… ${done}/${total}판`;
+      label.textContent = t('editor.trialProgress', { done, total });
     };
   }
 
@@ -772,25 +779,25 @@ export class EditorPanel {
     const winnerRows = Object.entries(report.winners)
       .map(
         ([w, n]) =>
-          `<div class="ed-issue info">${w === 'draw' ? '무승부' : FACTION_NAMES[w as FactionId]} 승리 ${n}판</div>`,
+          `<div class="ed-issue info">${escapeHtml(t('editor.trialWinner', { winner: w === 'draw' ? t('result.draw') : factionName(w as FactionId), count: n }))}</div>`,
       )
       .join('');
     const policyRows = Object.entries(report.policyWins)
-      .map(([p, n]) => `<div class="ed-issue info">${EVAL_POLICY_NAMES[p as EvalPolicyId]} — 인간 세력 ${n}승</div>`)
+      .map(([p, n]) => `<div class="ed-issue info">${escapeHtml(t('editor.trialPolicy', { policy: t(`evalPolicy.${p as EvalPolicyId}`), count: n }))}</div>`)
       .join('');
     const problems: string[] = [];
-    if (report.unfinished > 0) problems.push(`제한 안에 끝나지 않은 판 ${report.unfinished}`);
-    if (report.invalidStates > 0) problems.push(`불법 상태 ${report.invalidStates}`);
-    if (report.rejectedCommands > 0) problems.push(`거부된 명령 ${report.rejectedCommands}`);
+    if (report.unfinished > 0) problems.push(t('editor.trialUnfinished', { count: report.unfinished }));
+    if (report.invalidStates > 0) problems.push(t('editor.trialInvalid', { count: report.invalidStates }));
+    if (report.rejectedCommands > 0) problems.push(t('editor.trialRejected', { count: report.rejectedCommands }));
     if (report.stalledFactions.length > 0)
-      problems.push(`정체 세력 ${report.stalledFactions.map((f) => FACTION_NAMES[f]).join('·')}`);
+      problems.push(t('editor.trialStalled', { factions: report.stalledFactions.map(factionName).join(' · ') }));
     const s = this.openSheet(`
-      <h3>AI 품질 시험 결과 — ${report.games}판</h3>
-      <p class="ed-hint">평균 종료 ${report.avgEndTurn}턴 · 승리 별 분포 0/1/2/3 = ${report.starHistogram.join('/')}</p>
-      ${problems.length > 0 ? `<div class="ed-issue warning"><b>[경고]</b> ${escapeHtml(problems.join(' · '))}</div>` : '<div class="ed-issue info">종료 불능·불법 상태·거부 명령 없음 ✓</div>'}
+      <h3>${escapeHtml(t('editor.trialResult', { count: report.games }))}</h3>
+      <p class="ed-hint">${escapeHtml(t('editor.trialSummary', { turns: report.avgEndTurn, stars: report.starHistogram.join('/') }))}</p>
+      ${problems.length > 0 ? `<div class="ed-issue warning"><b>[${escapeHtml(t('editor.severity.warning'))}]</b> ${escapeHtml(problems.join(' · '))}</div>` : `<div class="ed-issue info">${escapeHtml(t('editor.trialClean'))}</div>`}
       ${winnerRows}
       ${policyRows}
-      <button class="close-btn" id="t-close">닫기</button>`);
+      <button class="close-btn" id="t-close">${escapeHtml(t('common.close'))}</button>`);
     s.querySelector('#t-close')!.addEventListener('click', () => this.closeSheet());
   }
 }
@@ -856,40 +863,40 @@ function buildConditionObject(
 export function describeVictory(c: VictoryCondition): string {
   switch (c.type) {
     case 'conquest':
-      return '모든 수도 점령';
+      return t('condition.victory.conquest');
     case 'hold-building':
-      return `(${c.at.q},${c.at.r}) 거점 ${c.turns}턴 연속 보유`;
+      return t('condition.victory.holdBuilding', { q: c.at.q, r: c.at.r, turns: c.turns });
     case 'capture-building':
-      return `(${c.at.q},${c.at.r}) 거점 점령`;
+      return t('condition.victory.captureBuilding', { q: c.at.q, r: c.at.r });
     case 'capture-count':
-      return `${c.building === 'capital' ? '수도' : c.building === 'village' ? '마을' : '왕관'} ${c.count}개 보유`;
+      return t('condition.victory.captureCount', { building: buildingName(c.building), count: c.count });
     case 'eliminate-faction':
-      return `${FACTION_NAMES[c.faction]} 제거`;
+      return t('condition.victory.eliminateFaction', { faction: factionName(c.faction) });
     case 'survive-turns':
-      return `${c.turns}턴까지 생존`;
+      return t('condition.victory.surviveTurns', { turns: c.turns });
     case 'reach-score':
-      return `${c.score}점 달성`;
+      return t('condition.victory.reachScore', { score: c.score });
     case 'unit-alive':
-      return `'${c.tag}' 유닛 생존`;
+      return t('condition.victory.unitAlive', { tag: c.tag });
     case 'all-of':
-      return `복수 목표 모두 (${c.conditions.length}개)`;
+      return t('condition.victory.allOf', { count: c.conditions.length });
     case 'any-of':
-      return `복수 목표 중 하나 (${c.conditions.length}개)`;
+      return t('condition.victory.anyOf', { count: c.conditions.length });
   }
 }
 
 export function describeDefeat(c: DefeatCondition): string {
   switch (c.type) {
     case 'human-eliminated':
-      return '내 세력 전멸';
+      return t('condition.defeat.humanEliminated');
     case 'lose-building':
-      return `(${c.at.q},${c.at.r}) 거점 상실`;
+      return t('condition.defeat.loseBuilding', { q: c.at.q, r: c.at.r });
     case 'unit-dies':
-      return `'${c.tag}' 유닛 사망`;
+      return t('condition.defeat.unitDies', { tag: c.tag });
     case 'enemy-captures':
-      return `적이 (${c.at.q},${c.at.r}) 점령`;
+      return t('condition.defeat.enemyCaptures', { q: c.at.q, r: c.at.r });
     case 'turn-limit':
-      return '제한 턴 초과';
+      return t('condition.defeat.turnLimit');
   }
 }
 

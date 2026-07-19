@@ -102,4 +102,33 @@ test('영어 모바일 시나리오 제작실 홈·편집 메뉴', async ({ page
   await expect(page.getByRole('button', { name: 'Test Play' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Quality Report' })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+
+  await page.getByRole('button', { name: 'Document Info' }).click();
+  await expect(page.getByText('Author')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('button', { name: 'Rules' }).click();
+  await expect(page.getByLabel('Turn-limit result')).toHaveValue('score');
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('button', { name: 'Factions' }).click();
+  await expect(page.getByText('Azure Kingdom')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('button', { name: 'Objectives' }).click();
+  await expect(page.getByText('Capture every capital')).toBeVisible();
+  await expect(page.getByText('Your faction is eliminated')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByRole('heading', { name: /Validation Results/ })).toBeVisible();
+  await expect(page.getByText('The conquest objective has no capitals.')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
 });
