@@ -1,25 +1,25 @@
 {
-  "generatedAt": "2026-07-19T17:29:58.994Z",
-  "elapsedSec": 75.8,
+  "generatedAt": "2026-07-19T20:42:42.430Z",
+  "elapsedSec": 79.5,
   "scenario": "crown-heart",
   "seedsPerCombo": 24,
   "totalGames": 1728,
   "uniqueTrajectories": 1728,
   "overallWinRates": {
-    "azure": 0.498,
-    "crimson": 0.237,
-    "violet": 0.263
+    "azure": 0.422,
+    "crimson": 0.268,
+    "violet": 0.31
   },
-  "avgEndTurn": 9.24,
-  "endWithin4Rate": 0.001,
+  "avgEndTurn": 9.16,
+  "endWithin4Rate": 0.003,
   "firstCrownOwnerDist": {
-    "azure": 0.6,
-    "crimson": 0.28,
-    "violet": 0.12
+    "azure": 0.611,
+    "crimson": 0.316,
+    "violet": 0.073
   },
-  "avgFirstCrownTurn": 3.49,
-  "avgCrownOwnerChanges": 1.39,
-  "avgContestedRounds": 1.06,
+  "avgFirstCrownTurn": 3.09,
+  "avgCrownOwnerChanges": 2.02,
+  "avgContestedRounds": 0.84,
   "avgArrivalByFaction": {
     "azure": 2.01,
     "crimson": 2,

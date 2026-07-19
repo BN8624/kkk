@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T13:19:14.228Z",
-  "elapsedSec": 1.7,
+  "generatedAt": "2026-07-19T20:41:21.358Z",
+  "elapsedSec": 2.8,
   "pass": true,
   "reports": [
     {
@@ -10,18 +10,18 @@
       "qualityErrors": 0,
       "qualityWarnings": 0,
       "trial": {
-        "games": 8,
+        "games": 11,
         "unfinished": 0,
         "invalidStates": 0,
         "rejectedCommands": 0,
         "stalledFactions": [],
         "winners": {
-          "azure": 8
+          "azure": 11
         },
-        "avgEndTurn": 5.5,
+        "avgEndTurn": 5.6,
         "starHistogram": [
           0,
-          6,
+          9,
           0,
           2
         ],
@@ -30,7 +30,10 @@
           "defensive": 1,
           "economic": 1,
           "balanced": 1,
-          "noisy": 4
+          "noisy": 4,
+          "objective-denial": 1,
+          "human-like-cautious": 1,
+          "human-like-direct": 1
         }
       }
     },
@@ -41,26 +44,26 @@
       "qualityErrors": 0,
       "qualityWarnings": 0,
       "trial": {
-        "games": 8,
+        "games": 11,
         "unfinished": 0,
         "invalidStates": 0,
         "rejectedCommands": 0,
         "stalledFactions": [],
         "winners": {
-          "crimson": 2,
-          "violet": 2,
-          "azure": 4
+          "crimson": 8,
+          "azure": 3
         },
-        "avgEndTurn": 27.8,
+        "avgEndTurn": 23.4,
         "starHistogram": [
           0,
           0,
           0,
-          4
+          3
         ],
         "policyWins": {
+          "economic": 1,
           "balanced": 1,
-          "noisy": 3
+          "noisy": 1
         }
       }
     },
@@ -71,26 +74,30 @@
       "qualityErrors": 0,
       "qualityWarnings": 1,
       "trial": {
-        "games": 8,
+        "games": 11,
         "unfinished": 0,
         "invalidStates": 0,
         "rejectedCommands": 0,
         "stalledFactions": [],
         "winners": {
-          "crimson": 3,
-          "azure": 5
+          "azure": 11
         },
-        "avgEndTurn": 13.6,
+        "avgEndTurn": 11.3,
         "starHistogram": [
           0,
+          6,
           5,
-          0,
           0
         ],
         "policyWins": {
+          "aggressive": 1,
           "defensive": 1,
+          "economic": 1,
           "balanced": 1,
-          "noisy": 3
+          "noisy": 4,
+          "objective-denial": 1,
+          "human-like-cautious": 1,
+          "human-like-direct": 1
         }
       }
     },
@@ -101,26 +108,26 @@
       "qualityErrors": 0,
       "qualityWarnings": 0,
       "trial": {
-        "games": 8,
+        "games": 11,
         "unfinished": 0,
         "invalidStates": 0,
         "rejectedCommands": 0,
         "stalledFactions": [],
         "winners": {
-          "azure": 1,
-          "crimson": 4,
-          "violet": 3
+          "crimson": 5,
+          "violet": 6
         },
-        "avgEndTurn": 7.5,
+        "avgEndTurn": 9.5,
         "starHistogram": [
           0,
           0,
-          3,
+          6,
           0
         ],
         "policyWins": {
+          "defensive": 1,
           "balanced": 1,
-          "noisy": 2
+          "noisy": 4
         }
       }
     },
@@ -131,27 +138,30 @@
       "qualityErrors": 0,
       "qualityWarnings": 0,
       "trial": {
-        "games": 8,
+        "games": 11,
         "unfinished": 0,
         "invalidStates": 0,
         "rejectedCommands": 0,
         "stalledFactions": [],
         "winners": {
-          "violet": 8
+          "violet": 11
         },
-        "avgEndTurn": 5.6,
+        "avgEndTurn": 5.5,
         "starHistogram": [
           0,
           1,
-          4,
-          3
+          9,
+          1
         ],
         "policyWins": {
           "aggressive": 1,
           "defensive": 1,
           "economic": 1,
           "balanced": 1,
-          "noisy": 4
+          "noisy": 4,
+          "objective-denial": 1,
+          "human-like-cautious": 1,
+          "human-like-direct": 1
         }
       }
     },
@@ -162,25 +172,29 @@
       "qualityErrors": 0,
       "qualityWarnings": 0,
       "trial": {
-        "games": 8,
+        "games": 11,
         "unfinished": 0,
         "invalidStates": 0,
         "rejectedCommands": 0,
         "stalledFactions": [],
         "winners": {
-          "azure": 5,
-          "crimson": 3
+          "crimson": 2,
+          "azure": 9
         },
-        "avgEndTurn": 5,
+        "avgEndTurn": 3.8,
         "starHistogram": [
           0,
           0,
           2,
-          3
+          7
         ],
         "policyWins": {
-          "aggressive": 1,
-          "noisy": 4
+          "defensive": 1,
+          "economic": 1,
+          "balanced": 1,
+          "noisy": 4,
+          "objective-denial": 1,
+          "human-like-direct": 1
         }
       }
     }

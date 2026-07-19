@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T13:00:00.645Z",
-  "elapsedSec": 7.3,
+  "generatedAt": "2026-07-19T20:41:17.381Z",
+  "elapsedSec": 7.7,
   "totalGames": 972,
   "pass": true,
   "reports": [
@@ -13,7 +13,7 @@
       "stalledFactions": [],
       "normalWins": 12,
       "winRateAll": 0.778,
-      "avgEndTurn": 9.3,
+      "avgEndTurn": 9.2,
       "starHistogram": [
         0,
         48,
@@ -30,12 +30,12 @@
       "stalledFactions": [],
       "normalWins": 12,
       "winRateAll": 1,
-      "avgEndTurn": 4.4,
+      "avgEndTurn": 3.1,
       "starHistogram": [
         0,
+        0,
         12,
-        84,
-        12
+        96
       ]
     },
     {
@@ -46,13 +46,13 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.667,
-      "avgEndTurn": 9.6,
+      "winRateAll": 0.556,
+      "avgEndTurn": 9.7,
       "starHistogram": [
         0,
-        24,
-        24,
-        24
+        0,
+        48,
+        12
       ]
     },
     {
@@ -63,13 +63,13 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.889,
-      "avgEndTurn": 4.3,
+      "winRateAll": 1,
+      "avgEndTurn": 1,
       "starHistogram": [
         0,
-        12,
-        48,
-        36
+        0,
+        0,
+        108
       ]
     },
     {
@@ -80,13 +80,13 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.667,
-      "avgEndTurn": 6.9,
+      "winRateAll": 0.778,
+      "avgEndTurn": 6.8,
       "starHistogram": [
         0,
         0,
-        48,
-        24
+        72,
+        12
       ]
     },
     {
@@ -97,13 +97,13 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.778,
+      "winRateAll": 1,
       "avgEndTurn": 3.8,
       "starHistogram": [
         0,
-        0,
-        72,
-        12
+        12,
+        96,
+        0
       ]
     },
     {
@@ -114,12 +114,12 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.778,
-      "avgEndTurn": 9.4,
+      "winRateAll": 0.667,
+      "avgEndTurn": 8.4,
       "starHistogram": [
         0,
-        48,
-        12,
+        24,
+        24,
         24
       ]
     },
@@ -131,13 +131,13 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.889,
-      "avgEndTurn": 5.1,
+      "winRateAll": 1,
+      "avgEndTurn": 4,
       "starHistogram": [
         0,
-        0,
-        60,
-        36
+        12,
+        24,
+        72
       ]
     },
     {
@@ -148,13 +148,13 @@
       "immediateEnds": 0,
       "stalledFactions": [],
       "normalWins": 12,
-      "winRateAll": 0.778,
-      "avgEndTurn": 11.2,
+      "winRateAll": 0.889,
+      "avgEndTurn": 7.2,
       "starHistogram": [
         0,
-        24,
-        24,
-        36
+        0,
+        12,
+        84
       ]
     }
   ]

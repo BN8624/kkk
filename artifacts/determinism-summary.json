@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T12:50:24.856Z",
-  "elapsedSec": 8.7,
+  "generatedAt": "2026-07-19T20:40:57.830Z",
+  "elapsedSec": 15.8,
   "totalGames": 593,
   "recordedReplays": 593,
   "replayFailures": 0,
@@ -8,10 +8,10 @@
   "commandOrderMismatches": 0,
   "unfinishedGames": 0,
   "winners": {
-    "azure": 271,
-    "crimson": 161,
-    "violet": 157,
-    "draw": 4
+    "azure": 205,
+    "crimson": 198,
+    "violet": 190,
+    "draw": 0
   },
   "pass": true,
   "failures": [],

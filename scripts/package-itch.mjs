@@ -10,17 +10,19 @@ if (!existsSync('dist/index.html')) {
 }
 
 const out = resolve(process.env.ITCH_OUTPUT ?? 'three-crowns-island.zip');
+const dist = resolve('dist');
 mkdirSync(dirname(out), { recursive: true });
 rmSync(out, { force: true });
 
 if (platform() === 'win32') {
-  execFileSync(
-    'tar.exe',
-    ['-a', '-cf', out, '-C', resolve('dist'), '.'],
-    { stdio: 'inherit' },
-  );
+  // Windows tar는 C:\ 경로를 원격 호스트로 오인할 수 있어 PowerShell Compress-Archive 사용
+  const ps = [
+    `$ErrorActionPreference='Stop'`,
+    `Compress-Archive -Path (Join-Path '${dist.replace(/'/g, "''")}' '*') -DestinationPath '${out.replace(/'/g, "''")}' -Force`,
+  ].join('; ');
+  execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'inherit' });
 } else {
-  execFileSync('zip', ['-q', '-r', out, '.'], { cwd: resolve('dist'), stdio: 'inherit' });
+  execFileSync('zip', ['-q', '-r', out, '.'], { cwd: dist, stdio: 'inherit' });
 }
 
 console.log(`생성 완료: ${out} (itch.io의 HTML 게임으로 업로드)`);
