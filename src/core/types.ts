@@ -1,5 +1,6 @@
 // 한 줄 목적: 게임 상태·유닛·타일 등 코어 로직의 공용 타입을 정의한다
 
+import type { GameCommand } from './command';
 import type { GameObjectives, ScenarioRuntimeSnapshot } from './scenario/types';
 
 export type FactionId = 'azure' | 'crimson' | 'violet';
@@ -87,6 +88,8 @@ export interface GameState {
   customScenario?: ScenarioRuntimeSnapshot;
   /** 게임 시작부터 성공한 명령 수(다음 명령의 순번). 리플레이 순서 검증에 쓴다 */
   cmdSeq?: number;
+  /** 성공한 명령 전체 기록(리플레이 생성용). 규칙에는 영향을 주지 않으며 다이제스트에서 제외된다 */
+  commandLog?: GameCommand[];
 }
 
 export interface UnitStats {

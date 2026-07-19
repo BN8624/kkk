@@ -226,6 +226,8 @@ export function executeCommand(state: GameState, command: GameCommand): CommandE
   }
   if (!result.ok) return result;
   state.cmdSeq = (state.cmdSeq ?? 0) + 1;
+  // 기록은 게임 시작 시 초기화된 로그에만 쌓는다(기록 없이 시작된 구버전 저장은 부분 리플레이를 만들지 않는다)
+  if (state.commandLog) state.commandLog.push(command);
   if (state.over) result.events.push(...gameEndEvents(state));
   return result;
 }

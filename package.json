@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "lint": "eslint src tests",
     "simulate": "vite-node scripts/simulate.ts",
+    "determinism": "vite-node scripts/determinism.ts",
     "package:itch": "node scripts/package-itch.mjs"
   },
   "dependencies": {

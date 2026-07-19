@@ -112,6 +112,8 @@ export function newGameFromScenario(
     over: false,
     stats,
     objectives: objectivesFromSnapshot(snapshot),
+    cmdSeq: 0,
+    commandLog: [],
   };
   if (!isBuiltin) state.customScenario = snapshot;
   if (holdVictoryCondition(state)) {

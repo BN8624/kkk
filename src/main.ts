@@ -8,6 +8,9 @@ import { dailyChallenge, MODIFIERS, shareText, todayKey, type ModifierId } from 
 import { DOCTRINES } from './core/doctrines';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from './core/records';
 import { attackTargets, forecastAttack, newGame, unitCost } from './core/game';
+import { buildReplayDocument, verifyReplay } from './core/replay';
+import { newDocId } from './storage/docstore';
+import { documentStore } from './storage/idb';
 import { reachableDestinations } from './core/pathfind';
 import { SCENARIO_IDS, SCENARIOS, scenarioDisplayName } from './core/scenarios';
 import {
@@ -745,8 +748,23 @@ class App {
       state.config.mode === 'daily' ? todayKey() : undefined,
     );
     saveRecords(outcome.records);
+    this.saveReplay(state);
 
     window.setTimeout(() => this.showResult(state, outcome), 700);
+  }
+
+  /** 게임 종료 시 리플레이를 자동 저장한다. 실패해도 결과 화면에는 영향을 주지 않는다. */
+  private saveReplay(state: GameState): void {
+    try {
+      const doc = buildReplayDocument(state, { replayId: newDocId('replay') });
+      if (!doc) return; // 구버전 저장 이어하기 등으로 명령 기록이 불완전한 게임
+      if (!verifyReplay(doc).ok) return; // 재생 불가능한 기록은 저장하지 않는다
+      void documentStore()
+        .put('replays', doc.replayId, doc)
+        .catch(() => {});
+    } catch {
+      /* 리플레이 생성·저장 실패는 무시하고 결과 화면을 유지한다 */
+    }
   }
 
   private showResult(state: GameState, outcome: RecordOutcome): void {
