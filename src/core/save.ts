@@ -1,5 +1,6 @@
 // 한 줄 목적: 게임 상태·설정의 버전 관리 직렬화와 안전한 복원을 담당한다
-import { FACTION_IDS } from './data';
+import { FACTION_IDS, TERRAIN_RULES, UNIT_STATS, BUILDING_INCOME } from './data';
+import { hexKey } from './hex';
 import type { FactionId, GameState } from './types';
 
 export const SAVE_VERSION = 2;
@@ -103,26 +104,84 @@ function migrateV1(old: V1State): GameState | null {
   }
 }
 
+const VALID_MODES = ['quick', 'daily'];
+const VALID_DIFFICULTIES = ['easy', 'normal', 'hard'];
+
+/** 저장된 시나리오 ID 형식 검증(내장 3개 + 커스텀/캠페인 확장 대비 소문자 슬러그). */
+export function isValidScenarioIdFormat(id: unknown): boolean {
+  return typeof id === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(id);
+}
+
 /** v2 상태의 구조적 유효성을 검증한다. */
-function validateState(s: GameState): boolean {
-  if (!s || typeof s.seed !== 'number' || typeof s.turn !== 'number') return false;
+export function validateState(s: GameState): boolean {
+  if (!s || typeof s.seed !== 'number' || !Number.isFinite(s.seed)) return false;
+  if (typeof s.turn !== 'number' || !Number.isInteger(s.turn) || s.turn < 1) return false;
+  if (typeof s.maxTurns !== 'number' || !Number.isInteger(s.maxTurns) || s.maxTurns < 1)
+    return false;
   if (!Array.isArray(s.tiles) || !Array.isArray(s.units)) return false;
   if (!s.config || !FACTION_IDS.includes(s.config.humanFaction)) return false;
+  if (!VALID_MODES.includes(s.config.mode)) return false;
+  if (!isValidScenarioIdFormat(s.config.scenario)) return false;
+  if (!VALID_DIFFICULTIES.includes(s.config.difficulty)) return false;
+  // 세력 순서: FACTION_IDS의 순열이어야 한다(중복 금지)
   if (!Array.isArray(s.order) || s.order.length !== FACTION_IDS.length) return false;
+  if (new Set(s.order).size !== s.order.length) return false;
+  if (!s.order.every((f) => FACTION_IDS.includes(f))) return false;
   if (!FACTION_IDS.includes(s.current)) return false;
+  let humans = 0;
   for (const fid of FACTION_IDS) {
-    if (!s.factions?.[fid] || typeof s.factions[fid].gold !== 'number') return false;
-    if (s.controllers?.[fid] !== 'human' && s.controllers?.[fid] !== 'ai') return false;
-    if (!s.stats?.[fid]) return false;
+    const f = s.factions?.[fid];
+    if (!f || typeof f.gold !== 'number' || !Number.isFinite(f.gold) || f.gold < 0) return false;
+    const c = s.controllers?.[fid];
+    if (c !== 'human' && c !== 'ai') return false;
+    if (c === 'human') humans++;
+    const st = s.stats?.[fid];
+    if (!st || typeof st.kills !== 'number' || typeof st.produced !== 'number') return false;
   }
-  // 유닛 좌표 중복·불법 세력 검사
+  // 인간 controller는 정확히 하나여야 하며 humanFaction과 일치해야 한다
+  if (humans !== 1 || s.controllers[s.config.humanFaction] !== 'human') return false;
+  // 타일: 유효한 지형·건물·소유자, 좌표 중복 금지
+  const tileKeys = new Set<string>();
+  for (const t of s.tiles) {
+    if (typeof t.q !== 'number' || typeof t.r !== 'number') return false;
+    if (!(t.terrain in TERRAIN_RULES)) return false;
+    if (t.building !== undefined && !(t.building in BUILDING_INCOME)) return false;
+    if (t.owner !== undefined && !FACTION_IDS.includes(t.owner)) return false;
+    const key = hexKey(t.q, t.r);
+    if (tileKeys.has(key)) return false;
+    tileKeys.add(key);
+  }
+  // 유닛: 유효한 병과·세력·HP 범위, ID·좌표 중복 금지, 존재하는 지상 타일 위
   const seen = new Set<string>();
+  const seenIds = new Set<number>();
+  let maxUnitId = 0;
   for (const u of s.units) {
     if (!FACTION_IDS.includes(u.faction)) return false;
-    const key = `${u.q},${u.r}`;
+    if (!(u.type in UNIT_STATS)) return false;
+    if (typeof u.id !== 'number' || !Number.isInteger(u.id) || u.id < 1) return false;
+    if (seenIds.has(u.id)) return false;
+    seenIds.add(u.id);
+    maxUnitId = Math.max(maxUnitId, u.id);
+    if (typeof u.hp !== 'number' || !Number.isFinite(u.hp) || u.hp < 1) return false;
+    if (u.hp > UNIT_STATS[u.type].hp) return false;
+    const key = hexKey(u.q, u.r);
     if (seen.has(key)) return false;
     seen.add(key);
+    if (!tileKeys.has(key)) return false;
+    const tile = s.tiles.find((t) => t.q === u.q && t.r === u.r)!;
+    if (tile.terrain === 'water') return false;
   }
+  // nextUnitId 정합: 존재하는 유닛 ID보다 커야 한다
+  if (
+    typeof s.nextUnitId !== 'number' ||
+    !Number.isInteger(s.nextUnitId) ||
+    s.nextUnitId <= maxUnitId
+  )
+    return false;
+  // winner·over 정합: winner가 있으면 over여야 한다
+  if (s.winner !== undefined && !s.over) return false;
+  if (s.winner !== undefined && s.winner !== 'draw' && !FACTION_IDS.includes(s.winner))
+    return false;
   return true;
 }
 
@@ -173,15 +232,24 @@ export function saveRaw(raw: string): void {
 }
 
 export function loadGame(): GameState | null {
-  const raw = storage()?.getItem(SAVE_KEY);
+  let raw: string | null = null;
+  try {
+    raw = storage()?.getItem(SAVE_KEY) ?? null;
+  } catch {
+    return null; /* 읽기 실패는 저장 없음으로 처리 */
+  }
   if (!raw) return null;
   const state = deserialize(raw);
-  if (!state) storage()?.removeItem(SAVE_KEY);
+  if (!state) clearSave();
   return state;
 }
 
 export function clearSave(): void {
-  storage()?.removeItem(SAVE_KEY);
+  try {
+    storage()?.removeItem(SAVE_KEY);
+  } catch {
+    /* 삭제 실패해도 게임은 계속 진행 */
+  }
 }
 
 export function loadSettings(): Settings {

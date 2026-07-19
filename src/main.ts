@@ -26,10 +26,16 @@ import {
   saveSettings,
   type Settings,
 } from './core/save';
-import type { Axial, FactionId, GameState, Tile, Unit, UnitTypeId } from './core/types';
+import type { Axial, FactionId, GameState, ScenarioId, Tile, Unit, UnitTypeId } from './core/types';
+import type { AppMode } from './app/mode';
 import { BoardScene } from './render/BoardScene';
 import { setSoundEnabled, sfx } from './render/sound';
-import { Hud } from './ui/hud';
+import { Hud } from './ui/game/hud';
+import { showPauseScreen, showResultScreen } from './ui/game/screens';
+import { showSetupScreen, type GameSetup } from './ui/setup';
+import { showDailyScreen, showRecordsScreen, showTitleScreen } from './ui/title';
+import { OverlayHost } from './ui/shared/overlay';
+import { injectSharedStyles } from './ui/shared/styles';
 
 const FACTION_TOKEN_DESC: Record<FactionId, string> = {
   azure: '남색',
@@ -53,10 +59,12 @@ function describeFaction(f: FactionId): string {
 
 class App {
   private hud: Hud;
+  private overlay: OverlayHost;
   private game: Phaser.Game;
   private scene: BoardScene | null = null;
   private state: GameState | null = null;
   private settings: Settings;
+  private mode: AppMode = 'title';
   private selectedUnitId: number | null = null;
   private moveDests: Axial[] = [];
   private attackIds = new Set<number>();
@@ -65,41 +73,23 @@ class App {
   private boardStarted = false;
   private tutorialStep = 0; // 0 = 비활성
   private lastTap: { q: number; r: number } | null = null;
-  private lastSetup: import('./ui/hud').GameSetup | null = null;
+  private lastSetup: GameSetup | null = null;
   private pendingAttackId: number | null = null;
 
   constructor() {
     this.settings = loadSettings();
     setSoundEnabled(this.settings.soundOn);
+    injectSharedStyles();
 
-    this.hud = new Hud(document.getElementById('hud')!, {
+    const hudRoot = document.getElementById('hud')!;
+    this.hud = new Hud(hudRoot, {
       onEndTurn: () => void this.endTurn(),
       onZoom: (f) => this.scene?.zoomBy(f),
       onProduce: (t) => this.produce(t),
       onCloseProduction: () => this.closeProduction(),
-      onPause: () => this.hud.showPause(this.settings.soundOn, aiSpeedLabel(this.settings.aiSpeed)),
-      onResume: () => this.hud.hideOverlay(),
-      onToggleSound: () => {
-        this.settings.soundOn = !this.settings.soundOn;
-        setSoundEnabled(this.settings.soundOn);
-        saveSettings(this.settings);
-        return this.settings.soundOn;
-      },
-      onCycleAiSpeed: () => {
-        this.settings.aiSpeed = this.settings.aiSpeed === 1 ? 2 : this.settings.aiSpeed === 2 ? 0 : 1;
-        saveSettings(this.settings);
-        return aiSpeedLabel(this.settings.aiSpeed);
-      },
-      onNewGame: () => this.startNewGame(),
-      onContinue: () => this.continueGame(),
-      onDaily: () => this.showDaily(),
-      onShowRecords: () => this.showRecords(),
-      onToTitle: () => this.toTitle(),
-      onReplayTutorial: () => {
-        this.hud.hideOverlay();
-        this.startTutorial();
-      },
+      onPause: () => this.showPause(),
     });
+    this.overlay = new OverlayHost(hudRoot);
 
     this.game = new Phaser.Game({
       type: Phaser.CANVAS,
@@ -124,6 +114,7 @@ class App {
       (window as unknown as { __tc?: unknown }).__tc = {
         state: () => this.state,
         busy: () => this.busy,
+        mode: () => this.mode,
         screenPos: (q: number, r: number) => this.scene?.screenPos({ q, r }),
         tap: (q: number, r: number) => this.onTileTap(q, r),
         lastTap: () => this.lastTap,
@@ -147,16 +138,63 @@ class App {
   // ---------------- 화면 전환 ----------------
 
   private toTitle(): void {
+    this.mode = 'title';
     const saved = loadGame();
     const summary = saved
       ? `${FACTION_NAMES[saved.config.humanFaction]} · ${SCENARIOS[saved.config.scenario].name} · ${
           DIFFICULTY_NAMES[saved.config.difficulty]
         } · ${Math.min(saved.turn, saved.maxTurns)}턴${saved.config.mode === 'daily' ? ' · 일일 도전' : ''}`
       : undefined;
-    this.hud.showTitle(saved !== null, summary);
+    showTitleScreen(this.overlay, {
+      hasSave: saved !== null,
+      saveSummary: summary,
+      // 캠페인·보관함·제작실·리플레이 메뉴는 해당 단계가 실제로 완성되면 켠다
+      features: { campaign: false, scenarios: false, editor: false, replays: false },
+      handlers: {
+        onContinue: () => this.continueGame(),
+        onNewGame: () => this.startNewGame(),
+        onDaily: () => this.showDaily(),
+        onCampaign: () => {},
+        onScenarios: () => {},
+        onEditor: () => {},
+        onReplays: () => {},
+        onRecords: () => this.showRecords(),
+      },
+    });
+  }
+
+  private showPause(): void {
+    this.mode = 'settings';
+    showPauseScreen(this.overlay, {
+      soundOn: this.settings.soundOn,
+      aiSpeedLabel: aiSpeedLabel(this.settings.aiSpeed),
+      onResume: () => {
+        this.mode = 'play';
+        this.overlay.hide();
+      },
+      onToggleSound: () => {
+        this.settings.soundOn = !this.settings.soundOn;
+        setSoundEnabled(this.settings.soundOn);
+        saveSettings(this.settings);
+        return this.settings.soundOn;
+      },
+      onCycleAiSpeed: () => {
+        this.settings.aiSpeed = this.settings.aiSpeed === 1 ? 2 : this.settings.aiSpeed === 2 ? 0 : 1;
+        saveSettings(this.settings);
+        return aiSpeedLabel(this.settings.aiSpeed);
+      },
+      onReplayTutorial: () => {
+        this.mode = 'play';
+        this.overlay.hide();
+        this.startTutorial();
+      },
+      onNewGame: () => this.startNewGame(),
+      onToTitle: () => this.toTitle(),
+    });
   }
 
   private showDaily(): void {
+    this.mode = 'daily';
     const ch = dailyChallenge(todayKey());
     const records = loadRecords();
     const today = records.daily?.dateKey === ch.dateKey ? records.daily : null;
@@ -176,7 +214,7 @@ class App {
           ]
         : []),
     ];
-    this.hud.showDaily({
+    showDailyScreen(this.overlay, {
       title: `${ch.dateKey.slice(0, 4)}년 ${ch.dateKey.slice(4, 6)}월 ${ch.dateKey.slice(6, 8)}일 — 모두 같은 전장에서 겨룹니다`,
       lines,
       note: '기록은 이 브라우저에만 저장됩니다 (서버 없음)',
@@ -196,6 +234,7 @@ class App {
   }
 
   private showRecords(): void {
+    this.mode = 'records';
     const r = loadRecords();
     const lines = [
       { label: '전체 플레이', value: `${r.plays}판` },
@@ -216,15 +255,15 @@ class App {
       { label: '최다 처치', value: `${r.maxKills}기` },
       {
         label: '오늘 일일 도전',
-        value:
-          r.daily?.dateKey === todayKey() ? `${r.daily.bestScore}점 (완료)` : '미완료',
+        value: r.daily?.dateKey === todayKey() ? `${r.daily.bestScore}점 (완료)` : '미완료',
       },
     ];
-    this.hud.showRecords(lines, () => this.toTitle());
+    showRecordsScreen(this.overlay, lines, () => this.toTitle());
   }
 
   private startNewGame(): void {
-    this.hud.showGameSetup({
+    this.mode = 'setup';
+    showSetupScreen(this.overlay, {
       describeFaction,
       scenarios: SCENARIO_IDS.map((id) => SCENARIOS[id]),
       initial: this.lastSetup ?? undefined,
@@ -234,7 +273,7 @@ class App {
         const seed = param ? Number(param) >>> 0 : Date.now() >>> 0;
         const state = newGame(seed, {
           humanFaction: sel.faction,
-          scenario: sel.scenario,
+          scenario: sel.scenario as ScenarioId,
           difficulty: sel.difficulty,
         });
         this.launch(state);
@@ -255,10 +294,11 @@ class App {
   }
 
   private launch(state: GameState): void {
+    this.mode = 'play';
     this.state = state;
     this.selectedUnitId = null;
     this.busy = false;
-    this.hud.hideOverlay();
+    this.overlay.hide();
     this.hud.hideProduction();
     this.hud.hideTutorial();
     this.hud.showUnitPanel(null, null, '');
@@ -700,25 +740,25 @@ class App {
     );
     saveRecords(outcome.records);
 
-    window.setTimeout(() => this.showResultScreen(state, outcome), 700);
+    window.setTimeout(() => this.showResult(state, outcome), 700);
   }
 
-  private showResultScreen(state: GameState, outcome: RecordOutcome): void {
+  private showResult(state: GameState, outcome: RecordOutcome): void {
     const modifier = state.config.modifier as ModifierId | undefined;
-    this.hud.showResult(state, {
+    showResultScreen(this.overlay, state, {
       scenarioName: SCENARIOS[state.config.scenario].name,
       difficultyName: DIFFICULTY_NAMES[state.config.difficulty],
       modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
       prevBest: outcome.prevBestScore,
       isNewBest: outcome.isNewBest,
       onShare: () => void this.shareResult(outcome),
-      onReplay: () => {
-        const seed =
-          state.config.mode === 'daily' ? state.seed : Date.now() >>> 0;
+      onReplaySameSetup: () => {
+        const seed = state.config.mode === 'daily' ? state.seed : Date.now() >>> 0;
         this.launch(newGame(seed, { ...state.config }));
       },
       onChangeSetup: () => this.startNewGame(),
       onDaily: () => this.showDaily(),
+      onToTitle: () => this.toTitle(),
     });
   }
 

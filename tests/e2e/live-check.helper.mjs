@@ -37,7 +37,7 @@ await page.goto(base + '?seed=42');
 await page.waitForTimeout(1000);
 await page.screenshot({ path: `${outDir}/live-01-title.png` });
 
-await page.getByRole('button', { name: '새 게임' }).click();
+await page.getByRole('button', { name: '빠른 전투' }).click();
 await page.waitForFunction(() => window.__tc?.state() !== null, undefined, { timeout: 15000 });
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${outDir}/live-02-board.png` });

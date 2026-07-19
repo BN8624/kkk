@@ -13,7 +13,7 @@ async function startGame(page) {
     );
   });
   await page.goto(`${BASE}/?seed=${SEED}`);
-  await page.getByRole('button', { name: '새 게임' }).click();
+  await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
   await page.waitForFunction(() => window.__tc?.state() !== null);
 }

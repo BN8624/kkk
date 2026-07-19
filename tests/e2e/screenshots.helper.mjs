@@ -13,7 +13,7 @@ await page.goto('http://localhost:5199/?seed=42');
 await page.waitForTimeout(800);
 await page.screenshot({ path: `${outDir}/01-title.png` });
 
-await page.getByRole('button', { name: '새 게임' }).click();
+await page.getByRole('button', { name: '빠른 전투' }).click();
 await page.waitForFunction(() => window.__tc?.state() !== null);
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${outDir}/02-board.png` });
@@ -43,7 +43,7 @@ await land.addInitScript(() => {
 });
 await land.setViewportSize({ width: 812, height: 375 });
 await land.goto('http://localhost:5199/?seed=42');
-await land.getByRole('button', { name: /새 게임|이어하기/ }).first().click();
+await land.getByRole('button', { name: /빠른 전투|이어하기/ }).first().click();
 await land.waitForTimeout(1200);
 await land.screenshot({ path: `${outDir}/05-landscape.png` });
 

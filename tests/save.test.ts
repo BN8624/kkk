@@ -44,8 +44,8 @@ describe('save', () => {
           { q: 2, r: 0, terrain: 'forest' },
         ],
         units: [
-          { id: 1, type: 'infantry', faction: 'player', q: 0, r: 1, hp: 12, moved: false, attacked: false },
-          { id: 2, type: 'archer', faction: 'ai2', q: 2, r: 1, hp: 9, moved: true, attacked: true },
+          { id: 1, type: 'infantry', faction: 'player', q: 0, r: 0, hp: 12, moved: false, attacked: false },
+          { id: 2, type: 'archer', faction: 'ai2', q: 2, r: 0, hp: 9, moved: true, attacked: true },
         ],
         factions: {
           player: { id: 'player', gold: 55, eliminated: false },
@@ -79,5 +79,89 @@ describe('save', () => {
     state.units[1].q = state.units[0].q;
     state.units[1].r = state.units[0].r;
     expect(deserialize(serialize(state))).toBeNull();
+  });
+
+  it('유닛 ID가 중복된 저장은 거부한다', () => {
+    const state = newGame(5);
+    state.units[1].id = state.units[0].id;
+    expect(deserialize(serialize(state))).toBeNull();
+  });
+
+  it('물 위 또는 존재하지 않는 타일 위 유닛은 거부한다', () => {
+    const onWater = newGame(5);
+    const water = onWater.tiles.find((t) => t.terrain === 'water')!;
+    onWater.units[0].q = water.q;
+    onWater.units[0].r = water.r;
+    expect(deserialize(serialize(onWater))).toBeNull();
+
+    const offMap = newGame(5);
+    offMap.units[0].q = 999;
+    offMap.units[0].r = 999;
+    expect(deserialize(serialize(offMap))).toBeNull();
+  });
+
+  it('HP가 범위를 벗어난 유닛은 거부한다', () => {
+    const zero = newGame(5);
+    zero.units[0].hp = 0;
+    expect(deserialize(serialize(zero))).toBeNull();
+    const over = newGame(5);
+    over.units[0].hp = 999;
+    expect(deserialize(serialize(over))).toBeNull();
+  });
+
+  it('nextUnitId가 기존 유닛 ID 이하이면 거부한다', () => {
+    const state = newGame(5);
+    state.nextUnitId = state.units[state.units.length - 1].id;
+    expect(deserialize(serialize(state))).toBeNull();
+  });
+
+  it('음수·NaN 금은 거부한다', () => {
+    const neg = newGame(5);
+    neg.factions.azure.gold = -1;
+    expect(deserialize(serialize(neg))).toBeNull();
+    const nan = newGame(5);
+    nan.factions.azure.gold = Number.NaN;
+    expect(deserialize(serialize(nan))).toBeNull();
+  });
+
+  it('winner가 있는데 over가 아니면 거부한다', () => {
+    const state = newGame(5);
+    state.winner = 'azure';
+    state.over = false;
+    expect(deserialize(serialize(state))).toBeNull();
+  });
+
+  it('세력 순서 중복·인간 controller 위반을 거부한다', () => {
+    const dupOrder = newGame(5);
+    dupOrder.order = ['azure', 'azure', 'violet'];
+    expect(deserialize(serialize(dupOrder))).toBeNull();
+
+    const twoHumans = newGame(5);
+    twoHumans.controllers.crimson = 'human';
+    expect(deserialize(serialize(twoHumans))).toBeNull();
+
+    const noHuman = newGame(5);
+    noHuman.controllers.azure = 'ai';
+    expect(deserialize(serialize(noHuman))).toBeNull();
+  });
+
+  it('잘못된 모드·난이도·시나리오 ID 형식은 거부한다', () => {
+    const badMode = newGame(5);
+    (badMode.config as { mode: string }).mode = 'weird';
+    expect(deserialize(serialize(badMode))).toBeNull();
+
+    const badScenario = newGame(5);
+    (badScenario.config as { scenario: string }).scenario = 'NOT VALID!!';
+    expect(deserialize(serialize(badScenario))).toBeNull();
+  });
+
+  it('잘못된 지형·건물·병과는 거부한다', () => {
+    const badTerrain = newGame(5);
+    (badTerrain.tiles[0] as { terrain: string }).terrain = 'lava';
+    expect(deserialize(serialize(badTerrain))).toBeNull();
+
+    const badType = newGame(5);
+    (badType.units[0] as { type: string }).type = 'dragon';
+    expect(deserialize(serialize(badType))).toBeNull();
   });
 });

@@ -10,7 +10,7 @@ test('한 판이 제한 턴 안에 끝나고 결과 화면이 표시된다', asy
     );
   });
   await page.goto('/?seed=20260719');
-  await page.getByRole('button', { name: '새 게임' }).click();
+  await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
   await page.waitForFunction(() => window.__tc?.state() !== null);
 
