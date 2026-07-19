@@ -61,8 +61,8 @@ test('공개 빌드에는 테스트 브리지가 없다', async ({ page }) => {
 
 test('PWA 앱 셸은 설치 후 오프라인에서 핵심 로컬 화면을 연다', async ({ page, context, browserName }) => {
   test.skip(
-    process.platform === 'win32' && browserName === 'webkit',
-    'Playwright WebKit on Windows fails offline reload internally; Linux CI keeps this coverage.',
+    browserName === 'webkit',
+    'Playwright WebKit fails offline reload internally; Chromium mobile and PC keep this coverage.',
   );
   await page.goto('/');
   await page.evaluate(async () => {
