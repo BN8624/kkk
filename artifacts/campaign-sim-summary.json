@@ -1,0 +1,161 @@
+{
+  "generatedAt": "2026-07-19T08:37:19.428Z",
+  "elapsedSec": 7.6,
+  "totalGames": 972,
+  "pass": true,
+  "reports": [
+    {
+      "missionId": "azure-1",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.778,
+      "avgEndTurn": 9.3,
+      "starHistogram": [
+        0,
+        0,
+        84,
+        0
+      ]
+    },
+    {
+      "missionId": "azure-2",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 1,
+      "avgEndTurn": 4.4,
+      "starHistogram": [
+        0,
+        0,
+        0,
+        108
+      ]
+    },
+    {
+      "missionId": "azure-3",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.667,
+      "avgEndTurn": 9.6,
+      "starHistogram": [
+        0,
+        0,
+        72,
+        0
+      ]
+    },
+    {
+      "missionId": "crimson-1",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.889,
+      "avgEndTurn": 4.3,
+      "starHistogram": [
+        0,
+        12,
+        48,
+        36
+      ]
+    },
+    {
+      "missionId": "crimson-2",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.667,
+      "avgEndTurn": 6.9,
+      "starHistogram": [
+        0,
+        0,
+        48,
+        24
+      ]
+    },
+    {
+      "missionId": "crimson-3",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.778,
+      "avgEndTurn": 3.8,
+      "starHistogram": [
+        0,
+        0,
+        48,
+        36
+      ]
+    },
+    {
+      "missionId": "violet-1",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.778,
+      "avgEndTurn": 9.4,
+      "starHistogram": [
+        0,
+        48,
+        12,
+        24
+      ]
+    },
+    {
+      "missionId": "violet-2",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.889,
+      "avgEndTurn": 5.1,
+      "starHistogram": [
+        0,
+        0,
+        60,
+        36
+      ]
+    },
+    {
+      "missionId": "violet-3",
+      "games": 108,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "immediateEnds": 0,
+      "stalledFactions": [],
+      "normalWins": 12,
+      "winRateAll": 0.778,
+      "avgEndTurn": 11.2,
+      "starHistogram": [
+        0,
+        0,
+        0,
+        84
+      ]
+    }
+  ]
+}

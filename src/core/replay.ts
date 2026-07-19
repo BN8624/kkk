@@ -10,7 +10,7 @@ import type { FactionId, GameConfig, GameState } from './types';
 
 export const REPLAY_SCHEMA_VERSION = 1;
 /** 리플레이를 기록한 게임 버전(공개판 마감 시 package.json과 함께 올린다). */
-export const GAME_VERSION = '1.0.0';
+export const GAME_VERSION = '1.5.0';
 
 // ---------------- 정본 직렬화·다이제스트 ----------------
 

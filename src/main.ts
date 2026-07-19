@@ -19,6 +19,7 @@ import {
   buildReplayDocument,
   parseReplayDocument,
   REPLAY_MAX_IMPORT_BYTES,
+  stateDigest,
   verifyReplay,
   type ReplayDocumentV1,
 } from './core/replay';
@@ -176,6 +177,7 @@ class App {
         state: () => this.state,
         busy: () => this.busy,
         mode: () => this.mode,
+        digest: () => (this.state ? stateDigest(this.state) : null),
         screenPos: (q: number, r: number) => this.scene?.screenPos({ q, r }),
         tap: (q: number, r: number) => this.onTileTap(q, r),
         lastTap: () => this.lastTap,
