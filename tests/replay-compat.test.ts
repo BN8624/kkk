@@ -7,9 +7,17 @@ import {
   parseVersion,
   type ReplayRuleVersion,
 } from '../src/core/replay-compat';
+import type { ScenarioRuntimeSnapshot } from '../src/core/scenario/types';
 
-function docWithVersion(gameVersion: string): Pick<ReplayDocument, 'gameVersion'> {
-  return { gameVersion };
+function scenarioStub(id: string): ScenarioRuntimeSnapshot {
+  return { id } as ScenarioRuntimeSnapshot;
+}
+
+function docWithVersion(
+  gameVersion: string,
+  scenarioId = 'three-crowns',
+): Pick<ReplayDocument, 'gameVersion' | 'scenario'> {
+  return { gameVersion, scenario: scenarioStub(scenarioId) };
 }
 
 describe('버전 범위 대조', () => {
@@ -32,17 +40,40 @@ describe('버전 범위 대조', () => {
 });
 
 describe('호환 판정', () => {
-  it('1.5.x 리플레이는 exact', () => {
+  it('1.5.x 비-crown 리플레이는 exact', () => {
     expect(checkReplayCompatibility(docWithVersion('1.5.0')).compatibility).toBe('exact');
-    expect(checkReplayCompatibility(docWithVersion('1.5.3')).compatibility).toBe('exact');
+    expect(checkReplayCompatibility(docWithVersion('1.5.3', 'broken-strait')).compatibility).toBe(
+      'exact',
+    );
   });
 
-  it('2.0.x 리플레이는 exact(규칙 동일 계열)', () => {
-    expect(checkReplayCompatibility(docWithVersion('2.0.0')).compatibility).toBe('exact');
+  it('2.0.x three-crowns 리플레이는 exact', () => {
+    const d = checkReplayCompatibility(docWithVersion('2.0.0', 'three-crowns'));
+    expect(d.compatibility).toBe('exact');
+    expect(d.reasonCode).toBe('exact');
   });
 
-  it('현재 게임 버전은 항상 exact 계열에 속한다', () => {
+  it('2.0.x crown-heart 리플레이는 playable-unverified(rules-changed)', () => {
+    const d = checkReplayCompatibility(docWithVersion('2.0.0', 'crown-heart'));
+    expect(d.compatibility).toBe('playable-unverified');
+    expect(d.reasonCode).toBe('rules-changed');
+  });
+
+  it('2.0.x broken-strait 리플레이는 exact', () => {
+    expect(checkReplayCompatibility(docWithVersion('2.0.1', 'broken-strait')).compatibility).toBe(
+      'exact',
+    );
+  });
+
+  it('2.1.0·현재 게임 버전은 exact', () => {
+    expect(checkReplayCompatibility(docWithVersion('2.1.0')).compatibility).toBe('exact');
+    expect(checkReplayCompatibility(docWithVersion('2.1.0', 'crown-heart')).compatibility).toBe(
+      'exact',
+    );
     expect(checkReplayCompatibility(docWithVersion(GAME_VERSION)).compatibility).toBe('exact');
+    expect(checkReplayCompatibility(docWithVersion(GAME_VERSION, 'crown-heart')).compatibility).toBe(
+      'exact',
+    );
   });
 
   it('리플레이 도입 이전 버전 표기는 unsupported', () => {
@@ -62,7 +93,7 @@ describe('호환 판정', () => {
   });
 
   it('판정은 항상 안정적인 이유 코드를 포함하고 예외를 던지지 않는다', () => {
-    for (const v of ['1.5.0', '2.0.0', '9.9.9', '0.0.1', 'x', '1.5']) {
+    for (const v of ['1.5.0', '2.0.0', '2.1.0', '9.9.9', '0.0.1', 'x', '1.5']) {
       const d = checkReplayCompatibility(docWithVersion(v));
       expect(typeof d.reasonCode).toBe('string');
       expect(d.reasonCode.length).toBeGreaterThan(0);
@@ -72,7 +103,10 @@ describe('호환 판정', () => {
 
 describe('마이그레이션 기제', () => {
   it('migratable 항목은 migrate 결과를 돌려주고, 실패·예외 시 unsupported로 강등된다', () => {
-    const migratedDoc = { gameVersion: GAME_VERSION } as ReplayDocument;
+    const migratedDoc = {
+      gameVersion: GAME_VERSION,
+      scenario: scenarioStub('three-crowns'),
+    } as ReplayDocument;
     const registry: ReplayRuleVersion[] = [
       { versionRange: '1.4.x', compatibility: 'migratable', migrate: () => migratedDoc },
       { versionRange: '1.3.x', compatibility: 'migratable', migrate: () => null },
@@ -87,7 +121,11 @@ describe('마이그레이션 기제', () => {
     const ok = checkReplayCompatibility(docWithVersion('1.4.0'), registry);
     expect(ok.compatibility).toBe('migratable');
     expect(ok.migrated).toBe(migratedDoc);
-    expect(checkReplayCompatibility(docWithVersion('1.3.0'), registry).compatibility).toBe('unsupported');
-    expect(checkReplayCompatibility(docWithVersion('1.2.0'), registry).compatibility).toBe('unsupported');
+    expect(checkReplayCompatibility(docWithVersion('1.3.0'), registry).compatibility).toBe(
+      'unsupported',
+    );
+    expect(checkReplayCompatibility(docWithVersion('1.2.0'), registry).compatibility).toBe(
+      'unsupported',
+    );
   });
 });

@@ -184,8 +184,11 @@ describe('내장 시나리오 스냅샷·마이그레이션', () => {
     expect(state.crownHold).toEqual({ owner: null, turns: 0 });
   });
 
-  it('v2 저장은 목표·lost 통계가 채워진 v3로 마이그레이션된다', () => {
+  it('v2 완료 crown-heart 저장은 목표·lost 통계가 채워진 v4로 마이그레이션된다', () => {
+    // 진행 중 crown-heart 는 v3→v4 에서 안전 폐기되므로 완료 상태로 검증한다
     const state = newGame(99, { scenario: 'crown-heart' });
+    state.over = true;
+    state.winner = 'azure';
     const v2 = JSON.parse(serialize(state)) as { version: number; state: unknown };
     v2.version = 2;
     const s = v2.state as { objectives?: unknown; stats: Record<string, { lost?: number }> };

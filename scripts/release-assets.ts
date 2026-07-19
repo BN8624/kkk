@@ -19,7 +19,7 @@ import { buildReplayDocument, GAME_VERSION } from '../src/core/replay';
 import { OFFICIAL_SCENARIOS } from '../src/core/scenario/official';
 import { BACKUP_PRODUCT, type BackupDocumentV1 } from '../src/storage/backup';
 
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const ROOT = resolve('.');
 const OUTPUT = resolve('release');
 

@@ -396,6 +396,7 @@ export const KO = {
   'replay.reason.migrated': '게임 버전 {version} 리플레이를 현재 형식으로 변환했습니다',
   'replay.reason.exact': '현재 게임 규칙과 같은 계열입니다',
   'replay.reason.unverified': '게임 버전 {version} 기록 — 현재 규칙과 결과가 다를 수 있습니다',
+  'replay.reason.rules-changed': '왕관 규칙이 바뀌어 이 리플레이는 재생만 가능합니다',
   'replay.reason.predates-replay': '게임 버전 {version}에는 리플레이 기능이 없었습니다 — 손상되었거나 위조된 기록입니다',
   'replay.confirmDelete': '이 리플레이를 삭제할까요?',
   'replay.deleteFailed': '삭제하지 못했습니다',

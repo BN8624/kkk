@@ -398,6 +398,7 @@ export const EN: Record<keyof typeof KO, string> = {
   'replay.reason.migrated': 'Replay from game version {version} was converted to the current format.',
   'replay.reason.exact': 'This replay uses the same rules family as the current game.',
   'replay.reason.unverified': 'Recorded in game version {version} — results may differ under the current rules.',
+  'replay.reason.rules-changed': 'Crown rules changed — this replay is view-only.',
   'replay.reason.predates-replay': 'Game version {version} predates replay support — this record is damaged or forged.',
   'replay.confirmDelete': 'Delete this replay?',
   'replay.deleteFailed': 'Unable to delete the replay.',

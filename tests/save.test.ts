@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame } from '../src/core/game';
 import { deserialize, SAVE_VERSION, serialize } from '../src/core/save';
+import { SCENARIOS } from '../src/core/scenarios';
 
 describe('save', () => {
   it('직렬화 후 복원하면 동일한 상태가 된다', () => {
@@ -10,6 +11,48 @@ describe('save', () => {
     expect(restored).toEqual(state);
     expect(restored!.config.humanFaction).toBe('crimson');
   });
+
+  it('새 crown-heart 게임 save→load 시 crownHold 가 보존된다', () => {
+    const state = newGame(42, { scenario: 'crown-heart' });
+    expect(state.crownHold).toEqual({ owner: null, turns: 0 });
+    state.crownHold = { owner: 'azure', turns: 2 };
+    const restored = deserialize(serialize(state));
+    expect(restored).not.toBeNull();
+    expect(restored!.crownHold).toEqual({ owner: 'azure', turns: 2 });
+    expect(restored!.config.scenario).toBe('crown-heart');
+    const hold = restored!.objectives.victory.find((c) => c.type === 'hold-building');
+    expect(hold).toMatchObject({
+      type: 'hold-building',
+      turns: SCENARIOS['crown-heart'].crownHoldTurns,
+      activationTurn: SCENARIOS['crown-heart'].crownActivationTurn,
+    });
+  });
+
+  it('version<4 진행 중 crown-heart 저장은 로드 시 null(안전 폐기)', () => {
+    const state = newGame(7, { scenario: 'crown-heart' });
+    expect(state.over).toBe(false);
+    state.crownHold = { owner: 'crimson', turns: 1 };
+    const raw = JSON.stringify({ version: 3, state });
+    expect(deserialize(raw)).toBeNull();
+  });
+
+  it('완료된 crown-heart·비-crown v3 저장은 정상 로드된다', () => {
+    const finished = newGame(9, { scenario: 'crown-heart' });
+    finished.over = true;
+    finished.winner = 'azure';
+    finished.crownHold = { owner: 'azure', turns: 4 };
+    const finishedRestored = deserialize(JSON.stringify({ version: 3, state: finished }));
+    expect(finishedRestored).not.toBeNull();
+    expect(finishedRestored!.over).toBe(true);
+    expect(finishedRestored!.crownHold).toEqual({ owner: 'azure', turns: 4 });
+
+    const nonCrown = newGame(11, { scenario: 'three-crowns' });
+    expect(nonCrown.over).toBe(false);
+    const nonCrownRestored = deserialize(JSON.stringify({ version: 3, state: nonCrown }));
+    expect(nonCrownRestored).not.toBeNull();
+    expect(nonCrownRestored!.config.scenario).toBe('three-crowns');
+  });
+
 
   it('손상된 JSON은 null을 반환한다', () => {
     expect(deserialize('not json')).toBeNull();

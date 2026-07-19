@@ -5,7 +5,7 @@ import { isBuiltinScenarioId, SCENARIOS } from './scenarios';
 import type { GameObjectives } from './scenario/types';
 import type { FactionId, GameState } from './types';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const SAVE_KEY = 'three-crowns-save';
 export const SETTINGS_KEY = 'three-crowns-settings';
 
@@ -139,6 +139,32 @@ function migrateV2(state: GameState): GameState | null {
   return { ...state, stats, objectives };
 }
 
+/**
+ * v3 저장을 v4로 변환한다.
+ * 구 왕관 규칙으로 진행 중인 crown-hold 판은 안전 폐기(null).
+ * 완료·비-crown 은 hold-building 에 activationTurn 이 없으면 현재 def 값으로 채운다.
+ */
+function migrateV3(state: GameState): GameState | null {
+  const scenario = state.config?.scenario;
+  if (typeof scenario !== 'string' || !isBuiltinScenarioId(scenario)) return state;
+  const def = SCENARIOS[scenario];
+  if (def.victory === 'crown-hold' && !state.over) return null;
+
+  if (def.victory !== 'crown-hold' || def.crownActivationTurn === undefined) return state;
+  if (!state.objectives || !Array.isArray(state.objectives.victory)) return state;
+
+  let changed = false;
+  const victory = state.objectives.victory.map((c) => {
+    if (c.type === 'hold-building' && c.activationTurn === undefined) {
+      changed = true;
+      return { ...c, activationTurn: def.crownActivationTurn };
+    }
+    return c;
+  });
+  if (!changed) return state;
+  return { ...state, objectives: { ...state.objectives, victory } };
+}
+
 const VALID_MODES = ['quick', 'daily', 'custom', 'campaign'];
 const VALID_DIFFICULTIES = ['easy', 'normal', 'hard'];
 
@@ -238,16 +264,20 @@ export function validateState(s: GameState): boolean {
   return true;
 }
 
-/** 저장 데이터를 검증하며 복원한다. 버전 불일치·손상 시 null을 반환한다(v1은 마이그레이션). */
+/** 저장 데이터를 검증하며 복원한다. 버전 불일치·손상 시 null을 반환한다(v1~v3은 마이그레이션). */
 export function deserialize(raw: string): GameState | null {
   try {
     const data = JSON.parse(raw) as SaveData;
     let state: GameState | null = null;
-    if (data.version === SAVE_VERSION) state = data.state;
-    else if (data.version === 2) state = migrateV2(data.state);
-    else if (data.version === 1) {
+    if (data.version === 4) state = data.state;
+    else if (data.version === 3) state = migrateV3(data.state);
+    else if (data.version === 2) {
+      const v3 = migrateV2(data.state);
+      state = v3 ? migrateV3(v3) : null;
+    } else if (data.version === 1) {
       const v2 = migrateV1(data.state as unknown as V1State);
-      state = v2 ? migrateV2(v2) : null;
+      const v3 = v2 ? migrateV2(v2) : null;
+      state = v3 ? migrateV3(v3) : null;
     }
     if (!state || !validateState(state)) return null;
     return state;

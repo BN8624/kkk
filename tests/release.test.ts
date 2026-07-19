@@ -7,10 +7,10 @@ function text(path: string): string {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 }
 
-describe('2.0 공개 릴리스 계약', () => {
-  it('패키지와 리플레이 게임 버전이 2.0.0으로 일치한다', () => {
+describe('2.1 공개 릴리스 계약', () => {
+  it('패키지와 리플레이 게임 버전이 2.1.0으로 일치한다', () => {
     const pkg = JSON.parse(text('package.json')) as { version: string };
-    expect(pkg.version).toBe('2.0.0');
+    expect(pkg.version).toBe('2.1.0');
     expect(GAME_VERSION).toBe(pkg.version);
   });
 

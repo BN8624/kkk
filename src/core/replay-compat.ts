@@ -27,6 +27,7 @@ export interface CompatibilityDecision {
     | 'migrated'
     | 'exact'
     | 'unverified'
+    | 'rules-changed'
     | 'predates-replay';
   gameVersion: string;
   /** migratable 판정 시 변환된 문서. */
@@ -52,15 +53,20 @@ export function parseVersion(version: string): [number, number, number] | null {
 
 /**
  * 규칙 버전 레지스트리. 전투 수치·규칙이 실제로 바뀔 때만 항목을 추가한다.
- * 1.5.0에서 리플레이가 도입되었고, 2.0.x까지 전투 규칙은 변하지 않았다(exact 계열).
+ * 1.5.x·2.0.x 비-crown 은 규칙 동일(exact). 2.0 crown-heart 는 왕관 규칙 변경으로 별도 강등.
+ * 2.1.x 가 현재 exact 계열이다.
  */
 export const REPLAY_RULE_VERSIONS: ReplayRuleVersion[] = [
   { versionRange: '1.5.x', compatibility: 'exact' },
   { versionRange: '2.0.x', compatibility: 'exact' },
+  { versionRange: '2.1.x', compatibility: 'exact' },
 ];
 
 /** 리플레이가 도입된 최초 버전 — 이보다 낮은 표기는 존재할 수 없는 기록이다. */
 const FIRST_REPLAY_VERSION: [number, number, number] = [1, 5, 0];
+
+/** 왕관 규칙이 바뀐 버전 — 이보다 낮은 crown-heart 리플레이는 exact 검증 불가. */
+const CROWN_RULES_CHANGED_AT: [number, number, number] = [2, 1, 0];
 
 function cmpVersion(a: [number, number, number], b: [number, number, number]): number {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
@@ -69,9 +75,10 @@ function cmpVersion(a: [number, number, number], b: [number, number, number]): n
 /**
  * 게임 버전 호환 판정. 예외를 던지지 않는다.
  * 레지스트리에 없는 미래·중간 버전은 재생만 가능(playable-unverified)으로 취급한다.
+ * 2.1 미만 crown-heart 는 왕관 규칙 변경으로 exact 를 강등한다.
  */
 export function checkReplayCompatibility(
-  doc: Pick<ReplayDocument, 'gameVersion'>,
+  doc: Pick<ReplayDocument, 'gameVersion' | 'scenario'>,
   registry: ReplayRuleVersion[] = REPLAY_RULE_VERSIONS,
 ): CompatibilityDecision {
   const parsed = parseVersion(doc.gameVersion);
@@ -103,6 +110,18 @@ export function checkReplayCompatibility(
         reasonCode: 'migrated',
         gameVersion: doc.gameVersion,
         migrated,
+      };
+    }
+    // 왕관 규칙 변경 이전 crown-heart 는 exact 검증이 부정직하므로 재생만 허용
+    if (
+      entry.compatibility === 'exact' &&
+      cmpVersion(parsed, CROWN_RULES_CHANGED_AT) < 0 &&
+      doc.scenario?.id === 'crown-heart'
+    ) {
+      return {
+        compatibility: 'playable-unverified',
+        reasonCode: 'rules-changed',
+        gameVersion: doc.gameVersion,
       };
     }
     return {
