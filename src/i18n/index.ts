@@ -108,6 +108,72 @@ export function modifierName(id: ModifierId): string {
   return t(`modifier.${id}.name`);
 }
 
+type CampaignSlug = 'azure' | 'crimson' | 'violet';
+export type MissionId =
+  | 'azure-1'
+  | 'azure-2'
+  | 'azure-3'
+  | 'crimson-1'
+  | 'crimson-2'
+  | 'crimson-3'
+  | 'violet-1'
+  | 'violet-2'
+  | 'violet-3';
+
+function campaignSlug(id: string): CampaignSlug | null {
+  switch (id) {
+    case 'campaign-azure':
+      return 'azure';
+    case 'campaign-crimson':
+      return 'crimson';
+    case 'campaign-violet':
+      return 'violet';
+    default:
+      return null;
+  }
+}
+
+function knownMissionId(id: string): MissionId | null {
+  switch (id) {
+    case 'azure-1':
+    case 'azure-2':
+    case 'azure-3':
+    case 'crimson-1':
+    case 'crimson-2':
+    case 'crimson-3':
+    case 'violet-1':
+    case 'violet-2':
+    case 'violet-3':
+      return id;
+    default:
+      return null;
+  }
+}
+
+export function campaignText(
+  id: string,
+  field: 'title' | 'description',
+  fallback: string,
+): string {
+  const slug = campaignSlug(id);
+  return slug ? t(`campaign.${slug}.${field}`) : fallback;
+}
+
+export function missionText(
+  id: string,
+  field: 'title' | 'description' | 'intro' | 'completion',
+  fallback: string,
+): string {
+  const mission = knownMissionId(id);
+  return mission ? t(`mission.${mission}.${field}`) : fallback;
+}
+
+/** 내장 캠페인 시나리오만 번역하고 사용자 작성 제목은 그대로 둔다. */
+export function campaignScenarioName(id: string, fallback: string): string {
+  const mission = id.startsWith('campaign-') ? knownMissionId(id.slice('campaign-'.length)) : null;
+  return mission ? t(`mission.${mission}.title`) : fallback;
+}
+
 /** 현재 언어의 결과 공유 텍스트를 만든다. */
 export function resultShareText(opts: {
   scenarioName: string;

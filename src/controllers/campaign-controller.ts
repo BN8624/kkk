@@ -13,6 +13,7 @@ import { factionScore, newGameFromScenario } from '../core/game';
 import { normalizeScenario } from '../core/scenario/normalize';
 import { starsEarned } from '../core/scenario/objectives';
 import type { GameState } from '../core/types';
+import { missionText, t } from '../i18n';
 import { showCampaignScreen, showMissionIntroScreen, type CampaignView } from '../ui/campaign';
 import { escapeHtml } from '../ui/shared/dom';
 import type { AppContext } from '../app/app-shell';
@@ -56,7 +57,7 @@ export class CampaignController implements AppController, CampaignFlow {
         difficulty: 'normal',
       });
     } catch {
-      this.ctx.hud.toast('미션을 시작할 수 없습니다');
+      this.ctx.hud.toast(t('campaign.startFailed'));
       return;
     }
     this.ctx.nav.launch(state);
@@ -96,7 +97,11 @@ export class CampaignController implements AppController, CampaignFlow {
   ): void {
     const me = state.config.humanFaction;
     const won = state.winner === me;
-    const word = won ? '승리' : state.winner === 'draw' ? '무승부' : '패배';
+    const word = won
+      ? t('result.win')
+      : state.winner === 'draw'
+        ? t('result.draw')
+        : t('result.lose');
     const starTotal = mission.scenario.starConditions?.length ?? 3;
     const next = nextMission(campaign, mission.id);
     const nextUnlocked = next
@@ -104,14 +109,14 @@ export class CampaignController implements AppController, CampaignFlow {
       : false;
     const overlay = this.ctx.overlay;
     overlay.show(`
-      <h1 class="result-word ${won ? 'win' : 'lose'}" style="font-size:34px;">${word}</h1>
-      <p class="subtitle cp-intro">${escapeHtml(won ? mission.completionText : mission.intro)}</p>
-      <p class="subtitle">${'★'.repeat(stars)}${'☆'.repeat(Math.max(0, starTotal - stars))} · ${Math.min(state.turn, state.maxTurns)}턴 · ${factionScore(state, me)}점</p>
-      ${won && next && nextUnlocked ? '<button class="big-btn" id="cp-next">다음 미션</button>' : ''}
-      <button class="${won && next && nextUnlocked ? 'sub-btn' : 'big-btn'}" id="cp-retry">다시 도전</button>
-      ${this.ctx.replays.hasLastReplay ? '<button class="sub-btn" id="cp-replay">리플레이 보기</button>' : ''}
-      <button class="sub-btn" id="cp-campaign">캠페인 목록</button>
-      <button class="sub-btn" id="cp-title">타이틀로</button>`);
+      <h1 class="result-word ${won ? 'win' : 'lose'}" style="font-size:34px;">${escapeHtml(word)}</h1>
+      <p class="subtitle cp-intro">${escapeHtml(missionText(mission.id, won ? 'completion' : 'intro', won ? mission.completionText : mission.intro))}</p>
+      <p class="subtitle">${escapeHtml(t('campaign.resultStats', { stars: '★'.repeat(stars) + '☆'.repeat(Math.max(0, starTotal - stars)), turns: Math.min(state.turn, state.maxTurns), score: factionScore(state, me) }))}</p>
+      ${won && next && nextUnlocked ? `<button class="big-btn" id="cp-next">${escapeHtml(t('campaign.next'))}</button>` : ''}
+      <button class="${won && next && nextUnlocked ? 'sub-btn' : 'big-btn'}" id="cp-retry">${escapeHtml(t('campaign.retry'))}</button>
+      ${this.ctx.replays.hasLastReplay ? `<button class="sub-btn" id="cp-replay">${escapeHtml(t('result.openReplay'))}</button>` : ''}
+      <button class="sub-btn" id="cp-campaign">${escapeHtml(t('campaign.list'))}</button>
+      <button class="sub-btn" id="cp-title">${escapeHtml(t('pause.toTitle'))}</button>`);
     overlay.bind({
       'cp-next': () => {
         if (next) this.showMissionIntro(next);

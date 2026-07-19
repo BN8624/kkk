@@ -29,3 +29,25 @@ test('영어 모바일 설정·HUD·일시정지', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'AI speed: Normal' })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
 });
+
+test('영어 모바일 캠페인 목록·미션 도입', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('three-crowns-locale', 'en');
+    localStorage.setItem(
+      'three-crowns-settings',
+      JSON.stringify({ soundOn: false, tutorialDone: true }),
+    );
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Campaign' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Campaign' })).toBeVisible();
+  await expect(page.getByText('The Last Bulwark', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: /1\. Southern Gate/ }).click();
+  await expect(page.getByRole('heading', { name: 'Southern Gate' })).toBeVisible();
+  await expect(page.getByText('Win the mission')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+
+  await page.getByRole('button', { name: 'Deploy' }).click();
+  await expect(page.getByRole('button', { name: 'End Turn' })).toBeVisible();
+});

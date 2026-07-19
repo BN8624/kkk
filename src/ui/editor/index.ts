@@ -15,6 +15,7 @@ import {
   type VictoryCondition,
 } from '../../core/scenario/types';
 import type { Axial, BuildingId, FactionId, UnitTypeId } from '../../core/types';
+import { t } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -895,20 +896,20 @@ export function describeDefeat(c: DefeatCondition): string {
 export function describeStar(c: StarCondition): string {
   switch (c.type) {
     case 'win':
-      return '승리';
+      return t('condition.star.win');
     case 'win-within-turns':
-      return `${c.turns}턴 이내 승리`;
+      return t('condition.star.winWithinTurns', { n: c.turns });
     case 'units-alive-at-least':
-      return `아군 ${c.count}기 이상 생존`;
+      return t('condition.star.unitsAlive', { n: c.count });
     case 'units-lost-at-most':
-      return `손실 ${c.count}기 이하`;
+      return t('condition.star.unitsLost', { n: c.count });
     case 'buildings-captured-at-least':
-      return `거점 ${c.count}개 이상 점령`;
+      return t('condition.star.buildingsCaptured', { n: c.count });
     case 'kills-at-least':
-      return `${c.count}기 이상 처치`;
+      return t('condition.star.kills', { n: c.count });
     case 'unit-alive':
-      return `'${c.tag}' 유닛 생존`;
+      return t('condition.star.unitAlive', { tag: c.tag });
     case 'gold-at-least':
-      return `${c.amount}금 이상 보유`;
+      return t('condition.star.gold', { n: c.amount });
   }
 }
