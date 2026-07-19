@@ -17,6 +17,10 @@ export interface ReplayListItem {
   score: number;
   favorite: boolean;
   sizeBytes: number;
+  /** 게임 버전 호환 배지(예: 검증됨·재생만 가능). 없으면 표시하지 않는다. */
+  compatLabel?: string;
+  /** exact 계열이 아니면 true — 배지를 경고색으로 표시한다. */
+  compatWarn?: boolean;
 }
 
 export interface ReplayArchiveHandlers {
@@ -57,7 +61,11 @@ export function showReplayArchiveScreen(
           <span class="rp-sub">${formatDate(it.createdAt)} · ${escapeHtml(it.factionName)} · ${escapeHtml(
             it.difficultyName,
           )}${it.daily ? ' · 일일 도전' : ''}</span>
-          <span class="rp-sub">${it.turns}턴 · ${it.score}점 · ${formatSize(it.sizeBytes)}</span>
+          <span class="rp-sub">${it.turns}턴 · ${it.score}점 · ${formatSize(it.sizeBytes)}${
+            it.compatLabel
+              ? ` · <span class="rp-compat${it.compatWarn ? ' warn' : ''}">${escapeHtml(it.compatLabel)}</span>`
+              : ''
+          }</span>
         </button>
         <div class="rp-actions">
           <button data-act="fav" aria-label="즐겨찾기">${it.favorite ? '★' : '☆'}</button>

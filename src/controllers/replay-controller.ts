@@ -7,6 +7,7 @@ import {
   type ReplayDocumentV1,
 } from '../core/replay';
 import { decodeReplayDocument, safeVerifyReplay } from '../core/replay-decode';
+import { checkReplayCompatibility, compatibilityLabel } from '../core/replay-compat';
 import type { GameState } from '../core/types';
 import { playEvents } from '../render/event-player';
 import { ReplayPlayback } from '../replay/playback';
@@ -77,6 +78,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
         const doc = rec?.data;
         if (!doc || doc.schemaVersion !== 1) continue;
         const me = doc.initialConfig.humanFaction;
+        const compat = checkReplayCompatibility(doc);
         items.push({
           id: s.id,
           createdAt: doc.createdAt || rec!.updatedAt,
@@ -90,6 +92,8 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
           score: doc.result.score,
           favorite: favs.has(s.id),
           sizeBytes: s.size,
+          compatLabel: compatibilityLabel(compat.compatibility),
+          compatWarn: compat.compatibility !== 'exact' && compat.compatibility !== 'migratable',
         });
       }
     } catch {
@@ -137,11 +141,17 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
 
   // ---------------- 재생 ----------------
 
-  /** 리플레이 재생 화면을 연다. 열기 전에 전체 재생 검증으로 재생 가능성을 보장한다. */
-  openPlayback(doc: ReplayDocumentV1): void {
-    if (!safeVerifyReplay(doc).ok) {
+  /**
+   * 리플레이 재생 화면을 연다. exact 계열은 전체 재생 검증으로 재생 가능성을 보장한다.
+   * unverified: 다른 규칙 버전의 기록 — 검증 없이 재생만 하며 결과를 정본으로 취급하지 않는다.
+   */
+  openPlayback(doc: ReplayDocumentV1, opts: { unverified?: boolean } = {}): void {
+    if (!opts.unverified && !safeVerifyReplay(doc).ok) {
       this.ctx.hud.toast('재생할 수 없는 리플레이입니다');
       return;
+    }
+    if (opts.unverified) {
+      this.ctx.hud.toast('다른 게임 버전의 기록입니다 — 재생 결과가 정본과 다를 수 있습니다');
     }
     this.ctx.enterMode('replay');
     this.ctx.overlay.hide();
@@ -319,7 +329,20 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
       this.ctx.hud.toast(decoded.issues[0]?.message ?? '리플레이 형식이 아닙니다');
       return;
     }
-    const doc = decoded.value;
+    // 게임 버전 호환 판정: exact·migratable만 보관하고, 다른 규칙 버전은 재생만 허용한다
+    const compat = checkReplayCompatibility(decoded.value);
+    if (compat.compatibility === 'unsupported') {
+      this.ctx.hud.toast(compat.reason);
+      return;
+    }
+    const doc = compat.migrated ?? decoded.value;
+    if (compat.compatibility === 'playable-unverified') {
+      if (!token.alive) return;
+      if (window.confirm(`${compat.reason}\n보관함에 저장하지 않고 재생만 할까요?`)) {
+        this.openPlayback(doc, { unverified: true });
+      }
+      return;
+    }
     if (!safeVerifyReplay(doc).ok) {
       this.ctx.hud.toast('재생 검증에 실패한 리플레이입니다');
       return;

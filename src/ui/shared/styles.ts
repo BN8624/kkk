@@ -182,6 +182,8 @@ export function injectSharedStyles(): void {
 .rp-outcome.win { color: #e8c95a; border-color: #e8c95a; }
 .rp-outcome.lose { color: #b95c66; border-color: #b95c66; }
 .rp-sub { font-size: 12px; color: #a9b4cc; }
+.rp-compat { color: #7fae7a; }
+.rp-compat.warn { color: #d9a441; }
 .rp-actions { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
 .rp-actions button {
   width: 34px; height: 26px; border-radius: 8px; font-size: 14px;
