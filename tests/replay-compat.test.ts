@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { GAME_VERSION, type ReplayDocument } from '../src/core/replay';
 import {
   checkReplayCompatibility,
-  compatibilityLabel,
   matchVersionRange,
   parseVersion,
   type ReplayRuleVersion,
@@ -62,11 +61,11 @@ describe('호환 판정', () => {
     expect(checkReplayCompatibility(docWithVersion('')).compatibility).toBe('unsupported');
   });
 
-  it('판정은 항상 사용자 이유 문자열을 포함하고 예외를 던지지 않는다', () => {
+  it('판정은 항상 안정적인 이유 코드를 포함하고 예외를 던지지 않는다', () => {
     for (const v of ['1.5.0', '2.0.0', '9.9.9', '0.0.1', 'x', '1.5']) {
       const d = checkReplayCompatibility(docWithVersion(v));
-      expect(typeof d.reason).toBe('string');
-      expect(d.reason.length).toBeGreaterThan(0);
+      expect(typeof d.reasonCode).toBe('string');
+      expect(d.reasonCode.length).toBeGreaterThan(0);
     }
   });
 });
@@ -90,14 +89,5 @@ describe('마이그레이션 기제', () => {
     expect(ok.migrated).toBe(migratedDoc);
     expect(checkReplayCompatibility(docWithVersion('1.3.0'), registry).compatibility).toBe('unsupported');
     expect(checkReplayCompatibility(docWithVersion('1.2.0'), registry).compatibility).toBe('unsupported');
-  });
-});
-
-describe('배지 표기', () => {
-  it('네 등급 모두 한국어 배지를 갖는다', () => {
-    expect(compatibilityLabel('exact')).toBe('검증됨');
-    expect(compatibilityLabel('migratable')).toBe('변환됨');
-    expect(compatibilityLabel('playable-unverified')).toBe('재생만 가능');
-    expect(compatibilityLabel('unsupported')).toBe('지원 안 함');
   });
 });

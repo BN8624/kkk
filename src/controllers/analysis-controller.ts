@@ -9,6 +9,7 @@ import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
 import { REPLAY_MAX_IMPORT_BYTES, upgradeStoredReplay, type ReplayDocument } from '../core/replay';
 import { checkReplayCompatibility } from '../core/replay-compat';
 import { decodeReplayDocument } from '../core/replay-decode';
+import { replayCompatibilityReason } from '../i18n';
 import { documentStore } from '../storage/idb';
 import {
   showAnalysisListScreen,
@@ -229,7 +230,7 @@ export class AnalysisController implements AppController {
     }
     const compat = checkReplayCompatibility(decoded.value);
     if (compat.compatibility === 'unsupported') {
-      this.ctx.hud.toast(compat.reason);
+      this.ctx.hud.toast(replayCompatibilityReason(compat));
       return;
     }
     const doc = compat.migrated ?? decoded.value;

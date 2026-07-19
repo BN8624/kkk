@@ -70,4 +70,10 @@ test('영어 모바일 일일 도전·기록·공식 전장', async ({ page }) =
   await expect(page.getByText('Lightning Arena')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Clone and edit Lightning Arena' })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.getByRole('button', { name: 'Replays' }).click();
+  await expect(page.getByRole('heading', { name: 'Replays' })).toBeVisible();
+  await expect(page.getByText('No saved replays.')).toBeVisible();
+  expect(await page.locator('body').innerText()).not.toMatch(/[가-힣]/);
 });

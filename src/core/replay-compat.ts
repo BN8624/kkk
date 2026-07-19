@@ -1,5 +1,5 @@
 // 한 줄 목적: 리플레이의 게임 규칙 버전 호환 판정(exact·migratable·playable-unverified·unsupported)과 마이그레이션
-import { GAME_VERSION, type ReplayDocument } from './replay';
+import type { ReplayDocument } from './replay';
 
 /**
  * 호환 등급.
@@ -20,8 +20,15 @@ export interface ReplayRuleVersion {
 
 export interface CompatibilityDecision {
   compatibility: ReplayCompatibility;
-  /** 사용자에게 보여 줄 판정 이유. */
-  reason: string;
+  /** UI가 현재 언어의 설명으로 바꾸는 안정적인 판정 사유 코드. */
+  reasonCode:
+    | 'invalid-version'
+    | 'migration-failed'
+    | 'migrated'
+    | 'exact'
+    | 'unverified'
+    | 'predates-replay';
+  gameVersion: string;
   /** migratable 판정 시 변환된 문서. */
   migrated?: ReplayDocument;
 }
@@ -69,7 +76,11 @@ export function checkReplayCompatibility(
 ): CompatibilityDecision {
   const parsed = parseVersion(doc.gameVersion);
   if (!parsed) {
-    return { compatibility: 'unsupported', reason: '게임 버전 표기를 해석할 수 없습니다' };
+    return {
+      compatibility: 'unsupported',
+      reasonCode: 'invalid-version',
+      gameVersion: doc.gameVersion,
+    };
   }
   for (const entry of registry) {
     if (!matchVersionRange(doc.gameVersion, entry.versionRange)) continue;
@@ -81,45 +92,36 @@ export function checkReplayCompatibility(
         migrated = null;
       }
       if (!migrated) {
-        return { compatibility: 'unsupported', reason: '이 버전의 리플레이를 변환하지 못했습니다' };
+        return {
+          compatibility: 'unsupported',
+          reasonCode: 'migration-failed',
+          gameVersion: doc.gameVersion,
+        };
       }
       return {
         compatibility: 'migratable',
-        reason: `게임 버전 ${doc.gameVersion} 리플레이를 현재 형식으로 변환했습니다`,
+        reasonCode: 'migrated',
+        gameVersion: doc.gameVersion,
         migrated,
       };
     }
     return {
       compatibility: entry.compatibility,
-      reason:
-        entry.compatibility === 'exact'
-          ? `현재 게임 규칙(${GAME_VERSION})과 같은 계열입니다`
-          : `게임 버전 ${doc.gameVersion} 기록 — 현재 규칙과 결과가 다를 수 있습니다`,
+      reasonCode: entry.compatibility === 'exact' ? 'exact' : 'unverified',
+      gameVersion: doc.gameVersion,
     };
   }
   if (cmpVersion(parsed, FIRST_REPLAY_VERSION) < 0) {
     return {
       compatibility: 'unsupported',
-      reason: `게임 버전 ${doc.gameVersion}에는 리플레이 기능이 없었습니다 — 손상되었거나 위조된 기록입니다`,
+      reasonCode: 'predates-replay',
+      gameVersion: doc.gameVersion,
     };
   }
   // 레지스트리에 없는 이후·미래 버전: 규칙이 달라졌을 수 있으므로 정본 검증 없이 재생만 허용
   return {
     compatibility: 'playable-unverified',
-    reason: `게임 버전 ${doc.gameVersion}의 기록입니다 — 현재 버전(${GAME_VERSION})과 결과가 다를 수 있습니다`,
+    reasonCode: 'unverified',
+    gameVersion: doc.gameVersion,
   };
-}
-
-/** 보관함 배지 등 짧은 한국어 표기. */
-export function compatibilityLabel(c: ReplayCompatibility): string {
-  switch (c) {
-    case 'exact':
-      return '검증됨';
-    case 'migratable':
-      return '변환됨';
-    case 'playable-unverified':
-      return '재생만 가능';
-    case 'unsupported':
-      return '지원 안 함';
-  }
 }

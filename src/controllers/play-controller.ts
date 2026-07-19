@@ -7,13 +7,14 @@ import { attackTargets, forecastAttack, newGame, unitCost } from '../core/game';
 import { reachableDestinations } from '../core/pathfind';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from '../core/records';
 import { clearSave, loadGame, saveGame, saveSettings } from '../core/save';
-import { isBuiltinScenarioId, SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
+import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
 import type { Axial, FactionId, GameState, ScenarioId, Tile, Unit, UnitTypeId } from '../core/types';
 import {
   buildingName,
   difficultyName,
   doctrineText,
   factionName,
+  localizedScenarioName,
   modifierName,
   resultShareText,
   scenarioDescription,
@@ -47,10 +48,6 @@ function describeFaction(f: FactionId): string {
     `✦ ${escapeHtml(doctrineText(f, 'bonusDesc'))} · ${escapeHtml(doctrineText(f, 'startDesc'))}<br>` +
     `<span style="opacity:.75">${escapeHtml(doctrineText(f, 'recommended'))}</span>`
   );
-}
-
-function localizedScenarioName(id: string, state?: Pick<GameState, 'customScenario'>): string {
-  return isBuiltinScenarioId(id) ? scenarioName(id) : (state?.customScenario?.title ?? id);
 }
 
 export class PlayController implements AppController, PlaySession {
@@ -655,7 +652,10 @@ export class PlayController implements AppController, PlaySession {
   private showResult(state: GameState, outcome: RecordOutcome): void {
     const modifier = state.config.modifier as ModifierId | undefined;
     showResultScreen(this.ctx.overlay, state, {
-      scenarioName: localizedScenarioName(state.config.scenario, state),
+      scenarioName: localizedScenarioName(
+        state.config.scenario,
+        state.customScenario?.title ?? state.config.scenario,
+      ),
       difficultyName: difficultyName(state.config.difficulty),
       modifierName: modifier ? modifierName(modifier) : undefined,
       prevBest: outcome.prevBestScore,
@@ -678,7 +678,10 @@ export class PlayController implements AppController, PlaySession {
     const e = outcome.entry;
     const modifier = this._state?.config.modifier as ModifierId | undefined;
     const text = resultShareText({
-      scenarioName: localizedScenarioName(e.scenario, this._state ?? undefined),
+      scenarioName: localizedScenarioName(
+        e.scenario,
+        this._state?.customScenario?.title ?? e.scenario,
+      ),
       difficultyName: difficultyName(e.difficulty),
       factionName: factionName(e.faction),
       outcome: e.outcome,

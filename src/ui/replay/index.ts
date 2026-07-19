@@ -1,7 +1,7 @@
 // 한 줄 목적: 리플레이 보관함 화면과 재생 컨트롤 바를 렌더링한다
-import { FACTION_NAMES, UNIT_NAMES } from '../../core/data';
 import type { GameEvent } from '../../core/command';
 import type { FactionId } from '../../core/types';
+import { factionName, t, unitName } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
 
@@ -12,7 +12,7 @@ export interface ReplayListItem {
   factionName: string;
   difficultyName: string;
   daily: boolean;
-  outcome: '승리' | '패배' | '무승부';
+  outcome: 'win' | 'lose' | 'draw';
   turns: number;
   score: number;
   favorite: boolean;
@@ -52,38 +52,44 @@ export function showReplayArchiveScreen(
 ): void {
   const rows = items
     .map((it) => {
-      const cls = it.outcome === '승리' ? 'win' : it.outcome === '패배' ? 'lose' : '';
+      const cls = it.outcome === 'win' ? 'win' : it.outcome === 'lose' ? 'lose' : '';
+      const outcome =
+        it.outcome === 'win'
+          ? t('result.win')
+          : it.outcome === 'draw'
+            ? t('result.draw')
+            : t('result.lose');
       return `
       <div class="rp-item" data-id="${escapeHtml(it.id)}">
         <button class="rp-main" data-act="open">
           <span class="rp-title"><b>${escapeHtml(it.scenarioTitle)}</b>
-            <span class="rp-outcome ${cls}">${it.outcome}</span></span>
+            <span class="rp-outcome ${cls}">${escapeHtml(outcome)}</span></span>
           <span class="rp-sub">${formatDate(it.createdAt)} · ${escapeHtml(it.factionName)} · ${escapeHtml(
             it.difficultyName,
-          )}${it.daily ? ' · 일일 도전' : ''}</span>
-          <span class="rp-sub">${it.turns}턴 · ${it.score}점 · ${formatSize(it.sizeBytes)}${
+          )}${it.daily ? ` · ${escapeHtml(t('replay.dailyTag'))}` : ''}</span>
+          <span class="rp-sub">${escapeHtml(t('replay.listStats', { turns: it.turns, score: it.score, size: formatSize(it.sizeBytes) }))}${
             it.compatLabel
               ? ` · <span class="rp-compat${it.compatWarn ? ' warn' : ''}">${escapeHtml(it.compatLabel)}</span>`
               : ''
           }</span>
         </button>
         <div class="rp-actions">
-          <button data-act="fav" aria-label="즐겨찾기">${it.favorite ? '★' : '☆'}</button>
-          <button data-act="export" aria-label="내보내기">⭳</button>
-          <button data-act="share" aria-label="공유">↗</button>
-          <button data-act="del" aria-label="삭제">✕</button>
+          <button data-act="fav" aria-label="${escapeHtml(t('replay.favorite'))}">${it.favorite ? '★' : '☆'}</button>
+          <button data-act="export" aria-label="${escapeHtml(t('replay.export'))}">⭳</button>
+          <button data-act="share" aria-label="${escapeHtml(t('replay.share'))}">↗</button>
+          <button data-act="del" aria-label="${escapeHtml(t('replay.delete'))}">✕</button>
         </div>
       </div>`;
     })
     .join('');
   const root = overlay.show(`
-      <h1 style="font-size:24px;">리플레이</h1>
-      <p class="subtitle" style="font-size:12.5px;">끝난 게임의 명령 기록으로 한 수씩 다시 봅니다 (이 브라우저에만 저장)</p>
-      <div class="rp-list">${rows || '<p class="subtitle">저장된 리플레이가 없습니다.<br>게임을 끝까지 플레이하면 자동으로 기록됩니다.</p>'}</div>
+      <h1 style="font-size:24px;">${escapeHtml(t('replay.title'))}</h1>
+      <p class="subtitle" style="font-size:12.5px;">${escapeHtml(t('replay.subtitle'))}</p>
+      <div class="rp-list">${rows || `<p class="subtitle">${escapeHtml(t('replay.empty'))}<br>${escapeHtml(t('replay.emptyHint'))}</p>`}</div>
       <input type="file" id="rp-import-file" accept=".json,application/json" style="display:none">
       <div style="display:flex; gap:8px; width:min(300px,82vw);">
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import">가져오기</button>
-        <button class="sub-btn" style="width:auto;flex:1;" id="btn-back">뒤로</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-import">${escapeHtml(t('replay.import'))}</button>
+        <button class="sub-btn" style="width:auto;flex:1;" id="btn-back">${escapeHtml(t('common.back'))}</button>
       </div>`);
   for (const row of root.querySelectorAll<HTMLElement>('.rp-item')) {
     const id = row.dataset.id!;
@@ -147,8 +153,8 @@ export class ReplayControls {
     this.top = document.createElement('div');
     this.top.className = 'rp-topbar';
     this.top.innerHTML = `
-      <button class="rp-exit" id="rp-exit">✕ 닫기</button>
-      <span class="hud-chip" id="rp-status"></span>`;
+      <button class="rp-exit" id="rp-exit">${escapeHtml(t('replay.close'))}</button>
+      <span class="hud-chip" id="rp-status" role="status" aria-live="polite"></span>`;
     root.appendChild(this.top);
 
     this.bar = document.createElement('div');
@@ -156,14 +162,14 @@ export class ReplayControls {
     this.bar.innerHTML = `
       <div class="rp-desc" id="rp-desc"></div>
       <div class="rp-controls">
-        <button id="rp-first" aria-label="처음">⏮</button>
-        <button id="rp-prev-turn" aria-label="이전 턴">«턴</button>
-        <button id="rp-back" aria-label="한 명령 뒤로">◀</button>
-        <button id="rp-play" class="rp-play" aria-label="재생">▶</button>
-        <button id="rp-fwd" aria-label="한 명령 앞으로">▶︎|</button>
-        <button id="rp-next-turn" aria-label="다음 턴">턴»</button>
-        <button id="rp-last" aria-label="마지막">⏭</button>
-        <button id="rp-speed" aria-label="배속">1×</button>
+        <button id="rp-first" aria-label="${escapeHtml(t('replay.first'))}">⏮</button>
+        <button id="rp-prev-turn" aria-label="${escapeHtml(t('replay.prevTurn'))}">«${escapeHtml(t('replay.turnShort'))}</button>
+        <button id="rp-back" aria-label="${escapeHtml(t('replay.stepBack'))}">◀</button>
+        <button id="rp-play" class="rp-play" aria-label="${escapeHtml(t('replay.play'))}">▶</button>
+        <button id="rp-fwd" aria-label="${escapeHtml(t('replay.stepForward'))}">▶︎|</button>
+        <button id="rp-next-turn" aria-label="${escapeHtml(t('replay.nextTurn'))}">${escapeHtml(t('replay.turnShort'))}»</button>
+        <button id="rp-last" aria-label="${escapeHtml(t('replay.last'))}">⏭</button>
+        <button id="rp-speed" aria-label="${escapeHtml(t('replay.speed'))}">1×</button>
       </div>`;
     root.appendChild(this.bar);
 
@@ -182,12 +188,21 @@ export class ReplayControls {
 
   update(v: ReplayControlsView): void {
     const status = this.top.querySelector('#rp-status')!;
-    status.textContent = `${v.turn}/${v.maxTurns}턴 · ${v.factionName} · 금 ${v.gold} · ${v.score}점 · ${v.index}/${v.length}`;
+    status.textContent = t('replay.status', {
+      turn: v.turn,
+      max: v.maxTurns,
+      faction: v.factionName,
+      gold: v.gold,
+      score: v.score,
+      index: v.index,
+      length: v.length,
+    });
     const desc = this.bar.querySelector('#rp-desc')!;
     desc.textContent = v.resultText ?? v.description;
     (desc as HTMLElement).classList.toggle('final', v.resultText !== undefined);
     const play = this.bar.querySelector('#rp-play')!;
     play.textContent = v.playing ? '⏸' : '▶';
+    play.setAttribute('aria-label', t(v.playing ? 'replay.pause' : 'replay.play'));
     this.bar.querySelector('#rp-speed')!.textContent = `${v.speed}×`;
   }
 
@@ -197,27 +212,40 @@ export class ReplayControls {
   }
 }
 
-/** 마지막으로 실행된 명령의 이벤트를 한 줄 한국어 설명으로 만든다. */
+/** 마지막으로 실행된 명령의 이벤트를 현재 언어의 한 줄 설명으로 만든다. */
 export function describeStep(events: GameEvent[]): string {
   for (const ev of events) {
     switch (ev.type) {
       case 'unit-attacked': {
-        const a = `${FACTION_NAMES[ev.attackerFaction]} ${UNIT_NAMES[ev.attackerType]}`;
-        const d = `${FACTION_NAMES[ev.defenderFaction]} ${UNIT_NAMES[ev.defenderType]}`;
+        const a = `${factionName(ev.attackerFaction)} ${unitName(ev.attackerType)}`;
+        const d = `${factionName(ev.defenderFaction)} ${unitName(ev.defenderType)}`;
         const died = events.some((e) => e.type === 'unit-died' && e.unitId === ev.defenderId);
-        return `${a} → ${d} 공격 (피해 ${ev.damage}${died ? ' · 처치' : ''})`;
+        return t('replay.step.attack', {
+          attacker: a,
+          defender: d,
+          damage: ev.damage,
+          defeated: died ? t('replay.step.defeated') : '',
+        });
       }
       case 'unit-produced':
-        return `${FACTION_NAMES[ev.faction]} ${UNIT_NAMES[ev.unitType]} 생산`;
+        return t('replay.step.produced', {
+          faction: factionName(ev.faction),
+          unit: unitName(ev.unitType),
+        });
       case 'building-captured':
-        return `${FACTION_NAMES[ev.newOwner]} 거점 점령`;
+        return t('replay.step.captured', { faction: factionName(ev.newOwner) });
       case 'unit-moved':
-        return `${FACTION_NAMES[ev.faction]} ${UNIT_NAMES[ev.unitType]} 이동`;
+        return t('replay.step.moved', {
+          faction: factionName(ev.faction),
+          unit: unitName(ev.unitType),
+        });
       case 'phase-ended': {
         const ts = events.find(
           (e): e is Extract<GameEvent, { type: 'turn-started' }> => e.type === 'turn-started',
         );
-        return ts ? `${ts.turn}턴 시작` : `${FACTION_NAMES[ev.faction]} 페이즈 종료`;
+        return ts
+          ? t('replay.step.turnStarted', { turn: ts.turn })
+          : t('replay.step.phaseEnded', { faction: factionName(ev.faction) });
       }
       default:
         break;
@@ -228,5 +256,7 @@ export function describeStep(events: GameEvent[]): string {
 
 /** 재생 종료 시 결과 요약 문구. */
 export function describeResult(winner: FactionId | 'draw', turns: number): string {
-  return winner === 'draw' ? `무승부 · ${turns}턴` : `${FACTION_NAMES[winner]} 승리 · ${turns}턴`;
+  return winner === 'draw'
+    ? t('replay.result.draw', { turns })
+    : t('replay.result.win', { faction: factionName(winner), turns });
 }

@@ -2,6 +2,7 @@
 import { EN } from './en';
 import { KO } from './ko';
 import type { ModifierId } from '../core/daily';
+import type { CompatibilityDecision, ReplayCompatibility } from '../core/replay-compat';
 import type { BuiltinScenarioId, FactionId } from '../core/types';
 
 export type Locale = 'ko' | 'en';
@@ -207,6 +208,32 @@ export function missionText(
 export function campaignScenarioName(id: string, fallback: string): string {
   const mission = id.startsWith('campaign-') ? knownMissionId(id.slice('campaign-'.length)) : null;
   return mission ? t(`mission.${mission}.title`) : fallback;
+}
+
+/** 내장·캠페인·공식 콘텐츠만 번역하고 사용자 작성 시나리오 제목은 그대로 둔다. */
+export function localizedScenarioName(id: string, fallback: string): string {
+  switch (id) {
+    case 'three-crowns':
+    case 'broken-strait':
+    case 'crown-heart':
+      return scenarioName(id);
+    default:
+      break;
+  }
+  const campaign = id.startsWith('campaign-')
+    ? knownMissionId(id.slice('campaign-'.length))
+    : null;
+  if (campaign) return t(`mission.${campaign}.title`);
+  const official = knownOfficialScenarioId(id);
+  return official ? t(`official.${official}.title`) : fallback;
+}
+
+export function replayCompatibilityLabel(value: ReplayCompatibility): string {
+  return t(`replay.compat.${value}`);
+}
+
+export function replayCompatibilityReason(decision: CompatibilityDecision): string {
+  return t(`replay.reason.${decision.reasonCode}`, { version: decision.gameVersion });
 }
 
 /** 현재 언어의 결과 공유 텍스트를 만든다. */

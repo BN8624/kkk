@@ -1,5 +1,4 @@
 // 한 줄 목적: 리플레이 보관함·가져오기/내보내기·재생 세션(배속·턴 이동)·게임 종료 자동 보관을 담당한다
-import { DIFFICULTY_NAMES, FACTION_NAMES } from '../core/data';
 import { factionScore } from '../core/game';
 import {
   buildReplayDocument,
@@ -8,7 +7,7 @@ import {
   type ReplayDocument,
 } from '../core/replay';
 import { decodeReplayDocument, safeVerifyReplay } from '../core/replay-decode';
-import { checkReplayCompatibility, compatibilityLabel } from '../core/replay-compat';
+import { checkReplayCompatibility } from '../core/replay-compat';
 import type { GameState } from '../core/types';
 import { playEvents } from '../render/event-player';
 import { ReplayPlayback } from '../replay/playback';
@@ -24,6 +23,14 @@ import {
 import type { AppContext } from '../app/app-shell';
 import type { AppController } from '../app/lifecycle';
 import type { ReplayArchiveFlow } from '../app/navigation';
+import {
+  difficultyName,
+  factionName,
+  localizedScenarioName,
+  replayCompatibilityLabel,
+  replayCompatibilityReason,
+  t,
+} from '../i18n';
 
 const FAVORITES_KEY = 'three-crowns-replay-favs';
 
@@ -83,17 +90,20 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
         items.push({
           id: s.id,
           createdAt: doc.createdAt || rec!.updatedAt,
-          scenarioTitle: doc.scenario.title || doc.initialConfig.scenario,
-          factionName: FACTION_NAMES[me],
-          difficultyName: DIFFICULTY_NAMES[doc.initialConfig.difficulty],
+          scenarioTitle: localizedScenarioName(
+            doc.initialConfig.scenario,
+            doc.scenario.title || doc.initialConfig.scenario,
+          ),
+          factionName: factionName(me),
+          difficultyName: difficultyName(doc.initialConfig.difficulty),
           daily: doc.initialConfig.mode === 'daily',
           outcome:
-            doc.result.winner === me ? '승리' : doc.result.winner === 'draw' ? '무승부' : '패배',
+            doc.result.winner === me ? 'win' : doc.result.winner === 'draw' ? 'draw' : 'lose',
           turns: doc.result.turns,
           score: doc.result.score,
           favorite: favs.has(s.id),
           sizeBytes: s.size,
-          compatLabel: compatibilityLabel(compat.compatibility),
+          compatLabel: replayCompatibilityLabel(compat.compatibility),
           compatWarn: compat.compatibility !== 'exact' && compat.compatibility !== 'migratable',
         });
       }
@@ -116,11 +126,11 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
         void this.showArchive();
       },
       onDelete: (id) => {
-        if (!window.confirm('이 리플레이를 삭제할까요?')) return;
+        if (!window.confirm(t('replay.confirmDelete'))) return;
         documentStore()
           .remove('replays', id)
           .then(() => this.showArchive())
-          .catch(() => this.ctx.hud.toast('삭제하지 못했습니다'));
+          .catch(() => this.ctx.hud.toast(t('replay.deleteFailed')));
       },
       onImport: (file) => void this.importReplay(file),
       onBack: () => this.ctx.nav.toTitle(),
@@ -135,7 +145,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     if (!token.alive) return;
     const doc = upgradeStoredReplay(rec?.data);
     if (!doc) {
-      this.ctx.hud.toast('리플레이를 불러오지 못했습니다');
+      this.ctx.hud.toast(t('replay.loadFailed'));
       return;
     }
     this.openPlayback(doc);
@@ -149,11 +159,11 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
    */
   openPlayback(doc: ReplayDocument, opts: { unverified?: boolean } = {}): void {
     if (!opts.unverified && !safeVerifyReplay(doc).ok) {
-      this.ctx.hud.toast('재생할 수 없는 리플레이입니다');
+      this.ctx.hud.toast(t('replay.unplayable'));
       return;
     }
     if (opts.unverified) {
-      this.ctx.hud.toast('다른 게임 버전의 기록입니다 — 재생 결과가 정본과 다를 수 있습니다');
+      this.ctx.hud.toast(t('replay.unverifiedWarning'));
     }
     this.ctx.enterMode('replay');
     this.ctx.overlay.hide();
@@ -270,7 +280,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
       maxTurns: st.maxTurns,
       index: pb.index,
       length: pb.length,
-      factionName: FACTION_NAMES[st.current],
+      factionName: factionName(st.current),
       gold: st.factions[st.config.humanFaction].gold,
       score: factionScore(st, st.config.humanFaction),
       description: describeStep(pb.lastEvents),
@@ -287,7 +297,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
       .get<ReplayDocument>('replays', id)
       .catch(() => null);
     if (!rec?.data) {
-      this.ctx.hud.toast('리플레이를 불러오지 못했습니다');
+      this.ctx.hud.toast(t('replay.loadFailed'));
       return;
     }
     const blob = new Blob([JSON.stringify(rec.data)], { type: 'application/json' });
@@ -304,7 +314,7 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
       .get<ReplayDocument>('replays', id)
       .catch(() => null);
     if (!rec?.data) {
-      this.ctx.hud.toast('리플레이를 불러오지 못했습니다');
+      this.ctx.hud.toast(t('replay.loadFailed'));
       return;
     }
     const json = JSON.stringify(rec.data);
@@ -319,54 +329,58 @@ export class ReplayController implements AppController, ReplayArchiveFlow {
     }
     try {
       await navigator.clipboard.writeText(json);
-      this.ctx.hud.toast('리플레이 JSON을 클립보드에 복사했습니다');
+      this.ctx.hud.toast(t('replay.copied'));
     } catch {
-      this.ctx.hud.toast('공유를 지원하지 않는 환경입니다');
+      this.ctx.hud.toast(t('play.shareUnavailable'));
     }
   }
 
   private async importReplay(file: File): Promise<void> {
     if (file.size > REPLAY_MAX_IMPORT_BYTES) {
-      this.ctx.hud.toast('파일이 너무 큽니다');
+      this.ctx.hud.toast(t('replay.fileTooLarge'));
       return;
     }
     const token = this.ctx.currentToken();
     const text = await file.text().catch(() => null);
     if (text === null) {
-      this.ctx.hud.toast('파일을 읽지 못했습니다');
+      this.ctx.hud.toast(t('replay.fileReadFailed'));
       return;
     }
     const decoded = decodeReplayDocument(text);
     if (!decoded.ok) {
-      this.ctx.hud.toast(decoded.issues[0]?.message ?? '리플레이 형식이 아닙니다');
+      this.ctx.hud.toast(t('replay.invalidFormat'));
       return;
     }
     // 게임 버전 호환 판정: exact·migratable만 보관하고, 다른 규칙 버전은 재생만 허용한다
     const compat = checkReplayCompatibility(decoded.value);
     if (compat.compatibility === 'unsupported') {
-      this.ctx.hud.toast(compat.reason);
+      this.ctx.hud.toast(replayCompatibilityReason(compat));
       return;
     }
     const doc = compat.migrated ?? decoded.value;
     if (compat.compatibility === 'playable-unverified') {
       if (!token.alive) return;
-      if (window.confirm(`${compat.reason}\n보관함에 저장하지 않고 재생만 할까요?`)) {
+      if (
+        window.confirm(
+          t('replay.playOnlyConfirm', { reason: replayCompatibilityReason(compat) }),
+        )
+      ) {
         this.openPlayback(doc, { unverified: true });
       }
       return;
     }
     if (!safeVerifyReplay(doc).ok) {
-      this.ctx.hud.toast('재생 검증에 실패한 리플레이입니다');
+      this.ctx.hud.toast(t('replay.verifyFailed'));
       return;
     }
     const id = newDocId('replay');
     try {
       await documentStore().put('replays', id, { ...doc, replayId: id });
     } catch {
-      this.ctx.hud.toast('저장 공간이 부족하거나 저장하지 못했습니다');
+      this.ctx.hud.toast(t('replay.storeFailed'));
       return;
     }
-    this.ctx.hud.toast('리플레이를 가져왔습니다');
+    this.ctx.hud.toast(t('replay.imported'));
     if (token.alive) void this.showArchive();
   }
 
