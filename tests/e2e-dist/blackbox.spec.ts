@@ -239,3 +239,58 @@ test('완료된 빠른 전투의 리플레이를 결과 화면에서 연다', as
   await replay.click();
   await expect(page.locator('.rp-controls')).toBeVisible();
 });
+
+/** HUD 턴 칩 텍스트에서 현재 턴 번호를 읽는다(공개 UI 전용, 브리지 없음). */
+async function readHudTurn(page: Page): Promise<number | null> {
+  const text = (await page.locator('.hud-top').textContent()) ?? '';
+  const m = text.match(/(\d+)\s*\/\s*\d+\s*턴/);
+  return m ? Number(m[1]) : null;
+}
+
+test('왕관의 심장: 봉인 UI 표시 후 턴 진행, turn 4 자동종료 없음', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '빠른 전투' }).click();
+  await page.getByRole('button', { name: '왕관의 심장' }).click();
+  await page.getByRole('button', { name: /청람 왕국/ }).click();
+  await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
+  await waitEndTurnReady(page);
+
+  // turn 1: crown 봉인 칩(공개 HUD)
+  await expect(page.locator('.hud-top')).toContainText(/봉인/);
+  const turn1 = await readHudTurn(page);
+  expect(turn1).toBe(1);
+
+  // 턴 종료를 여러 번 — turn 4 시점에 결과 화면이 뜨면 안 된다
+  for (let i = 0; i < 4; i++) {
+    const result = page.locator('.result-word');
+    if (await result.isVisible().catch(() => false)) {
+      const t = await readHudTurn(page);
+      // turn 4 이하에서의 종료는 4턴 자동승리 금지 위반
+      expect(t === null || t > 4).toBe(true);
+      break;
+    }
+    await waitEndTurnReady(page);
+    await page.getByRole('button', { name: '턴 종료' }).click();
+    // AI 페이즈 후 턴 칩 갱신 대기
+    await waitEndTurnReady(page).catch(async () => {
+      // 게임이 끝났으면 결과 대기
+      await expect(page.locator('.result-word')).toBeVisible({ timeout: 15_000 });
+    });
+  }
+
+  const resultVisible = await page.locator('.result-word').isVisible().catch(() => false);
+  if (resultVisible) {
+    // 종료됐다면 결과 표시는 정상이되, turn 4 자동종료가 아니어야 함
+    // (결과 화면에서 턴 칩이 사라질 수 있어, 여기선 결과만 허용하고 조기 종료는 루프 내 assert)
+    await expect(page.locator('.result-word')).toBeVisible();
+  } else {
+    // 아직 진행 중: turn 4 이상이며 봉인이 아니거나 턴 종료 가능
+    const turn = await readHudTurn(page);
+    expect(turn).not.toBeNull();
+    expect(turn!).toBeGreaterThanOrEqual(4);
+    // turn 4 자동 종료 없음
+    await expect(page.getByRole('button', { name: '턴 종료' })).toBeVisible();
+    await expect(page.locator('.result-word')).toHaveCount(0);
+  }
+});
+

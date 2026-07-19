@@ -353,6 +353,8 @@ export class AppShell implements AppContext, AppNavigation {
       dests: () => this.playCtrl.destinations,
       human: () => (this.playCtrl.state ? humanFaction(this.playCtrl.state) : null),
       targets: (id: number) => this.playCtrl.targetsOf(id),
+      // E2E: 왕관 보유 상태 불변식 폴링용(프로덕션 로직 영향 없음)
+      crownHold: () => this.playCtrl.state?.crownHold ?? null,
       openEditor: () => this.toEditorHome(),
       editorDoc: () => this.editorCtrl.currentDoc,
       editorTap: (q: number, r: number) => this.editorCtrl.editorTap(q, r),
