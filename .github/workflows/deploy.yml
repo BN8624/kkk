@@ -1,4 +1,4 @@
-# 한 줄 목적: main 푸시 시 lint·타입·단위·E2E·빌드가 모두 성공해야 GitHub Pages로 배포한다
+# 목적: 모든 품질·보안·결정론·시나리오·E2E 검증을 통과한 빌드만 GitHub Pages에 배포한다.
 name: Deploy to GitHub Pages
 
 on:
@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -19,9 +17,12 @@ jobs:
   core:
     name: Core
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -30,38 +31,80 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: production-dist
           path: dist
           if-no-files-found: error
 
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify immutable lockfile
+        run: git diff --exit-code -- package-lock.json
+      - name: Block production high or critical vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+      - name: Report development vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Run malicious fixture and fuzz tests
+        run: npm test -- --run tests/decode-hardening.test.ts tests/fuzz.test.ts
+
   scenario:
     name: Scenario
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run test:scenario
+      - run: npm test -- --run tests/scenario-quality.test.ts tests/official-pack.test.ts
+      - run: npm run simulate:official
+      - name: Upload official scenario evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: official-scenario-evidence
+          path: |
+            artifacts/official-pack-summary.json
+            artifacts/official-pack-summary.md
+          if-no-files-found: warn
+          retention-days: 14
 
   determinism:
     name: Determinism
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run determinism
+      - name: Verify replay compatibility
+        run: npm test -- --run tests/replay.test.ts tests/replay-compat.test.ts tests/replay-observation.test.ts
       - name: Upload determinism evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: determinism-evidence
           path: |
@@ -71,35 +114,59 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  simulation:
-    name: Simulation
+  playtest-analysis:
+    name: Playtest Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run tests/analysis.test.ts
+
+  campaign-matrix:
+    name: Campaign Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run simulate:campaign
-      - name: Upload campaign simulation evidence
+      - run: npm run simulate:matrix
+      - name: Upload campaign matrix evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: campaign-simulation-evidence
+          name: campaign-matrix-evidence
           path: |
             artifacts/campaign-sim-summary.json
             artifacts/campaign-sim-summary.md
+            artifacts/campaign-matrix-summary.json
+            artifacts/campaign-matrix-summary.md
           if-no-files-found: warn
           retention-days: 14
 
   e2e:
     name: E2E
-    needs: [core, scenario, determinism, simulation]
+    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -109,24 +176,26 @@ jobs:
       - run: npm run test:e2e:dist
       - name: Upload Playwright failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-artifacts
           path: |
             playwright-report
             test-results
+          if-no-files-found: ignore
           retention-days: 7
 
   package-pages:
     name: Package Pages
-    needs: [core, scenario, determinism, simulation, e2e]
+    needs: [core, security, scenario, determinism, playtest-analysis, campaign-matrix, e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: production-dist
           path: dist
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -134,9 +203,13 @@ jobs:
     name: Deploy
     needs: package-pages
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
