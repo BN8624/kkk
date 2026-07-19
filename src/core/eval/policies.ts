@@ -1,15 +1,24 @@
-// 한 줄 목적: 캠페인 품질 매트릭스용 테스트 전용 인간 대체 평가 정책 5종 — 실제 게임 AI를 대체하지 않는다
+// 한 줄 목적: 캠페인·밸런스 품질 시험용 테스트 전용 인간 대체 평가 정책(실제 인간 데이터가 아닌 테스트 전용 대체 정책)
 import { runAiTurn, type AiTurnResult } from '../ai';
 import { tileAt, unitAt, unitById, unitsOf } from '../board';
 import { issueCommand, type CommandExecutionResult, type GameCommandPayload } from '../command';
-import { MAX_UNITS_PER_FACTION } from '../data';
+import { MAX_UNITS_PER_FACTION, UNIT_STATS } from '../data';
 import { forecastAttack, unitCost, unitRange } from '../game';
-import { hexDistance, hexKey } from '../hex';
+import { hexDistance, hexKey, neighbors } from '../hex';
 import { movementRange } from '../pathfind';
 import { mulberry32, type Rng } from '../rng';
+import { crownStatus } from '../scenario/crown-status';
 import type { Axial, FactionId, GameState, Tile, Unit, UnitTypeId } from '../types';
 
-export type EvalPolicyId = 'aggressive' | 'defensive' | 'economic' | 'balanced' | 'noisy';
+export type EvalPolicyId =
+  | 'aggressive'
+  | 'defensive'
+  | 'economic'
+  | 'balanced'
+  | 'noisy'
+  | 'objective-denial'
+  | 'human-like-cautious'
+  | 'human-like-direct';
 
 export const EVAL_POLICY_IDS: EvalPolicyId[] = [
   'aggressive',
@@ -17,6 +26,9 @@ export const EVAL_POLICY_IDS: EvalPolicyId[] = [
   'economic',
   'balanced',
   'noisy',
+  'objective-denial',
+  'human-like-cautious',
+  'human-like-direct',
 ];
 
 export const EVAL_POLICY_NAMES: Record<EvalPolicyId, string> = {
@@ -25,6 +37,9 @@ export const EVAL_POLICY_NAMES: Record<EvalPolicyId, string> = {
   economic: '경제 우선',
   balanced: '균형(공개 AI)',
   noisy: '균형·시드 변형',
+  'objective-denial': '목표 저지',
+  'human-like-cautious': '신중형',
+  'human-like-direct': '직행형',
 };
 
 /** 정책별 성향 계수. 모든 행동은 정본 명령 실행기를 거치므로 불법 행동은 발행되지 않는다. */
@@ -41,6 +56,16 @@ interface PolicyProfile {
   maxAdvanceFromCapital?: number;
   /** 생산 성향 */
   production: 'attack' | 'defense' | 'economy';
+  /**
+   * 목표 저지: 활성화된 왕관을 적이 보유하면 왕관/인접 점령·경합을 최우선한다.
+   * (실제 인간 데이터가 아닌 테스트 전용 대체 정책 플래그)
+   */
+  denyObjective?: boolean;
+  /**
+   * 신중형: 초반 이동 제한·고립 회피.
+   * (실제 인간 데이터가 아닌 테스트 전용 대체 정책 플래그)
+   */
+  cautiousFirstMoves?: boolean;
 }
 
 const POLICY_PROFILES: Record<Exclude<EvalPolicyId, 'balanced' | 'noisy'>, PolicyProfile> = {
@@ -66,6 +91,33 @@ const POLICY_PROFILES: Record<Exclude<EvalPolicyId, 'balanced' | 'noisy'>, Polic
     advance: 'economy',
     production: 'economy',
   },
+  // 실제 인간 데이터가 아닌 테스트 전용 대체 정책: 적 활성 왕관 점령·경합 저지
+  'objective-denial': {
+    killBonus: 40,
+    counterPenalty: 0.5,
+    avoidBadTrades: false,
+    advance: 'objectives',
+    production: 'attack',
+    denyObjective: true,
+  },
+  // 실제 인간 데이터가 아닌 테스트 전용 대체 정책: 초반 신중 전진·고립 회피
+  'human-like-cautious': {
+    killBonus: 25,
+    counterPenalty: 1.0,
+    avoidBadTrades: true,
+    advance: 'objectives',
+    maxAdvanceFromCapital: 5,
+    production: 'defense',
+    cautiousFirstMoves: true,
+  },
+  // 실제 인간 데이터가 아닌 테스트 전용 대체 정책: 핵심 목표 최단 직행
+  'human-like-direct': {
+    killBonus: 35,
+    counterPenalty: 0.6,
+    avoidBadTrades: false,
+    advance: 'objectives',
+    production: 'attack',
+  },
 };
 
 /**
@@ -73,6 +125,7 @@ const POLICY_PROFILES: Record<Exclude<EvalPolicyId, 'balanced' | 'noisy'>, Polic
  * - balanced: 공개 보통 AI 그대로
  * - noisy: 공개 보통 AI와 동일한 후보 평가에 시드 기반 결정론적 동점 분해(유닛 행동 순서 셔플)를 더한다
  * 같은 (state, policy, seed)에 대해 항상 같은 명령열을 낸다.
+ * 모든 정책은 실제 인간 데이터가 아닌 테스트 전용 대체 정책이다.
  */
 export function runEvalPolicyTurn(
   state: GameState,
@@ -178,10 +231,116 @@ function actAllUnits(
 }
 
 function actUnit(state: GameState, unit: Unit, profile: PolicyProfile, issue: IssueFn): void {
+  // 목표 저지: 적 활성 왕관 보유 시 점령·경합·관련 공격을 최우선
+  if (profile.denyObjective && tryDenyObjective(state, unit, profile, issue)) return;
   if (tryPolicyAttack(state, unit, profile, issue)) return;
   if (profile.advance === 'economy' && tryEconomyCapture(state, unit, issue)) return;
   if (tryCaptureAny(state, unit, issue)) return;
   advanceUnit(state, unit, profile, issue);
+}
+
+/**
+ * 활성화된 왕관을 적이 보유하면 왕관 위 점령 또는 인접 경합 이동을 최우선한다.
+ * 왕관 위 적 공격도 포함한다. 조건 불충족 시 false.
+ */
+function tryDenyObjective(
+  state: GameState,
+  unit: Unit,
+  profile: PolicyProfile,
+  issue: IssueFn,
+): boolean {
+  const cs = crownStatus(state);
+  if (!cs || !cs.active || !cs.owner || cs.owner === unit.faction) return false;
+  const crown = cs.at;
+
+  // 왕관 위 적 또는 왕관 소유 세력 유닛 우선 공격
+  if (!unit.attacked) {
+    const enemies = enemiesOf(state, unit.faction).filter(
+      (e) =>
+        e.faction === cs.owner &&
+        (hexDistance(e, crown) === 0 || hexDistance(e, crown) === 1),
+    );
+    if (enemies.length > 0) {
+      const range = unitRange(unit);
+      const reach = unit.moved ? null : movementRange(state, unit);
+      const positions: { key: string | null; q: number; r: number }[] = [
+        { key: null, q: unit.q, r: unit.r },
+      ];
+      if (reach) {
+        for (const [key, e] of reach) {
+          if (key === hexKey(unit.q, unit.r)) continue;
+          if (unitAt(state, e.q, e.r)) continue;
+          positions.push({ key, q: e.q, r: e.r });
+        }
+      }
+      let best: { destKey: string | null; targetId: number; score: number } | null = null;
+      for (const pos of positions) {
+        for (const enemy of enemies) {
+          if (!unitById(state, enemy.id)) continue;
+          if (hexDistance(pos, enemy) > range) continue;
+          const fc = forecastAttack(state, unit, enemy, {
+            attackerPos: { q: pos.q, r: pos.r },
+            attackerMoved: pos.key ? true : unit.moved,
+          });
+          if (profile.avoidBadTrades && fc.attackerDies && !fc.defenderDies) continue;
+          let score = fc.damage.total + 40;
+          if (hexDistance(enemy, crown) === 0) score += 50;
+          if (fc.defenderDies) score += profile.killBonus;
+          if (fc.counter) score -= fc.counter.total * profile.counterPenalty;
+          if (!best || score > best.score) best = { destKey: pos.key, targetId: enemy.id, score };
+        }
+      }
+      if (best) {
+        if (best.destKey && reach) {
+          const entry = reach.get(best.destKey)!;
+          issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
+          if (state.over) return true;
+        }
+        if (issue({ type: 'attack-unit', attackerId: unit.id, defenderId: best.targetId }).ok)
+          return true;
+      }
+    }
+  }
+
+  if (unit.moved) return false;
+
+  // 이미 왕관 위·인접이면 일반 공격/점령 흐름에 맡긴다(위치 유지)
+  if (hexDistance(unit, crown) <= 1) return false;
+
+  const reach = movementRange(state, unit);
+  // ① 왕관 타일 점령
+  const crownKey = hexKey(crown.q, crown.r);
+  const crownEntry = reach.get(crownKey);
+  if (crownEntry && !unitAt(state, crown.q, crown.r)) {
+    return issue({ type: 'move-unit', unitId: unit.id, to: { q: crown.q, r: crown.r } }).ok;
+  }
+  // ② 인접 빈칸으로 경합
+  let bestAdj: { q: number; r: number; cost: number } | null = null;
+  for (const n of neighbors(crown)) {
+    if (unitAt(state, n.q, n.r)) continue;
+    const t = tileAt(state, n.q, n.r);
+    if (!t || t.terrain === 'water') continue;
+    const e = reach.get(hexKey(n.q, n.r));
+    if (!e) continue;
+    if (!bestAdj || e.cost < bestAdj.cost) bestAdj = { q: n.q, r: n.r, cost: e.cost };
+  }
+  if (bestAdj) {
+    return issue({ type: 'move-unit', unitId: unit.id, to: { q: bestAdj.q, r: bestAdj.r } }).ok;
+  }
+  // ③ 왕관을 향해 전진
+  const currentDist = hexDistance(unit, crown);
+  let best: { key: string; dist: number; cost: number } | null = null;
+  for (const [key, e] of reach) {
+    if (key === hexKey(unit.q, unit.r)) continue;
+    if (unitAt(state, e.q, e.r)) continue;
+    const dist = hexDistance(e, crown);
+    if (!best || dist < best.dist || (dist === best.dist && e.cost < best.cost)) {
+      best = { key, dist, cost: e.cost };
+    }
+  }
+  if (!best || best.dist >= currentDist) return false;
+  const entry = reach.get(best.key)!;
+  return issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } }).ok;
 }
 
 function enemiesOf(state: GameState, faction: FactionId): Unit[] {
@@ -208,6 +367,8 @@ function tryPolicyAttack(
     for (const [key, e] of reach) {
       if (key === hexKey(unit.q, unit.r)) continue;
       if (unitAt(state, e.q, e.r)) continue;
+      // 신중형: 고립 위협 위치로는 이동+공격하지 않는다
+      if (profile.cautiousFirstMoves && wouldIsolate(state, unit, e)) continue;
       positions.push({ key, q: e.q, r: e.r });
     }
   }
@@ -280,6 +441,26 @@ function myCapital(state: GameState, faction: FactionId): Tile | null {
   return state.tiles.find((t) => t.building === 'capital' && t.owner === faction) ?? null;
 }
 
+/**
+ * 신중형: 목적지가 적 위협권에 있고 인접 아군이 없으면 고립으로 본다.
+ * (실제 인간 데이터가 아닌 테스트 전용 대체 정책 보조)
+ */
+function wouldIsolate(state: GameState, unit: Unit, dest: Axial): boolean {
+  const enemies = enemiesOf(state, unit.faction);
+  const threatened = enemies.some((e) => {
+    const threatRange = UNIT_STATS[e.type].move + UNIT_STATS[e.type].range;
+    return hexDistance(dest, e) <= Math.min(threatRange, 3);
+  });
+  if (!threatened) return false;
+  const allyNearby = state.units.some(
+    (u) =>
+      u.faction === unit.faction &&
+      u.id !== unit.id &&
+      hexDistance(u, dest) <= 2,
+  );
+  return !allyNearby;
+}
+
 /** 정책 목표를 향해 전진한다. 방어 정책은 수도 반경을 벗어나지 않는다. */
 function advanceUnit(state: GameState, unit: Unit, profile: PolicyProfile, issue: IssueFn): void {
   if (unit.moved) return;
@@ -294,19 +475,35 @@ function advanceUnit(state: GameState, unit: Unit, profile: PolicyProfile, issue
   } else if (profile.advance === 'economy') {
     goal = nearestUnownedBuilding(state, unit, 'village') ?? nearestObjective(state, unit);
   } else {
-    goal = nearestObjective(state, unit) ?? nearestEnemy(state, unit);
+    // objectives(직행형 포함): 왕관 > 수도 > 마을 핵심 목표로 최단 전진
+    goal = nearestKeyObjective(state, unit) ?? nearestEnemy(state, unit);
   }
   if (!goal) return;
 
-  const cap = profile.maxAdvanceFromCapital !== undefined ? myCapital(state, faction) : null;
+  const cap = profile.maxAdvanceFromCapital !== undefined || profile.cautiousFirstMoves
+    ? myCapital(state, faction)
+    : null;
+  const maxFromCap =
+    profile.cautiousFirstMoves && state.turn <= 2
+      ? Math.min(profile.maxAdvanceFromCapital ?? 5, 3)
+      : profile.maxAdvanceFromCapital;
+  // 신중형 첫 2턴: 한 턴 이동량을 최대 이동력의 절반으로 제한(과도한 최장 진격 방지)
+  const maxCost =
+    profile.cautiousFirstMoves && state.turn <= 2
+      ? Math.max(1, Math.floor(UNIT_STATS[unit.type].move / 2))
+      : Infinity;
+
   const reach = movementRange(state, unit);
   const currentDist = hexDistance(unit, goal);
   let best: { key: string; dist: number; cost: number } | null = null;
   for (const [key, e] of reach) {
     if (key === hexKey(unit.q, unit.r)) continue;
     if (unitAt(state, e.q, e.r)) continue;
-    // 방어 정책: 수도에서 너무 멀어지는 이동은 하지 않는다
-    if (cap && hexDistance(e, cap) > profile.maxAdvanceFromCapital!) continue;
+    if (e.cost > maxCost) continue;
+    // 방어·신중: 수도에서 너무 멀어지는 이동은 하지 않는다
+    if (cap && maxFromCap !== undefined && hexDistance(e, cap) > maxFromCap) continue;
+    // 신중형: 홀로 적 위협권에 고립되는 목적지 회피
+    if (profile.cautiousFirstMoves && wouldIsolate(state, unit, e)) continue;
     const dist = hexDistance(e, goal);
     if (!best || dist < best.dist || (dist === best.dist && e.cost < best.cost)) {
       best = { key, dist, cost: e.cost };
@@ -315,6 +512,17 @@ function advanceUnit(state: GameState, unit: Unit, profile: PolicyProfile, issue
   if (!best || best.dist >= currentDist) return;
   const entry = reach.get(best.key)!;
   issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
+}
+
+/** 핵심 목표(왕관 > 수도 > 마을) 중 가장 가까운 것을 고른다. */
+function nearestKeyObjective(state: GameState, unit: Unit): Axial | null {
+  for (const kind of ['crown', 'capital', 'village'] as const) {
+    const t = state.tiles
+      .filter((x) => x.building === kind && x.owner !== unit.faction)
+      .sort((a, b) => hexDistance(unit, a) - hexDistance(unit, b))[0];
+    if (t) return t;
+  }
+  return nearestObjective(state, unit);
 }
 
 function nearestObjective(state: GameState, unit: Unit): Axial | null {
