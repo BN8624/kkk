@@ -1,9 +1,11 @@
 // 한 줄 목적: 게임 상태·설정의 버전 관리 직렬화와 안전한 복원을 담당한다
 import { FACTION_IDS, TERRAIN_RULES, UNIT_STATS, BUILDING_INCOME } from './data';
 import { hexKey } from './hex';
+import { isBuiltinScenarioId, SCENARIOS } from './scenarios';
+import type { GameObjectives } from './scenario/types';
 import type { FactionId, GameState } from './types';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const SAVE_KEY = 'three-crowns-save';
 export const SETTINGS_KEY = 'three-crowns-settings';
 
@@ -64,8 +66,8 @@ function migrateV1(old: V1State): GameState | null {
       controllers[fid] = fid === 'azure' ? 'human' : 'ai';
       stats[fid] =
         fid === 'azure'
-          ? { ...old.stats }
-          : { kills: 0, produced: 0, captured: 0 };
+          ? { ...old.stats, lost: 0 }
+          : { kills: 0, produced: 0, captured: 0, lost: 0 };
     }
     const state: GameState = {
       seed: old.seed,
@@ -96,6 +98,8 @@ function migrateV1(old: V1State): GameState | null {
       over: old.over,
       winner: old.winner === 'draw' ? 'draw' : mapF(old.winner),
       stats,
+      // 목표는 migrateV2에서 시나리오 기준으로 채운다
+      objectives: { victory: [], defeat: [], stars: [], turnLimit: 'score' },
     };
     if (state.units.some((u) => !u.faction)) return null;
     return state;
@@ -104,7 +108,37 @@ function migrateV1(old: V1State): GameState | null {
   }
 }
 
-const VALID_MODES = ['quick', 'daily'];
+/** v2 저장(목표 없음·lost 통계 없음)을 v3 상태로 변환한다. v2는 항상 내장 시나리오다. */
+function migrateV2(state: GameState): GameState | null {
+  const scenario = state.config?.scenario;
+  if (typeof scenario !== 'string' || !isBuiltinScenarioId(scenario)) return null;
+  const def = SCENARIOS[scenario];
+  const objectives: GameObjectives = {
+    victory: [{ type: 'conquest' }],
+    defeat: [{ type: 'human-eliminated' }],
+    stars: [],
+    turnLimit: 'score',
+  };
+  if (def.victory === 'crown-hold') {
+    const crown = state.tiles?.find?.((t) => t.building === 'crown');
+    if (crown) {
+      objectives.victory.push({
+        type: 'hold-building',
+        at: { q: crown.q, r: crown.r },
+        turns: def.crownHoldTurns ?? 4,
+      });
+    }
+  }
+  const stats = {} as GameState['stats'];
+  for (const fid of FACTION_IDS) {
+    const s = state.stats?.[fid];
+    if (!s) return null;
+    stats[fid] = { kills: s.kills, produced: s.produced, captured: s.captured, lost: s.lost ?? 0 };
+  }
+  return { ...state, stats, objectives };
+}
+
+const VALID_MODES = ['quick', 'daily', 'custom', 'campaign'];
 const VALID_DIFFICULTIES = ['easy', 'normal', 'hard'];
 
 /** 저장된 시나리오 ID 형식 검증(내장 3개 + 커스텀/캠페인 확장 대비 소문자 슬러그). */
@@ -182,6 +216,20 @@ export function validateState(s: GameState): boolean {
   if (s.winner !== undefined && !s.over) return false;
   if (s.winner !== undefined && s.winner !== 'draw' && !FACTION_IDS.includes(s.winner))
     return false;
+  // 목표 정합: 배열 구조여야 한다
+  if (
+    !s.objectives ||
+    !Array.isArray(s.objectives.victory) ||
+    !Array.isArray(s.objectives.defeat) ||
+    !Array.isArray(s.objectives.stars) ||
+    (s.objectives.turnLimit !== 'score' && s.objectives.turnLimit !== 'defeat')
+  )
+    return false;
+  // 커스텀 시나리오 저장은 재현용 스냅샷을 반드시 포함해야 한다(ID 일치)
+  if (!isBuiltinScenarioId(s.config.scenario)) {
+    const snap = s.customScenario;
+    if (!snap || snap.id !== s.config.scenario || !Array.isArray(snap.board?.tiles)) return false;
+  }
   return true;
 }
 
@@ -191,7 +239,11 @@ export function deserialize(raw: string): GameState | null {
     const data = JSON.parse(raw) as SaveData;
     let state: GameState | null = null;
     if (data.version === SAVE_VERSION) state = data.state;
-    else if (data.version === 1) state = migrateV1(data.state as unknown as V1State);
+    else if (data.version === 2) state = migrateV2(data.state);
+    else if (data.version === 1) {
+      const v2 = migrateV1(data.state as unknown as V1State);
+      state = v2 ? migrateV2(v2) : null;
+    }
     if (!state || !validateState(state)) return null;
     return state;
   } catch {

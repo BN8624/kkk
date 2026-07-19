@@ -12,6 +12,7 @@ import {
 } from './game';
 import { hexDistance, hexKey } from './hex';
 import { movementRange, reconstructPath } from './pathfind';
+import { holdVictoryCondition } from './scenario/objectives';
 import type {
   Axial,
   Difficulty,
@@ -99,6 +100,8 @@ interface Analysis {
   myCapital: Tile | null;
   capitalThreats: Unit[];
   crownTile: Tile | null;
+  /** hold-building 승리 조건이 있는 시나리오(왕관의 심장 등) */
+  crownScenario: boolean;
   objectives: Objective[];
   turnsLeft: number;
 }
@@ -139,8 +142,11 @@ function analyze(state: GameState, faction: FactionId): Analysis {
         (e) => hexDistance(e, myCapital) <= UNIT_STATS[e.type].move + unitRange(e),
       )
     : [];
-  const crownTile = state.tiles.find((t) => t.building === 'crown') ?? null;
-  const isCrownScenario = state.config.scenario === 'crown-heart';
+  const hold = holdVictoryCondition(state);
+  const crownTile = hold
+    ? (tileAt(state, hold.at.q, hold.at.r) ?? null)
+    : (state.tiles.find((t) => t.building === 'crown') ?? null);
+  const isCrownScenario = hold !== null;
   const objectives: Objective[] = [];
   for (const t of state.tiles) {
     if (!t.building || t.owner === faction) continue;
@@ -159,6 +165,7 @@ function analyze(state: GameState, faction: FactionId): Analysis {
     myCapital,
     capitalThreats,
     crownTile,
+    crownScenario: isCrownScenario,
     objectives,
     turnsLeft: state.maxTurns - state.turn,
   };
@@ -188,7 +195,7 @@ function assignRoles(
   if (
     an.crownTile &&
     an.crownTile.owner === faction &&
-    state.config.scenario === 'crown-heart' &&
+    an.crownScenario &&
     !unitAt(state, an.crownTile.q, an.crownTile.r)
   ) {
     const crown = an.crownTile;

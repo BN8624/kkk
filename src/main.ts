@@ -17,7 +17,7 @@ import {
   unitCost,
 } from './core/game';
 import { reachableDestinations } from './core/pathfind';
-import { SCENARIO_IDS, SCENARIOS } from './core/scenarios';
+import { SCENARIO_IDS, SCENARIOS, scenarioDisplayName } from './core/scenarios';
 import {
   clearSave,
   loadGame,
@@ -141,7 +141,7 @@ class App {
     this.mode = 'title';
     const saved = loadGame();
     const summary = saved
-      ? `${FACTION_NAMES[saved.config.humanFaction]} · ${SCENARIOS[saved.config.scenario].name} · ${
+      ? `${FACTION_NAMES[saved.config.humanFaction]} · ${scenarioDisplayName(saved.config.scenario, saved)} · ${
           DIFFICULTY_NAMES[saved.config.difficulty]
         } · ${Math.min(saved.turn, saved.maxTurns)}턴${saved.config.mode === 'daily' ? ' · 일일 도전' : ''}`
       : undefined;
@@ -746,7 +746,7 @@ class App {
   private showResult(state: GameState, outcome: RecordOutcome): void {
     const modifier = state.config.modifier as ModifierId | undefined;
     showResultScreen(this.overlay, state, {
-      scenarioName: SCENARIOS[state.config.scenario].name,
+      scenarioName: scenarioDisplayName(state.config.scenario, state),
       difficultyName: DIFFICULTY_NAMES[state.config.difficulty],
       modifierName: modifier ? MODIFIERS[modifier]?.name : undefined,
       prevBest: outcome.prevBestScore,
@@ -766,7 +766,7 @@ class App {
     const e = outcome.entry;
     const modifier = this.state?.config.modifier as ModifierId | undefined;
     const text = shareText({
-      scenarioName: SCENARIOS[e.scenario].name,
+      scenarioName: scenarioDisplayName(e.scenario, this.state ?? undefined),
       difficultyName: DIFFICULTY_NAMES[e.difficulty],
       factionName: FACTION_NAMES[e.faction],
       outcome: e.outcome,

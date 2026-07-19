@@ -3,7 +3,7 @@ import { UNIT_STATS } from '../src/core/data';
 import type { FactionId, GameConfig, GameState, Tile, Unit } from '../src/core/types';
 
 export function zeroStats() {
-  return { kills: 0, produced: 0, captured: 0 };
+  return { kills: 0, produced: 0, captured: 0, lost: 0 };
 }
 
 /** 평원 5x5 미니 맵 기반 테스트 상태를 만든다. */
@@ -44,6 +44,12 @@ export function makeState(config: Partial<GameConfig> = {}): GameState {
     nextUnitId: 1,
     over: false,
     stats: { azure: zeroStats(), crimson: zeroStats(), violet: zeroStats() },
+    objectives: {
+      victory: [{ type: 'conquest' }],
+      defeat: [{ type: 'human-eliminated' }],
+      stars: [],
+      turnLimit: 'score',
+    },
   };
 }
 

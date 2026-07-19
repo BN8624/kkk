@@ -1,7 +1,6 @@
 // 한 줄 목적: 플레이 중 게임 HUD(상단 정보·유닛 패널·생산 시트·튜토리얼·토스트)를 관리한다
 import { FACTION_NAMES, TERRAIN_NAMES, UNIT_NAMES, UNIT_STATS } from '../../core/data';
 import { factionScore } from '../../core/game';
-import { SCENARIOS } from '../../core/scenarios';
 import type { FactionId, GameState, Tile, Unit, UnitTypeId } from '../../core/types';
 import { COIN_SVG, EMBLEM_SVG, FACTION_CSS, GEAR_SVG, el, button } from '../shared/dom';
 
@@ -74,7 +73,8 @@ export class Hud {
       .join('');
     let crownChip = '';
     if (state.crownHold) {
-      const need = SCENARIOS[state.config.scenario]?.crownHoldTurns ?? 0;
+      const holdCond = state.objectives.victory.find((c) => c.type === 'hold-building');
+      const need = holdCond?.turns ?? 0;
       const owner = state.crownHold.owner;
       crownChip = `<span class="hud-chip" style="border-color:${owner ? FACTION_CSS[owner] : '#c9a227'}">👑 ${
         owner ? `${state.crownHold.turns}/${need}` : '무주'

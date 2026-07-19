@@ -17,10 +17,17 @@ import {
   HIGHGROUND_TERRAINS,
   VIOLET_ARCHER_RANGE,
 } from './doctrines';
-import { hexDistance, hexKey, neighbors } from './hex';
-import { generateScenarioMap } from './map';
+import { hexDistance, hexKey } from './hex';
 import { movementRange, reconstructPath } from './pathfind';
-import { SCENARIOS } from './scenarios';
+import { isBuiltinScenarioId } from './scenarios';
+import { builtinScenarioSnapshot, objectivesFromSnapshot } from './scenario/builtin';
+import {
+  defeatMet,
+  hasConquest,
+  holdVictoryCondition,
+  victoryMet,
+} from './scenario/objectives';
+import type { ScenarioRuntimeSnapshot } from './scenario/types';
 import type {
   Axial,
   FactionId,
@@ -38,26 +45,58 @@ export const DEFAULT_CONFIG: GameConfig = {
   humanFaction: 'azure',
 };
 
+/** 내장 시나리오로 새 게임을 시작한다(스냅샷 생성 → 상태 구성 경로를 항상 거친다). */
 export function newGame(
   seed: number,
   config: Partial<GameConfig> = {},
   maxTurnsOverride?: number,
 ): GameState {
   const cfg: GameConfig = { ...DEFAULT_CONFIG, ...config };
-  const scenario = SCENARIOS[cfg.scenario];
-  let maxTurns = maxTurnsOverride ?? scenario.maxTurns ?? DEFAULT_MAX_TURNS;
+  if (!isBuiltinScenarioId(cfg.scenario)) {
+    throw new Error(`내장 시나리오가 아닙니다: ${cfg.scenario} (newGameFromScenario를 사용하세요)`);
+  }
+  const snapshot = builtinScenarioSnapshot(cfg.scenario, seed, cfg.humanFaction);
+  return newGameFromScenario(seed, snapshot, cfg, maxTurnsOverride);
+}
+
+/**
+ * 정규화된 시나리오 스냅샷으로 새 게임을 시작한다.
+ * 내장 시나리오는 시드로 재구성 가능하므로 스냅샷을 상태에 넣지 않고,
+ * 커스텀·캠페인 시나리오는 이어하기·리플레이 재현을 위해 스냅샷을 상태에 포함한다.
+ */
+export function newGameFromScenario(
+  seed: number,
+  snapshot: ScenarioRuntimeSnapshot,
+  config: Partial<GameConfig> = {},
+  maxTurnsOverride?: number,
+): GameState {
+  const humanSetup = snapshot.factions.find((f) => f.active && f.controller === 'human');
+  const cfg: GameConfig = {
+    ...DEFAULT_CONFIG,
+    scenario: snapshot.id,
+    ...config,
+    ...(humanSetup ? { humanFaction: humanSetup.id } : {}),
+  };
+  if (cfg.modifier === undefined && snapshot.rules.modifier !== undefined) {
+    cfg.modifier = snapshot.rules.modifier;
+  }
+  let maxTurns = maxTurnsOverride ?? snapshot.rules.maxTurns ?? DEFAULT_MAX_TURNS;
   if (cfg.modifier === 'short-war') maxTurns = Math.max(6, maxTurns - 2);
-  const { tiles, capitals } = generateScenarioMap(cfg.scenario, seed);
+
   const controllers = {} as GameState['controllers'];
   const factions = {} as GameState['factions'];
   const stats = {} as GameState['stats'];
   for (const fid of FACTION_IDS) {
+    const setup = snapshot.factions.find((f) => f.id === fid);
+    const active = setup?.active ?? false;
     controllers[fid] = fid === cfg.humanFaction ? 'human' : 'ai';
-    let gold = DOCTRINES[fid].startGold;
+    let gold = active ? (setup?.startGold ?? DOCTRINES[fid].startGold) : 0;
     if (cfg.modifier === 'poor-start') gold = Math.max(0, gold - 15);
-    factions[fid] = { id: fid, gold, eliminated: false };
-    stats[fid] = { kills: 0, produced: 0, captured: 0 };
+    factions[fid] = { id: fid, gold, eliminated: !active };
+    stats[fid] = { kills: 0, produced: 0, captured: 0, lost: 0 };
   }
+  const isBuiltin =
+    isBuiltinScenarioId(snapshot.id) && snapshot.generatedFromSeed !== undefined;
   const state: GameState = {
     seed,
     config: cfg,
@@ -66,40 +105,43 @@ export function newGame(
     order: [...FACTION_IDS],
     current: FACTION_IDS[0],
     controllers,
-    tiles,
+    tiles: snapshot.board.tiles.map((t) => ({ ...t })),
     units: [],
     factions,
     nextUnitId: 1,
     over: false,
     stats,
+    objectives: objectivesFromSnapshot(snapshot),
   };
-  if (scenario.victory === 'crown-hold') {
+  if (!isBuiltin) state.customScenario = snapshot;
+  if (holdVictoryCondition(state)) {
     state.crownHold = { owner: null, turns: 0 };
   }
-
-  // 시작 유닛: 각 세력 교리에 따른 시작 배치를 수도 인접에 놓는다
-  for (const fid of FACTION_IDS) {
-    const cap = capitals[fid];
-    const spots = neighbors(cap).filter((n) => {
-      const t = tileAt(state, n.q, n.r);
-      return t && t.terrain !== 'water' && !unitAt(state, n.q, n.r);
-    });
-    DOCTRINES[fid].startUnits.forEach((type, i) => {
-      const spot = spots[i] ?? cap;
-      spawnUnit(state, fid, type, spot);
-    });
+  for (const su of snapshot.units) {
+    const unit = spawnUnit(state, su.faction, su.type, su, su.hp);
+    if (su.tag !== undefined) unit.tag = su.tag;
+    if (!su.canAct) {
+      unit.moved = true;
+      unit.attacked = true;
+    }
   }
   return state;
 }
 
-function spawnUnit(state: GameState, faction: FactionId, type: UnitTypeId, pos: Axial): Unit {
+function spawnUnit(
+  state: GameState,
+  faction: FactionId,
+  type: UnitTypeId,
+  pos: Axial,
+  hp?: number,
+): Unit {
   const unit: Unit = {
     id: state.nextUnitId++,
     type,
     faction,
     q: pos.q,
     r: pos.r,
-    hp: UNIT_STATS[type].hp,
+    hp: hp ?? UNIT_STATS[type].hp,
     moved: false,
     attacked: false,
   };
@@ -302,6 +344,7 @@ export function attack(state: GameState, attackerId: number, defenderId: number)
     defenderDied = true;
     removeUnit(state, defender.id);
     state.stats[attacker.faction].kills++;
+    state.stats[defender.faction].lost++;
   } else if (fc.counter) {
     counterDamage = fc.counter.total;
     attacker.hp -= counterDamage;
@@ -309,6 +352,7 @@ export function attack(state: GameState, attackerId: number, defenderId: number)
       attackerDied = true;
       removeUnit(state, attacker.id);
       state.stats[defender.faction].kills++;
+      state.stats[attacker.faction].lost++;
     }
   }
   evaluateVictory(state);
@@ -392,34 +436,72 @@ export function evaluateVictory(state: GameState): void {
       fs.eliminated = true;
     }
   }
-  // 한 세력이 모든 수도를 점령하면 즉시 승리
-  const total = totalCapitals(state);
-  for (const fid of state.order) {
-    if (total > 0 && capitalsOwned(state, fid) === total) {
-      state.over = true;
-      state.winner = fid;
-      return;
+  // 정복 조건: 한 세력이 모든 수도를 점령하면 즉시 승리(모든 세력에 대칭 적용)
+  if (hasConquest(state)) {
+    const total = totalCapitals(state);
+    for (const fid of state.order) {
+      if (total > 0 && capitalsOwned(state, fid) === total) {
+        state.over = true;
+        state.winner = fid;
+        return;
+      }
     }
   }
   const alive = state.order.filter((f) => !state.factions[f].eliminated);
+  if (alive.length === 0) {
+    state.over = true;
+    state.winner = 'draw';
+    return;
+  }
   if (alive.length === 1) {
     state.over = true;
     state.winner = alive[0];
     return;
   }
+  const me = humanFaction(state);
   // 인간 세력이 탈락하면 게임 종료: 남은 세력 중 최고 점수가 승자
-  if (state.factions[humanFaction(state)].eliminated) {
+  if (state.factions[me].eliminated) {
     state.over = true;
     const winner = scoreWinner(state, alive);
     state.winner = winner === 'draw' ? alive[0] : winner;
+    return;
+  }
+  // 시나리오 패배 조건(수도 상실·지정 유닛 사망·적 거점 점령 등)
+  if (state.objectives.defeat.some((c) => c.type !== 'human-eliminated' && defeatMet(state, c))) {
+    state.over = true;
+    state.winner = enemyWinner(state, alive);
+    return;
+  }
+  // 시나리오 승리 조건(대칭 처리되는 conquest·hold-building 제외)
+  for (const c of state.objectives.victory) {
+    if (c.type === 'conquest' || c.type === 'hold-building') continue;
+    if (victoryMet(state, c, factionScore)) {
+      state.over = true;
+      state.winner = me;
+      return;
+    }
   }
 }
 
-/** 제한 턴 종료 시 점수로 승자를 결정한다. */
+/** 인간 패배 시 승자: 생존 적 세력 중 최고 점수(적이 없으면 무승부). */
+function enemyWinner(state: GameState, alive: FactionId[]): FactionId | 'draw' {
+  const me = humanFaction(state);
+  const enemies = alive.filter((f) => f !== me);
+  if (enemies.length === 0) return 'draw';
+  const w = scoreWinner(state, enemies);
+  return w === 'draw' ? enemies[0] : w;
+}
+
+/** 제한 턴 종료 시 판정: score 모드는 점수 승부, defeat 모드는 승리 조건 미달성 시 패배. */
 export function evaluateTurnLimit(state: GameState): void {
   if (state.over) return;
   if (state.turn <= state.maxTurns) return;
   state.over = true;
+  if (state.objectives.turnLimit === 'defeat') {
+    const alive = state.order.filter((f) => !state.factions[f].eliminated);
+    state.winner = enemyWinner(state, alive);
+    return;
+  }
   state.winner = scoreWinner(state, state.order);
 }
 
@@ -447,14 +529,14 @@ export function advancePhase(state: GameState): void {
     u.moved = false;
     u.attacked = false;
   }
-  // 왕관의 심장: 라운드 종료 시 연속 보유 판정
-  if (state.crownHold) {
-    const crownTile = state.tiles.find((t) => t.building === 'crown');
+  // hold-building 승리 조건(왕관의 심장 등): 라운드 종료 시 연속 보유 판정(대칭)
+  const hold = holdVictoryCondition(state);
+  if (state.crownHold && hold) {
+    const crownTile = tileAt(state, hold.at.q, hold.at.r);
     const owner = crownTile?.owner ?? null;
     if (owner && owner === state.crownHold.owner) state.crownHold.turns++;
     else state.crownHold = { owner, turns: owner ? 1 : 0 };
-    const need = SCENARIOS[state.config.scenario].crownHoldTurns ?? Infinity;
-    if (owner && state.crownHold.turns >= need) {
+    if (owner && state.crownHold.turns >= hold.turns) {
       state.over = true;
       state.winner = owner;
       return;
@@ -462,5 +544,7 @@ export function advancePhase(state: GameState): void {
   }
   state.turn++;
   state.current = state.order[0];
+  // 턴 경계에서만 달성되는 조건(생존 턴 등)을 평가한 뒤 제한 턴을 판정한다
+  evaluateVictory(state);
   evaluateTurnLimit(state);
 }

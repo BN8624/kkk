@@ -64,7 +64,7 @@ describe('로컬 기록', () => {
     state.over = true;
     state.winner = 'crimson';
     state.turn = 9;
-    state.stats.crimson = { kills: 8, produced: 4, captured: 5 };
+    state.stats.crimson = { kills: 8, produced: 4, captured: 5, lost: 0 };
     state.config.mode = 'daily';
 
     const r1 = recordGame(emptyRecords(), state, '20260719');

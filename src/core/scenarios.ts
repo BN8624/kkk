@@ -1,8 +1,8 @@
-// 한 줄 목적: 시나리오 정의(이름·설명·턴 수·승리 규칙)를 데이터로 제공한다
-import type { ScenarioId } from './types';
+// 한 줄 목적: 내장 시나리오 정의(이름·설명·턴 수·승리 규칙)를 데이터로 제공한다
+import type { BuiltinScenarioId, GameState } from './types';
 
 export interface ScenarioDefinition {
-  id: ScenarioId;
+  id: BuiltinScenarioId;
   name: string;
   /** 한 줄 설명(설정 화면·결과 화면 표시용) */
   description: string;
@@ -12,7 +12,7 @@ export interface ScenarioDefinition {
   crownHoldTurns?: number;
 }
 
-export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
+export const SCENARIOS: Record<BuiltinScenarioId, ScenarioDefinition> = {
   'three-crowns': {
     id: 'three-crowns',
     name: '세 왕관 전쟁',
@@ -37,4 +37,14 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
   },
 };
 
-export const SCENARIO_IDS: ScenarioId[] = ['three-crowns', 'broken-strait', 'crown-heart'];
+export const SCENARIO_IDS: BuiltinScenarioId[] = ['three-crowns', 'broken-strait', 'crown-heart'];
+
+export function isBuiltinScenarioId(id: string): id is BuiltinScenarioId {
+  return (SCENARIO_IDS as string[]).includes(id);
+}
+
+/** 내장·커스텀을 아우르는 시나리오 표시 이름. 커스텀은 스냅샷 제목을 쓴다. */
+export function scenarioDisplayName(id: string, state?: Pick<GameState, 'customScenario'>): string {
+  if (isBuiltinScenarioId(id)) return SCENARIOS[id].name;
+  return state?.customScenario?.title ?? id;
+}

@@ -1,7 +1,7 @@
 // 한 줄 목적: 로컬 날짜 기반 결정론적 일일 도전(시드·시나리오·왕국·난이도·수정자)을 정의한다
 import { mulberry32 } from './rng';
 import { SCENARIO_IDS } from './scenarios';
-import type { Difficulty, FactionId, ScenarioId } from './types';
+import type { BuiltinScenarioId, Difficulty, FactionId } from './types';
 
 export type ModifierId =
   | 'poor-start'
@@ -34,7 +34,7 @@ const MODIFIER_IDS: ModifierId[] = [
 export interface DailyChallenge {
   dateKey: string;
   seed: number;
-  scenario: ScenarioId;
+  scenario: BuiltinScenarioId;
   faction: FactionId;
   difficulty: Difficulty;
   /** 하루 최대 1개. 없을 수도 있다 */

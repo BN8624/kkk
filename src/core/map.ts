@@ -2,7 +2,7 @@
 import { FACTION_IDS } from './data';
 import { hexDistance, hexKey, hexLine, offsetToAxial } from './hex';
 import { mulberry32, shuffle, type Rng } from './rng';
-import type { Axial, FactionId, ScenarioId, Tile } from './types';
+import type { Axial, FactionId, BuiltinScenarioId, Tile } from './types';
 
 export const MAP_COLS = 9;
 export const MAP_ROWS = 12;
@@ -270,7 +270,7 @@ export function validateMap(map: GeneratedMap): string[] {
   return issues;
 }
 
-const GENERATORS: Record<ScenarioId, (seed: number) => GeneratedMap> = {
+const GENERATORS: Record<BuiltinScenarioId, (seed: number) => GeneratedMap> = {
   'three-crowns': genThreeCrowns,
   'broken-strait': genBrokenStrait,
   'crown-heart': genCrownHeart,
@@ -278,21 +278,8 @@ const GENERATORS: Record<ScenarioId, (seed: number) => GeneratedMap> = {
 
 const MAX_ATTEMPTS = 8;
 
-/**
- * 시나리오 지도를 생성한다. 검증 실패 시 파생 시드로 재생성하고,
- * 제한 횟수를 넘기면 마지막 후보의 결함을 강제 개통으로 수리해 사용한다(항상 결정론적).
- */
-export function generateScenarioMap(scenario: ScenarioId, seed: number): GeneratedMap {
-  const gen = GENERATORS[scenario];
-  let last: GeneratedMap | null = null;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const derived = attempt === 0 ? seed : (seed + attempt * 2654435761) >>> 0;
-    const map = gen(derived);
-    last = map;
-    if (validateMap(map).length === 0) return map;
-  }
-  // fallback: 마지막 후보를 강제 수리한다(수도 주변 개간 + 전체 연결 개통)
-  const map = last!;
+/** 마지막 후보 지도를 결정론적으로 수리한다(수도 주변 개간 + 전체 연결 개통). */
+function repairMap(map: GeneratedMap): void {
   const byKey = new Map(map.tiles.map((t) => [hexKey(t.q, t.r), t]));
   for (const fid of FACTION_IDS) {
     const cap = map.capitals[fid];
@@ -303,7 +290,60 @@ export function generateScenarioMap(scenario: ScenarioId, seed: number): Generat
   }
   const base = map.capitals[FACTION_IDS[0]];
   ensureConnectivity(byKey, base, map.tiles.filter((t) => t.building));
-  return map;
+}
+
+/** 최후의 검증된 정적 fallback: 전체 평원 지도에 정규 위치의 수도·마을(·왕관)을 놓는다. */
+function staticFallbackMap(scenario: BuiltinScenarioId): GeneratedMap {
+  const tiles = new Map<string, Tile>();
+  for (let row = 0; row < MAP_ROWS; row++) {
+    for (let col = 0; col < MAP_COLS; col++) {
+      const { q, r } = offsetToAxial(col, row);
+      tiles.set(hexKey(q, r), { q, r, terrain: 'plains' });
+    }
+  }
+  const capitals = placeCapitals(tiles);
+  for (const [col, row] of [
+    [4, 8],
+    [2, 3],
+    [6, 3],
+  ]) {
+    const p = offsetToAxial(col, row);
+    const t = tiles.get(hexKey(p.q, p.r))!;
+    if (!t.building) {
+      t.building = 'village';
+      t.owner = undefined;
+    }
+  }
+  let crown: Axial | undefined;
+  if (scenario === 'crown-heart') {
+    crown = offsetToAxial(4, 5);
+    const t = tiles.get(hexKey(crown.q, crown.r))!;
+    t.building = 'crown';
+    t.owner = undefined;
+  }
+  return { tiles: [...tiles.values()], capitals, crown };
+}
+
+/**
+ * 시나리오 지도를 생성한다. 생성 → 검증 → 제한 재생성 → 결정론적 수리 → 재검증 →
+ * 검증된 정적 fallback → 그래도 실패하면 명시적 오류. 검증되지 않은 지도는 반환하지 않는다.
+ */
+export function generateScenarioMap(scenario: BuiltinScenarioId, seed: number): GeneratedMap {
+  const gen = GENERATORS[scenario];
+  let last: GeneratedMap | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const derived = attempt === 0 ? seed : (seed + attempt * 2654435761) >>> 0;
+    const map = gen(derived);
+    last = map;
+    if (validateMap(map).length === 0) return map;
+  }
+  const map = last!;
+  repairMap(map);
+  if (validateMap(map).length === 0) return map;
+  const fallback = staticFallbackMap(scenario);
+  const issues = validateMap(fallback);
+  if (issues.length === 0) return fallback;
+  throw new Error(`지도 생성 실패(${scenario}): ${issues.join(', ')}`);
 }
 
 /** 기본(세 왕관 전쟁) 지도 생성 — 기존 호출부 호환용. */

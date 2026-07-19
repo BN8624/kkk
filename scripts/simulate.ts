@@ -10,7 +10,7 @@ import type {
   Difficulty,
   FactionId,
   GameState,
-  ScenarioId,
+  BuiltinScenarioId,
   UnitTypeId,
 } from '../src/core/types';
 
@@ -20,7 +20,7 @@ const SEEDS_PER_COMBO = Number(process.argv.find((a) => a.startsWith('--seeds=')
 const SEED_BASE = 20260000;
 
 interface GameOutcome {
-  scenario: ScenarioId;
+  scenario: BuiltinScenarioId;
   humanFaction: FactionId;
   difficulty: Difficulty;
   seed: number;
@@ -62,7 +62,7 @@ function checkIllegal(state: GameState, out: Set<string>): void {
 }
 
 function runGame(
-  scenario: ScenarioId,
+  scenario: BuiltinScenarioId,
   humanFaction: FactionId,
   difficulty: Difficulty,
   seed: number,

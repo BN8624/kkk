@@ -65,6 +65,7 @@ describe('왕관 요새 승리 규칙', () => {
     const need = SCENARIOS['crown-heart'].crownHoldTurns!;
     const state = makeState({ scenario: 'crown-heart' });
     state.crownHold = { owner: null, turns: 0 };
+    state.objectives.victory.push({ type: 'hold-building', at: { q: 2, r: 2 }, turns: need });
     const crown = tileAt(state, 2, 2)!;
     crown.building = 'crown';
     crown.owner = 'crimson';
@@ -85,6 +86,11 @@ describe('왕관 요새 승리 규칙', () => {
   it('보유 세력이 바뀌면 연속 보유가 초기화된다', () => {
     const state = makeState({ scenario: 'crown-heart' });
     state.crownHold = { owner: null, turns: 0 };
+    state.objectives.victory.push({
+      type: 'hold-building',
+      at: { q: 2, r: 2 },
+      turns: SCENARIOS['crown-heart'].crownHoldTurns!,
+    });
     const crown = tileAt(state, 2, 2)!;
     crown.building = 'crown';
     crown.owner = 'crimson';
