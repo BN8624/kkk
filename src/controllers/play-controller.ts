@@ -433,10 +433,16 @@ export class PlayController implements AppController, PlaySession {
       this.openProduction(tile);
       return;
     }
-    // 적 유닛 정보 보기
+    // 적 유닛 정보 보기(왕관 위면 왕관 상세 병기)
     if (tappedUnit) {
       this.deselect();
-      this.ctx.hud.showUnitPanel(tappedUnit, null, '');
+      this.ctx.hud.showUnitPanel(tappedUnit, tile, '', state);
+      return;
+    }
+    // 빈 왕관 타일 등 타일 인스펙트
+    if (tile.building === 'crown') {
+      this.deselect();
+      this.ctx.hud.showUnitPanel(null, tile, '', state);
       return;
     }
     this.deselect();
@@ -467,7 +473,8 @@ export class PlayController implements AppController, PlaySession {
     else if (this.moveDests.length > 0) hint = t('play.hint.move');
     else if (targets.length > 0) hint = t('play.hint.attack');
     else hint = t('play.hint.done');
-    this.ctx.hud.showUnitPanel(unit, null, hint);
+    const tile = tileAt(state, unit.q, unit.r) ?? null;
+    this.ctx.hud.showUnitPanel(unit, tile, hint, state);
 
     if (this.tutorialStep === 1) this.advanceTutorial(2);
   }

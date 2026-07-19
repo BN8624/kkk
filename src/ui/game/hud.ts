@@ -1,6 +1,7 @@
 // 한 줄 목적: 플레이 중 게임 HUD(상단 정보·유닛 패널·생산 시트·튜토리얼·토스트)를 관리한다
 import { UNIT_STATS } from '../../core/data';
 import { factionScore } from '../../core/game';
+import { crownStatus } from '../../core/scenario/crown-status';
 import type { FactionId, GameState, Tile, Unit, UnitTypeId } from '../../core/types';
 import { factionName, t, terrainName, unitName, victoryConditionText } from '../../i18n';
 import { COIN_SVG, EMBLEM_SVG, FACTION_CSS, GEAR_SVG, el, button, escapeHtml } from '../shared/dom';
@@ -97,13 +98,20 @@ export class Hud {
       })
       .join('');
     let crownChip = '';
-    if (state.crownHold) {
-      const holdCond = state.objectives.victory.find((c) => c.type === 'hold-building');
-      const need = holdCond?.turns ?? 0;
-      const owner = state.crownHold.owner;
-      crownChip = `<span class="hud-chip" style="border-color:${owner ? FACTION_CSS[owner] : '#c9a227'}">👑 ${
-        owner ? `${state.crownHold.turns}/${need}` : escapeHtml(t('hud.crownUnclaimed'))
-      }</span>`;
+    const cs = crownStatus(state);
+    if (cs) {
+      const owner = cs.owner;
+      const border = owner ? FACTION_CSS[owner] : '#c9a227';
+      let label: string;
+      if (!cs.active) {
+        label = t('hud.crownSealed', { turns: cs.turnsToActivate });
+      } else if (owner) {
+        label = `${cs.heldTurns}/${cs.needTurns}`;
+        if (cs.contested) label += ` · ${t('hud.crownContested')}`;
+      } else {
+        label = t('hud.crownUnclaimed');
+      }
+      crownChip = `<span class="hud-chip" style="border-color:${border}">👑 ${escapeHtml(label)}</span>`;
     }
     this.topBar.innerHTML = `
       <span class="hud-chip">${escapeHtml(t('hud.turn', { current: state.turn > state.maxTurns ? state.maxTurns : state.turn, max: state.maxTurns }))}</span>
@@ -152,7 +160,7 @@ export class Hud {
 
   // ---------------- 하단 유닛 패널 ----------------
 
-  showUnitPanel(unit: Unit | null, tile: Tile | null, hint: string): void {
+  showUnitPanel(unit: Unit | null, tile: Tile | null, hint: string, state?: GameState): void {
     if (!unit && !tile) {
       this.bottomPanel.classList.remove('show');
       this.selectionStatus = '';
@@ -179,11 +187,60 @@ export class Hud {
       this.selectionStatus = t('a11y.selectedTile', { terrain: terrainName(tile.terrain) });
       html = `<h3>${escapeHtml(terrainName(tile.terrain))}</h3>`;
     }
+    // 왕관 타일(또는 왕관 위 유닛) 선택 시 상세 상태 패널
+    if (state) {
+      const crownTile =
+        tile?.building === 'crown'
+          ? tile
+          : unit
+            ? state.tiles.find((x) => x.q === unit.q && x.r === unit.r && x.building === 'crown')
+            : undefined;
+      if (crownTile) {
+        const panel = this.renderCrownPanel(state);
+        if (panel) html += panel;
+      }
+    }
     if (hint) html += `<div class="hint">${escapeHtml(hint)}</div>`;
     this.actionStatus = hint ? t('a11y.availableAction', { action: hint }) : '';
     this.bottomPanel.innerHTML = html;
     this.bottomPanel.classList.add('show');
     this.updateAccessibleStatus();
+  }
+
+  /** 왕관 요새 선택 시 소유·보유·봉인/경합·예상 승리 상세 HTML. */
+  private renderCrownPanel(state: GameState): string {
+    const cs = crownStatus(state);
+    if (!cs) {
+      // hold-building 없는 시나리오의 장식용 왕관 타일
+      return `<div class="stats" style="margin-top:6px;flex-direction:column;align-items:flex-start;gap:3px;">
+        <span><b>${escapeHtml(t('crown.panel.title'))}</b></span>
+      </div>`;
+    }
+    const lines: string[] = [`<b>${escapeHtml(t('crown.panel.title'))}</b>`];
+    lines.push(
+      cs.owner
+        ? escapeHtml(t('crown.panel.owner', { faction: factionName(cs.owner) }))
+        : escapeHtml(t('crown.panel.unclaimed')),
+    );
+    if (!cs.active) {
+      lines.push(escapeHtml(t('crown.panel.sealed', { turns: cs.turnsToActivate })));
+    } else {
+      lines.push(
+        escapeHtml(t('crown.panel.held', { turns: cs.heldTurns, need: cs.needTurns })),
+      );
+      if (cs.contested) lines.push(escapeHtml(t('crown.panel.contested')));
+    }
+    const tile = state.tiles.find((x) => x.q === cs.at.q && x.r === cs.at.r);
+    if (tile?.owner && cs.owner && tile.owner !== cs.owner) {
+      lines.push(escapeHtml(t('crown.panel.reset')));
+    }
+    if (cs.earliestWinTurn !== null) {
+      lines.push(escapeHtml(t('crown.panel.predict', { turn: cs.earliestWinTurn })));
+    }
+    lines.push(escapeHtml(t('crown.panel.rule', { need: cs.needTurns })));
+    return `<div class="stats" style="margin-top:6px;flex-direction:column;align-items:flex-start;gap:3px;">
+      ${lines.map((l) => `<span>${l}</span>`).join('')}
+    </div>`;
   }
 
   private updateAccessibleStatus(): void {
