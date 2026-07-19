@@ -17,6 +17,28 @@ describe('에디터 문서 생성', () => {
     expect(doc.board.tiles).toHaveLength(9 * 12);
     expect(doc.board.tiles.every((t) => t.terrain === 'plains')).toBe(true);
     expect(doc.victoryConditions[0].type).toBe('conquest');
+    // 새 제작실 문서는 고유 병종 허용 기본값
+    expect(doc.rules.uniqueUnits).toBe(true);
+  });
+
+  it('고유 병종은 해당 세력만 배치하고 다른 세력·비허용 로스터는 차단한다', () => {
+    const c = makeController();
+    c.tool = 'unit';
+    c.options.unitFaction = 'azure';
+    c.options.unitType = 'guardian';
+    expect(c.canPlaceUnitType('azure', 'guardian')).toBe(true);
+    expect(c.placeUnitAt(2, 2)).toBe('placed');
+    expect(c.doc.units.some((u) => u.type === 'guardian' && u.faction === 'azure')).toBe(true);
+
+    c.options.unitFaction = 'crimson';
+    c.options.unitType = 'guardian';
+    expect(c.canPlaceUnitType('crimson', 'guardian')).toBe(false);
+    expect(c.placeUnitAt(3, 3)).toBe('blocked');
+
+    c.doc.rules.uniqueUnits = false;
+    c.options.unitFaction = 'azure';
+    c.options.unitType = 'guardian';
+    expect(c.canPlaceUnitType('azure', 'guardian')).toBe(false);
   });
 
   it('랜덤 지도는 수도 3개를 포함하고, 내장 복제는 즉시 플레이 가능하다', () => {

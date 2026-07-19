@@ -14,6 +14,7 @@ import {
   type VictoryCondition,
 } from '../../core/scenario/types';
 import type { Axial, BuildingId, FactionId, UnitTypeId } from '../../core/types';
+import { canFactionUseUnit, isUniqueUnit, UNIT_TYPE_IDS } from '../../core/units';
 import { factionName, t, unitName, victoryConditionText } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import type { OverlayHost } from '../shared/overlay';
@@ -238,7 +239,7 @@ const TOOLS: EditorTool[] = [
 ];
 
 const FACTIONS: FactionId[] = ['azure', 'crimson', 'violet'];
-const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
+const UNIT_TYPES: UnitTypeId[] = [...UNIT_TYPE_IDS];
 
 /** 에디터 화면의 DOM 패널(상단 바·도구 팔레트·시트). 문서 데이터는 App이 소유한다. */
 export class EditorPanel {
@@ -310,9 +311,25 @@ export class EditorPanel {
         ${chip('none', t('editor.neutral'), options.owner === null, 'owner')}
         ${FACTIONS.map((f) => chip(f, factionName(f).split(' ')[0], options.owner === f, 'owner')).join('')}`;
     } else if (tool === 'unit') {
+      const allowUnique = doc.rules.uniqueUnits === true;
+      const unitChip = (type: UnitTypeId) => {
+        const allowed =
+          canFactionUseUnit(options.unitFaction, type) &&
+          (!isUniqueUnit(type) || allowUnique);
+        let reason = '';
+        if (!canFactionUseUnit(options.unitFaction, type)) {
+          reason = t('editor.unitLockedFaction');
+        } else if (isUniqueUnit(type) && !allowUnique) {
+          reason = t('editor.unitLockedRoster');
+        }
+        const on = options.unitType === type && allowed;
+        const dis = allowed ? '' : ' disabled aria-disabled="true"';
+        const title = reason ? ` title="${escapeHtml(reason)}"` : '';
+        return `<button class="ed-chip ${on ? 'on' : ''} ${allowed ? '' : 'ed-chip-locked'}" data-ut="${type}" aria-pressed="${on}"${dis}${title}>${escapeHtml(unitName(type))}</button>`;
+      };
       sub = `${FACTIONS.map((f) => chip(f, factionName(f).split(' ')[0], options.unitFaction === f, 'uf')).join('')}
         <span class="ed-sub-label">·</span>
-        ${UNIT_TYPES.map((type) => chip(type, unitName(type), options.unitType === type, 'ut')).join('')}`;
+        ${UNIT_TYPES.map(unitChip).join('')}`;
     }
     this.palette.innerHTML = `
       <div class="ed-tool-row">${TOOLS.map((id) => chip(id, t(`editor.tool.${id}`), tool === id, 'tool')).join('')}</div>
@@ -333,14 +350,19 @@ export class EditorPanel {
       );
     }
     for (const btn of this.palette.querySelectorAll<HTMLButtonElement>('[data-uf]')) {
-      btn.addEventListener('click', () =>
-        this.handlers.onOptions({ unitFaction: btn.dataset.uf as FactionId }),
-      );
+      btn.addEventListener('click', () => {
+        const faction = btn.dataset.uf as FactionId;
+        // 세력 전환 시 선택 병종이 새 세력에 맞지 않으면 보병으로 되돌림
+        const patch: Partial<EditorToolOptions> = { unitFaction: faction };
+        if (!canFactionUseUnit(faction, options.unitType)) patch.unitType = 'infantry';
+        this.handlers.onOptions(patch);
+      });
     }
     for (const btn of this.palette.querySelectorAll<HTMLButtonElement>('[data-ut]')) {
-      btn.addEventListener('click', () =>
-        this.handlers.onOptions({ unitType: btn.dataset.ut as UnitTypeId }),
-      );
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        this.handlers.onOptions({ unitType: btn.dataset.ut as UnitTypeId });
+      });
     }
   }
 
@@ -479,12 +501,19 @@ export class EditorPanel {
           <option value="on" ${doc.rules.doctrines !== false ? 'selected' : ''}>${escapeHtml(t('editor.enabled'))}</option>
           <option value="off" ${doc.rules.doctrines === false ? 'selected' : ''}>${escapeHtml(t('editor.disabled'))}</option>
         </select></label>
+      <label class="ed-field">${escapeHtml(t('editor.field.uniqueUnits'))}
+        <select id="f-uu">
+          <option value="on" ${doc.rules.uniqueUnits === true ? 'selected' : ''}>${escapeHtml(t('editor.enabled'))}</option>
+          <option value="off" ${doc.rules.uniqueUnits !== true ? 'selected' : ''}>${escapeHtml(t('editor.disabled'))}</option>
+        </select></label>
+      <p class="ed-hint">${escapeHtml(t('editor.uniqueUnits.hint'))}</p>
       <div class="ed-row"><button class="close-btn" id="f-ok">${escapeHtml(t('common.apply'))}</button><button class="close-btn" id="f-cancel">${escapeHtml(t('common.cancel'))}</button></div>`);
     s.querySelector('#f-ok')!.addEventListener('click', () => {
       const maxTurns = Number((s.querySelector('#f-turns') as HTMLInputElement).value);
       const turnLimit = (s.querySelector('#f-tl') as HTMLSelectElement).value as 'score' | 'defeat';
       const doctrines = (s.querySelector('#f-doc') as HTMLSelectElement).value === 'on';
-      this.handlers.onRulesChange({ ...doc.rules, maxTurns, turnLimit, doctrines });
+      const uniqueUnits = (s.querySelector('#f-uu') as HTMLSelectElement).value === 'on';
+      this.handlers.onRulesChange({ ...doc.rules, maxTurns, turnLimit, doctrines, uniqueUnits });
       this.closeSheet();
     });
     s.querySelector('#f-cancel')!.addEventListener('click', () => this.closeSheet());

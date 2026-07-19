@@ -4,6 +4,7 @@ import { hexKey } from '../hex';
 import { MODIFIERS } from '../daily';
 import { t } from '../../i18n';
 import type { Axial, FactionId } from '../types';
+import { canFactionUseUnit, isKnownUnitType, isUniqueUnit } from '../units';
 import {
   SCENARIO_LIMITS as L,
   isValidScenarioId,
@@ -172,9 +173,30 @@ export function validateScenario(doc: ScenarioDocumentV1): ValidationIssue[] {
     }
     if (!activeIds.has(u.faction))
       issues.push(issue('unit-inactive-faction', 'error', t('validation.unitInactiveFaction', { faction: u.faction }), { path, unitIndex: i }));
-    if (!(u.type in UNIT_STATS)) {
+    if (!isKnownUnitType(u.type)) {
       issues.push(issue('bad-unit-type', 'error', t('validation.badUnitType', { value: String(u.type) }), { path, unitIndex: i }));
       return;
+    }
+    if (!canFactionUseUnit(u.faction, u.type)) {
+      issues.push(
+        issue(
+          'unit-faction-mismatch',
+          'error',
+          t('validation.unitFactionMismatch', { unit: u.type, faction: u.faction }),
+          { path, unitIndex: i },
+        ),
+      );
+    }
+    // uniqueUnits 미설정(false) 문서에 고유 병종 배치 금지 — 기존 문서 의미 유지
+    if (isUniqueUnit(u.type) && doc.rules?.uniqueUnits !== true) {
+      issues.push(
+        issue(
+          'unique-unit-disallowed',
+          'error',
+          t('validation.uniqueUnitDisallowed', { unit: u.type }),
+          { path, unitIndex: i },
+        ),
+      );
     }
     if (u.hp !== undefined && (!Number.isInteger(u.hp) || u.hp < 1 || u.hp > UNIT_STATS[u.type].hp))
       issues.push(issue('bad-unit-hp', 'error', t('validation.badUnitHp', { max: UNIT_STATS[u.type].hp }), { path, unitIndex: i }));

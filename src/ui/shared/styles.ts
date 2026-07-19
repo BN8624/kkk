@@ -307,6 +307,7 @@ export function injectSharedStyles(): void {
   border: 1px solid #6b7894; background: rgba(29,26,20,.85); color: #d8deeb; font-size: 14px;
 }
 .ed-chip.on { border-color: #c9a227; background: rgba(201,162,39,.25); color: #f2ead8; font-weight: bold; }
+.ed-chip-locked { opacity: .38; cursor: not-allowed; filter: grayscale(.5); }
 .ed-sheet { z-index: 5; max-height: 72vh; overflow-y: auto; }
 .ed-menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
 .ed-menu-grid button {

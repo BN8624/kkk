@@ -106,6 +106,65 @@ describe('시나리오 검증기', () => {
     });
     expect(validateScenario(doc).map((i) => i.code)).toContain('unknown-tag');
   });
+
+  it('고유 병종을 잘못된 세력·비허용 로스터·알 수 없는 ID·HP 오류로 잡는다', () => {
+    const mismatch = makeDoc({
+      rules: { maxTurns: 10, turnLimit: 'score', uniqueUnits: true },
+      units: [
+        { faction: 'crimson', type: 'guardian', q: 0, r: 0 },
+        { faction: 'azure', type: 'infantry', q: 1, r: 0 },
+      ],
+    });
+    expect(validateScenario(mismatch).map((i) => i.code)).toContain('unit-faction-mismatch');
+
+    const disallowed = makeDoc({
+      rules: { maxTurns: 10, turnLimit: 'score' },
+      units: [
+        { faction: 'azure', type: 'guardian', q: 0, r: 0 },
+        { faction: 'crimson', type: 'infantry', q: 1, r: 0 },
+      ],
+    });
+    expect(validateScenario(disallowed).map((i) => i.code)).toContain('unique-unit-disallowed');
+
+    const badType = makeDoc({
+      units: [
+        { faction: 'azure', type: 'dragon' as 'infantry', q: 0, r: 0 },
+        { faction: 'crimson', type: 'infantry', q: 1, r: 0 },
+      ],
+    });
+    expect(validateScenario(badType).map((i) => i.code)).toContain('bad-unit-type');
+
+    const badHp = makeDoc({
+      rules: { maxTurns: 10, turnLimit: 'score', uniqueUnits: true },
+      units: [
+        { faction: 'azure', type: 'guardian', q: 0, r: 0, hp: 99 },
+        { faction: 'crimson', type: 'infantry', q: 1, r: 0 },
+      ],
+    });
+    expect(validateScenario(badHp).map((i) => i.code)).toContain('bad-unit-hp');
+  });
+
+  it('uniqueUnits true 문서에 올바른 세력 고유 병종은 통과한다', () => {
+    const doc = makeDoc({
+      rules: { maxTurns: 10, turnLimit: 'score', uniqueUnits: true },
+      units: [
+        { faction: 'azure', type: 'guardian', q: 0, r: 0 },
+        { faction: 'crimson', type: 'raider', q: 1, r: 0 },
+      ],
+    });
+    // violet 비활성이라 crossbow 제외 — 활성 세력만
+    const errors = validateScenario(doc).filter((i) => i.severity === 'error');
+    expect(errors.map((i) => i.code).filter((c) => c.startsWith('unit-') || c.startsWith('unique-') || c === 'bad-unit-type')).toEqual([]);
+  });
+
+  it('스키마 v1 문서는 uniqueUnits 없이도 계속 가져올 수 있다', () => {
+    const { doc, issues } = parseScenarioDocument(
+      makeDoc({ rules: { maxTurns: 10, turnLimit: 'score' } }),
+    );
+    expect(doc).not.toBeNull();
+    expect(doc!.schemaVersion).toBe(1);
+    expect(issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
 });
 
 describe('정규화·커스텀 게임', () => {

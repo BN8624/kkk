@@ -3,6 +3,7 @@ import { hexKey, neighbors, offsetToAxial } from '../core/hex';
 import { isPlayable, validateScenario } from '../core/scenario/validate';
 import { SCENARIO_LIMITS, type ScenarioDocumentV1, type ScenarioTile, type ScenarioUnitSetup, type ValidationIssue } from '../core/scenario/types';
 import type { BuildingId, FactionId, TerrainId, UnitTypeId } from '../core/types';
+import { canFactionUseUnit, isUniqueUnit } from '../core/units';
 import type { DocumentStore } from '../storage/docstore';
 import { applyOp, clone, EditorHistory, type EditorOp, type TileChange } from './ops';
 
@@ -144,6 +145,8 @@ export class EditorController {
     if (!tile || tile.terrain === 'water') return 'blocked';
     const idx = this.unitIndexAt(q, r);
     const { unitFaction, unitType } = this.options;
+    // 세력·로스터 제한(고유 병종) — UI 흐림과 동일한 규칙
+    if (!this.canPlaceUnitType(unitFaction, unitType)) return 'blocked';
     if (idx >= 0) {
       const existing = this.doc.units[idx];
       if (existing.faction === unitFaction && existing.type === unitType) {
@@ -162,6 +165,13 @@ export class EditorController {
       unit: { faction: unitFaction, type: unitType, q, r },
     });
     return 'placed';
+  }
+
+  /** 선택 세력·문서 규칙 기준으로 해당 병종 배치 가능 여부. */
+  canPlaceUnitType(faction: FactionId, type: UnitTypeId): boolean {
+    if (!canFactionUseUnit(faction, type)) return false;
+    if (isUniqueUnit(type) && this.doc.rules.uniqueUnits !== true) return false;
+    return true;
   }
 
   removeUnitAt(q: number, r: number): boolean {

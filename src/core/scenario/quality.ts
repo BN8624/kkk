@@ -2,6 +2,7 @@
 import { MAX_UNITS_PER_FACTION, TERRAIN_RULES, UNIT_STATS } from '../data';
 import { hexDistance, hexKey } from '../hex';
 import type { Axial, FactionId } from '../types';
+import { isUniqueUnit } from '../units';
 import { factionName, t } from '../../i18n';
 import type {
   ScenarioDocumentV1,
@@ -358,6 +359,78 @@ export function scenarioQualityReport(doc: ScenarioDocumentV1): QualityReport {
       if (c.type === 'win-within-turns' && c.turns >= doc.rules.maxTurns)
         issues.push(issue('star-trivial', 'warning', t('quality.starTrivialTurn', { maxTurns: doc.rules.maxTurns, starTurns: c.turns }), { path }));
     });
+  }
+
+  // ---------- 고유 병종 역할 활용 가능성 ----------
+  const uniqueUnits = doc.units.filter((u) => isUniqueUnit(u.type));
+  if (uniqueUnits.length > 0) {
+    const buildings = doc.board.tiles.filter((t) => t.building);
+    const forests = doc.board.tiles.filter((t) => t.terrain === 'forest' || t.terrain === 'mountain');
+    for (const u of uniqueUnits) {
+      if (u.type === 'guardian') {
+        // 수호대 방어 목표(아군 거점) 없음
+        const ownsBuilding = buildings.some((t) => t.owner === u.faction);
+        if (!ownsBuilding) {
+          issues.push(
+            issue('unique-role-guardian', 'warning', t('quality.uniqueGuardianNoHold'), {
+              unitIndex: doc.units.indexOf(u),
+            }),
+          );
+        }
+      }
+      if (u.type === 'raider') {
+        // 우회·점령 대상 부족(숲/산 없고 중립·적 거점도 적음)
+        const capturable = buildings.filter((t) => t.owner !== u.faction).length;
+        if (forests.length === 0 && capturable === 0) {
+          issues.push(
+            issue('unique-role-raider', 'warning', t('quality.uniqueRaiderNoPath'), {
+              unitIndex: doc.units.indexOf(u),
+            }),
+          );
+        }
+      }
+      if (u.type === 'crossbow') {
+        // 사거리 2 안전 사격 공간이 거의 없는 초소형 맵
+        if (land.size < 12) {
+          issues.push(
+            issue('unique-role-crossbow', 'info', t('quality.uniqueCrossbowTight'), {
+              unitIndex: doc.units.indexOf(u),
+            }),
+          );
+        }
+      }
+    }
+    // 한 세력에만 과도한 고유 병종
+    const byFaction = new Map<FactionId, number>();
+    for (const u of uniqueUnits) {
+      byFaction.set(u.faction, (byFaction.get(u.faction) ?? 0) + 1);
+    }
+    for (const [f, n] of byFaction) {
+      if (n >= 4) {
+        issues.push(
+          issue('unique-overload', 'warning', t('quality.uniqueOverload', { faction: factionName(f), count: n })),
+        );
+      }
+    }
+    // 특정 고유 병종만으로 즉시 자동 승리 가능 힌트: 시작 시 인간 고유 병종이 빈 수도 인접
+    if (human) {
+      const humanUniques = uniqueUnits.filter((u) => u.faction === human);
+      for (const u of humanUniques) {
+        if (u.type !== 'raider' && u.type !== 'cavalry') continue;
+        for (const building of buildings) {
+          if (building.building !== 'capital' || !building.owner || building.owner === human) continue;
+          if (
+            hexDistance(u, building) <= UNIT_STATS[u.type].move &&
+            !doc.units.some((x) => x.q === building.q && x.r === building.r)
+          ) {
+            issues.push(
+              issue('unique-instant-pressure', 'info', t('quality.uniqueInstantPressure')),
+            );
+            break;
+          }
+        }
+      }
+    }
   }
 
   return {

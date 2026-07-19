@@ -28,7 +28,8 @@ function baseDocument(id: string, title: string): Omit<ScenarioDocumentV1, 'boar
     description: '',
     factions: defaultFactions(),
     units: [],
-    rules: { maxTurns: 12, turnLimit: 'score' },
+    // 새 제작실 문서는 고유 병종 허용을 기본값으로 제공(기존 외부 문서는 필드 없음 → 공용만)
+    rules: { maxTurns: 12, turnLimit: 'score', uniqueUnits: true },
     victoryConditions: [{ type: 'conquest' }],
     defeatConditions: [{ type: 'human-eliminated' }],
     starConditions: [],
