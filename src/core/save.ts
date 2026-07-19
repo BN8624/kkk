@@ -212,6 +212,8 @@ export function validateState(s: GameState): boolean {
     s.nextUnitId <= maxUnitId
   )
     return false;
+  // 명령 순번: 존재하면 0 이상의 정수여야 한다
+  if (s.cmdSeq !== undefined && (!Number.isInteger(s.cmdSeq) || s.cmdSeq < 0)) return false;
   // winner·over 정합: winner가 있으면 over여야 한다
   if (s.winner !== undefined && !s.over) return false;
   if (s.winner !== undefined && s.winner !== 'draw' && !FACTION_IDS.includes(s.winner))

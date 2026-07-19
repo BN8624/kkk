@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runAiTurn } from '../src/core/ai';
 import { FACTION_IDS, FACTION_NAMES, UNIT_NAMES } from '../src/core/data';
-import { advancePhase, newGame } from '../src/core/game';
+import { newGame } from '../src/core/game';
 import { SCENARIO_IDS, SCENARIOS } from '../src/core/scenarios';
 import type {
   Difficulty,
@@ -82,21 +82,24 @@ function runGame(
     const f = state.current;
     const t0 = performance.now();
     // 인간 대체 AI: 선택 왕국은 항상 '보통' 실력으로 고정하고, 나머지는 설정 난이도를 따른다
-    const log = runAiTurn(state, f, f === humanFaction ? 'normal' : undefined);
+    // (runAiTurn이 END_PHASE 명령까지 발행해 페이즈를 넘긴다)
+    const { commands } = runAiTurn(state, f, f === humanFaction ? 'normal' : undefined);
     maxPhaseMs = Math.max(maxPhaseMs, performance.now() - t0);
     phases++;
+    const unitCommands = commands.filter((c) => c.type !== 'end-phase');
     if (!state.factions[f].eliminated && state.units.some((u) => u.faction === f)) {
       eligiblePhases++;
-      if (log.length === 0) idlePhases++;
+      if (unitCommands.length === 0) idlePhases++;
     }
-    for (const a of log) {
-      if (a.kind === 'produce') {
-        produced[a.type]++;
-        spawned[a.type]++;
+    for (const c of commands) {
+      if (c.type === 'produce-unit') {
+        produced[c.unitType]++;
+        spawned[c.unitType]++;
       }
     }
     checkIllegal(state, illegal);
-    advancePhase(state);
+    // AI가 페이즈를 넘기지 못하면(방어적 가드) 무한 루프를 피하기 위해 종료한다
+    if (state.current === f && !state.over) break;
   }
 
   const alive = zeroByType();

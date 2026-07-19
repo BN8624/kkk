@@ -1,17 +1,16 @@
 // 한 줄 목적: 전략 분석·역할 배정·전투 평가·생산 판단을 수행하는 난이도별 AI 턴 실행기
 import { tileAt, unitAt, unitById, unitsOf } from './board';
-import { MAX_UNITS_PER_FACTION, UNIT_STATS } from './data';
 import {
-  attack,
-  forecastAttack,
-  moveUnit,
-  produceUnit,
-  terrainDefBonus,
-  unitCost,
-  unitRange,
-} from './game';
+  issueCommand,
+  type CommandExecutionResult,
+  type GameCommand,
+  type GameCommandPayload,
+  type GameEvent,
+} from './command';
+import { MAX_UNITS_PER_FACTION, UNIT_STATS } from './data';
+import { forecastAttack, terrainDefBonus, unitCost, unitRange } from './game';
 import { hexDistance, hexKey } from './hex';
-import { movementRange, reconstructPath } from './pathfind';
+import { movementRange } from './pathfind';
 import { holdVictoryCondition } from './scenario/objectives';
 import type {
   Axial,
@@ -23,18 +22,14 @@ import type {
   UnitTypeId,
 } from './types';
 
-export type AiAction =
-  | { kind: 'move'; unitId: number; path: Axial[] }
-  | {
-      kind: 'attack';
-      unitId: number;
-      targetId: number;
-      damage: number;
-      counterDamage?: number;
-      attackerType: UnitTypeId;
-    }
-  | { kind: 'capture'; unitId: number; at: Axial }
-  | { kind: 'produce'; unitId: number; at: Axial; type: UnitTypeId };
+/** AI 턴 실행 결과: 발행한 정본 명령(리플레이 기록용)과 연출용 정본 이벤트. */
+export interface AiTurnResult {
+  commands: GameCommand[];
+  events: GameEvent[];
+}
+
+/** 명령 발행 함수: 성공한 명령·이벤트는 턴 결과에 자동 수집된다. */
+type IssueFn = (payload: GameCommandPayload) => CommandExecutionResult;
 
 /** 난이도별 의사결정 프로파일. 자원 치트는 없다 — 판단 수준만 다르다. */
 interface AiProfile {
@@ -106,15 +101,29 @@ interface Analysis {
   turnsLeft: number;
 }
 
-/** AI 세력 하나의 턴을 실행하고 애니메이션 재생용 행동 로그를 반환한다.
+/** AI 세력 하나의 턴을 명령 실행기 경유로 실행하고 명령·이벤트를 반환한다(END_PHASE 포함).
  *  difficultyOverride는 밸런스 시뮬레이션에서 세력별 난이도를 달리할 때 쓴다. */
 export function runAiTurn(
   state: GameState,
   faction: FactionId,
   difficultyOverride?: Difficulty,
-): AiAction[] {
-  const log: AiAction[] = [];
-  if (state.over || state.factions[faction].eliminated) return log;
+): AiTurnResult {
+  const commands: GameCommand[] = [];
+  const events: GameEvent[] = [];
+  const issue: IssueFn = (payload) => {
+    const r = issueCommand(state, payload, 'ai');
+    if (r.ok) {
+      commands.push(r.command);
+      events.push(...r.events);
+    }
+    return r;
+  };
+  // 자기 차례가 아니면 아무 명령도 발행하지 않는다(호출자 오류 방어)
+  if (state.over || faction !== state.current) return { commands, events };
+  if (state.factions[faction].eliminated) {
+    issue({ type: 'end-phase' });
+    return { commands, events };
+  }
   const profile = PROFILES[difficultyOverride ?? state.config.difficulty] ?? PROFILES.normal;
 
   const analysis = analyze(state, faction);
@@ -124,10 +133,11 @@ export function runAiTurn(
   for (const uid of unitIds) {
     const unit = unitById(state, uid);
     if (!unit || state.over) break;
-    actUnit(state, unit, roles.get(uid) ?? 'attack', analysis, profile, log);
+    actUnit(state, unit, roles.get(uid) ?? 'attack', analysis, profile, issue);
   }
-  if (!state.over) produceUnits(state, faction, analysis, profile, log);
-  return log;
+  if (!state.over) produceUnits(state, faction, analysis, profile, issue);
+  if (!state.over) issue({ type: 'end-phase' });
+  return { commands, events };
 }
 
 // ---------------- 8.1 전략 상태 분석 ----------------
@@ -215,30 +225,30 @@ function actUnit(
   role: Role,
   an: Analysis,
   profile: AiProfile,
-  log: AiAction[],
+  issue: IssueFn,
 ): void {
   if (role === 'defend') {
     // 방어: 위협 공격 우선, 수도가 비어 있으면 주둔, 아니면 수도 쪽으로 물러난다
-    if (tryAttack(state, unit, an, profile, log)) return;
+    if (tryAttack(state, unit, an, profile, issue)) return;
     if (an.myCapital) {
-      if (tryOccupy(state, unit, an.myCapital, log)) return;
-      moveToward(state, unit, an.myCapital, profile, log);
+      if (tryOccupy(state, unit, an.myCapital, issue)) return;
+      moveToward(state, unit, an.myCapital, profile, issue);
     }
     return;
   }
   if (role === 'garrison') {
     // 수비대: 요새 위로 이동(도달 불가면 접근). 인접 적은 공격
     if (an.crownTile) {
-      if (tryOccupy(state, unit, an.crownTile, log)) return;
-      if (tryAttack(state, unit, an, profile, log)) return;
-      moveToward(state, unit, an.crownTile, profile, log);
+      if (tryOccupy(state, unit, an.crownTile, issue)) return;
+      if (tryAttack(state, unit, an, profile, issue)) return;
+      moveToward(state, unit, an.crownTile, profile, issue);
       return;
     }
   }
   // 공격 역할: 공격 → 점령 → 전진
-  if (tryAttack(state, unit, an, profile, log)) return;
-  if (tryCapture(state, unit, an, log)) return;
-  tryAdvance(state, unit, an, profile, log);
+  if (tryAttack(state, unit, an, profile, issue)) return;
+  if (tryCapture(state, unit, an, issue)) return;
+  tryAdvance(state, unit, an, profile, issue);
 }
 
 function unitValue(u: Unit): number {
@@ -258,7 +268,7 @@ function tryAttack(
   unit: Unit,
   an: Analysis,
   profile: AiProfile,
-  log: AiAction[],
+  issue: IssueFn,
 ): boolean {
   if (unit.attacked) return false;
   const range = unitRange(unit);
@@ -307,47 +317,23 @@ function tryAttack(
 
   if (best.destKey && reach) {
     const entry = reach.get(best.destKey)!;
-    const result = moveUnit(state, unit.id, { q: entry.q, r: entry.r });
-    if (result.ok && result.path) {
-      log.push({ kind: 'move', unitId: unit.id, path: result.path });
-      if (result.captured)
-        log.push({ kind: 'capture', unitId: unit.id, at: { q: entry.q, r: entry.r } });
-    }
+    issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
   }
-  const atkResult = attack(state, unit.id, best.target.id);
-  if (atkResult.ok) {
-    log.push({
-      kind: 'attack',
-      unitId: unit.id,
-      targetId: best.target.id,
-      damage: atkResult.damage!,
-      counterDamage: atkResult.counterDamage,
-      attackerType: unit.type,
-    });
-    return true;
-  }
-  return false;
+  return issue({ type: 'attack-unit', attackerId: unit.id, defenderId: best.target.id }).ok;
 }
 
 /** 특정 타일 위로 이동을 시도한다(왕관 수비 등). */
-function tryOccupy(state: GameState, unit: Unit, target: Tile, log: AiAction[]): boolean {
+function tryOccupy(state: GameState, unit: Unit, target: Tile, issue: IssueFn): boolean {
   if (unit.moved) return false;
   if (unit.q === target.q && unit.r === target.r) return true;
   if (unitAt(state, target.q, target.r)) return false;
   const reach = movementRange(state, unit);
   const key = hexKey(target.q, target.r);
   if (!reach.has(key)) return false;
-  const result = moveUnit(state, unit.id, { q: target.q, r: target.r });
-  if (result.ok && result.path) {
-    log.push({ kind: 'move', unitId: unit.id, path: result.path });
-    if (result.captured)
-      log.push({ kind: 'capture', unitId: unit.id, at: { q: target.q, r: target.r } });
-    return true;
-  }
-  return false;
+  return issue({ type: 'move-unit', unitId: unit.id, to: { q: target.q, r: target.r } }).ok;
 }
 
-function tryCapture(state: GameState, unit: Unit, an: Analysis, log: AiAction[]): boolean {
+function tryCapture(state: GameState, unit: Unit, an: Analysis, issue: IssueFn): boolean {
   if (unit.moved) return false;
   const reach = movementRange(state, unit);
   let best: { key: string; value: number } | null = null;
@@ -362,13 +348,7 @@ function tryCapture(state: GameState, unit: Unit, an: Analysis, log: AiAction[])
   }
   if (!best) return false;
   const entry = reach.get(best.key)!;
-  const result = moveUnit(state, unit.id, { q: entry.q, r: entry.r });
-  if (result.ok && result.path) {
-    log.push({ kind: 'move', unitId: unit.id, path: result.path });
-    log.push({ kind: 'capture', unitId: unit.id, at: { q: entry.q, r: entry.r } });
-    return true;
-  }
-  return false;
+  return issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } }).ok;
 }
 
 /** 목표 지점을 향해 실제 도달 가능 타일 중 가장 가까워지는 곳으로 이동한다. */
@@ -377,7 +357,7 @@ function moveToward(
   unit: Unit,
   target: Axial,
   profile: AiProfile,
-  log: AiAction[],
+  issue: IssueFn,
 ): void {
   if (unit.moved) return;
   const reach = movementRange(state, unit);
@@ -399,13 +379,7 @@ function moveToward(
   }
   if (!best || best.dist >= currentDist) return; // 전진이 안 되면 대기
   const entry = reach.get(best.key)!;
-  const path = reconstructPath(reach, { q: entry.q, r: entry.r });
-  const result = moveUnit(state, unit.id, { q: entry.q, r: entry.r });
-  if (result.ok && path) {
-    log.push({ kind: 'move', unitId: unit.id, path });
-    if (result.captured)
-      log.push({ kind: 'capture', unitId: unit.id, at: { q: entry.q, r: entry.r } });
-  }
+  issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
 }
 
 function tryAdvance(
@@ -413,7 +387,7 @@ function tryAdvance(
   unit: Unit,
   an: Analysis,
   profile: AiProfile,
-  log: AiAction[],
+  issue: IssueFn,
 ): void {
   if (unit.moved) return;
   // 목표 선택: 거점 가치 - 거리 비용 - 혼잡 페널티, 적 유닛도 후보
@@ -442,7 +416,7 @@ function tryAdvance(
   }
   if (!goal) return;
   if (chosen) chosen.claimed++;
-  moveToward(state, unit, goal, profile, log);
+  moveToward(state, unit, goal, profile, issue);
 }
 
 // ---------------- 8.4 생산 결정 ----------------
@@ -494,7 +468,7 @@ function produceUnits(
   faction: FactionId,
   an: Analysis,
   profile: AiProfile,
-  log: AiAction[],
+  issue: IssueFn,
 ): void {
   const fs = state.factions[faction];
   const spots = state.tiles.filter(
@@ -516,9 +490,6 @@ function produceUnits(
     let type = pickProductionType(state, faction, an, profile);
     if (fs.gold < unitCost(faction, type, state.config.modifier)) type = 'infantry';
     if (fs.gold < unitCost(faction, type, state.config.modifier)) break;
-    const result = produceUnit(state, faction, spot, type);
-    if (result.ok && result.unit) {
-      log.push({ kind: 'produce', unitId: result.unit.id, at: { q: spot.q, r: spot.r }, type });
-    }
+    issue({ type: 'produce-unit', at: { q: spot.q, r: spot.r }, unitType: type });
   }
 }

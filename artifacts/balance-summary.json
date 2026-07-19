@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T02:50:43.422Z",
-  "elapsedSec": 10,
+  "generatedAt": "2026-07-19T05:37:30.721Z",
+  "elapsedSec": 10.4,
   "totalGames": 1080,
   "seedsPerCombo": 40,
   "unfinishedGames": 0,
@@ -127,7 +127,7 @@
   },
   "idlePhaseRate": 0.031,
   "avgCapturesPerGame": 8.08,
-  "maxPhaseMs": 2.6,
+  "maxPhaseMs": 17,
   "pass": true,
   "failures": []
 }

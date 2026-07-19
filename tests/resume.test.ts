@@ -10,8 +10,7 @@ import type { GameState } from '../src/core/types';
 function playRound(state: GameState, checkpoints?: string[]): void {
   advancePhase(state); // 인간 페이즈 종료
   while (!state.over && !isHumanTurn(state)) {
-    runAiTurn(state, state.current);
-    advancePhase(state);
+    runAiTurn(state, state.current); // END_PHASE 명령 포함
     checkpoints?.push(serialize(state));
   }
 }
@@ -29,7 +28,6 @@ describe('AI 페이즈 중단·복구', () => {
         advancePhase(resumed);
         while (!resumed.over && !isHumanTurn(resumed)) {
           runAiTurn(resumed, resumed.current);
-          advancePhase(resumed);
           const restored = deserialize(serialize(resumed));
           expect(restored).not.toBeNull();
           resumed = restored!;
@@ -43,8 +41,7 @@ describe('AI 페이즈 중단·복구', () => {
     const seed = 777;
     const state = newGame(seed);
     advancePhase(state); // -> crimson(AI)
-    runAiTurn(state, 'crimson');
-    advancePhase(state); // -> violet(AI) 경계에서 "새로고침"
+    runAiTurn(state, 'crimson'); // END_PHASE 포함 -> violet(AI) 경계에서 "새로고침"
     const raw = serialize(state);
 
     const restored = deserialize(raw)!;
@@ -55,7 +52,6 @@ describe('AI 페이즈 중단·복구', () => {
     // 복구 루프: 남은 AI 페이즈만 진행
     while (!restored.over && !isHumanTurn(restored)) {
       runAiTurn(restored, restored.current);
-      advancePhase(restored);
     }
     expect(restored.turn).toBe(2);
     expect(restored.current).toBe('azure');

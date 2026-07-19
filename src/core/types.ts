@@ -85,6 +85,8 @@ export interface GameState {
   objectives: GameObjectives;
   /** 커스텀·캠페인 게임의 정규화 스냅샷(이어하기·리플레이 재현용). 내장 시나리오는 시드로 재구성한다 */
   customScenario?: ScenarioRuntimeSnapshot;
+  /** 게임 시작부터 성공한 명령 수(다음 명령의 순번). 리플레이 순서 검증에 쓴다 */
+  cmdSeq?: number;
 }
 
 export interface UnitStats {

@@ -1,21 +1,13 @@
 // 한 줄 목적: 게임 전체 흐름(타이틀→플레이→AI 턴→승패)과 입력·저장·튜토리얼을 조율하는 진입점
 import Phaser from 'phaser';
-import { runAiTurn, type AiAction } from './core/ai';
+import { runAiTurn } from './core/ai';
 import { humanFaction, isHumanTurn, tileAt, unitAt, unitById } from './core/board';
+import { findEvent, issueCommand, type GameEvent } from './core/command';
 import { BUILDING_NAMES, DIFFICULTY_NAMES, FACTION_NAMES, UNIT_NAMES } from './core/data';
 import { dailyChallenge, MODIFIERS, shareText, todayKey, type ModifierId } from './core/daily';
 import { DOCTRINES } from './core/doctrines';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from './core/records';
-import {
-  advancePhase,
-  attack,
-  attackTargets,
-  forecastAttack,
-  moveUnit,
-  newGame,
-  produceUnit,
-  unitCost,
-} from './core/game';
+import { attackTargets, forecastAttack, newGame, unitCost } from './core/game';
 import { reachableDestinations } from './core/pathfind';
 import { SCENARIO_IDS, SCENARIOS, scenarioDisplayName } from './core/scenarios';
 import {
@@ -506,19 +498,22 @@ class App {
     this.busy = true;
     this.scene?.clearHighlights();
     this.scene?.showSelection(null);
-    const result = moveUnit(state, unitId, dest);
+    const result = issueCommand(state, { type: 'move-unit', unitId, to: dest }, 'human');
     if (!result.ok) {
       this.busy = false;
       this.deselect();
       return;
     }
     sfx.move();
-    await this.scene?.animateMove(unitId, result.path!);
-    if (result.captured) {
+    const moved = findEvent(result.events, 'unit-moved')!;
+    await this.scene?.animateMove(unitId, moved.path);
+    const captured = findEvent(result.events, 'building-captured');
+    if (captured) {
       sfx.capture();
-      await this.scene?.animateCapture(dest, result.captured.building !== 'village');
-      const bonus = result.bonusGold ? ` (+${result.bonusGold}금)` : '';
-      this.hud.toast(`${BUILDING_NAMES[result.captured.building!]} 점령!${bonus}`);
+      await this.scene?.animateCapture(captured.at, captured.building !== 'village');
+      const gold = findEvent(result.events, 'gold-changed');
+      const bonus = gold && gold.reason === 'capture-bonus' ? ` (+${gold.delta}금)` : '';
+      this.hud.toast(`${BUILDING_NAMES[captured.building]} 점령!${bonus}`);
     }
     this.hud.updateTop(state);
     saveGame(state);
@@ -544,28 +539,29 @@ class App {
     this.busy = true;
     this.scene?.clearHighlights();
     this.scene?.showSelection(null);
-    const attacker = unitById(state, attackerId)!;
-    const defender = unitById(state, defenderId)!;
-    const attackerPos = { q: attacker.q, r: attacker.r };
-    const defenderPos = { q: defender.q, r: defender.r };
-    const result = attack(state, attackerId, defenderId);
+    const result = issueCommand(state, { type: 'attack-unit', attackerId, defenderId }, 'human');
     if (!result.ok) {
       this.busy = false;
       this.deselect();
       return;
     }
     sfx.attack();
+    // 이벤트가 공격 시점 좌표를 보존하므로 사망 유닛도 정확한 위치에서 연출된다
+    const atk = findEvent(result.events, 'unit-attacked')!;
+    const counter = findEvent(result.events, 'unit-countered');
     await this.scene?.animateAttack({
       attackerId,
-      attackerType: attacker.type,
+      attackerType: atk.attackerType,
       defenderId,
-      defenderPos,
-      damage: result.damage!,
-      counterDamage: result.counterDamage,
-      attackerPos,
+      defenderPos: atk.at,
+      damage: atk.damage,
+      counterDamage: counter?.damage,
+      attackerPos: atk.from,
     });
-    if (result.defenderDied || result.attackerDied) sfx.hit();
-    if (result.defenderDied) this.hud.toast('적 유닛 처치!');
+    const defenderDied = result.events.some((e) => e.type === 'unit-died' && e.unitId === defenderId);
+    const attackerDied = result.events.some((e) => e.type === 'unit-died' && e.unitId === attackerId);
+    if (defenderDied || attackerDied) sfx.hit();
+    if (defenderDied) this.hud.toast('적 유닛 처치!');
     this.hud.updateTop(state);
     saveGame(state);
     this.busy = false;
@@ -597,7 +593,11 @@ class App {
     const state = this.state!;
     const tile = this.productionTile;
     if (!tile || this.busy) return;
-    const result = produceUnit(state, this.human(), tile, type);
+    const result = issueCommand(
+      state,
+      { type: 'produce-unit', at: { q: tile.q, r: tile.r }, unitType: type },
+      'human',
+    );
     if (!result.ok) {
       this.hud.toast(
         result.reason === 'no-gold'
@@ -610,7 +610,8 @@ class App {
     }
     this.closeProduction();
     sfx.capture();
-    void this.scene?.animateSpawn(result.unit!.id);
+    const produced = findEvent(result.events, 'unit-produced')!;
+    void this.scene?.animateSpawn(produced.unitId);
     this.hud.toast(`${UNIT_NAMES[type]} 생산 완료 — 다음 턴부터 행동합니다`);
     this.hud.updateTop(state);
     saveGame(state);
@@ -624,7 +625,7 @@ class App {
     this.deselect();
     this.closeProduction();
     if (this.tutorialStep === 5) this.advanceTutorial(6);
-    advancePhase(state); // 인간 페이즈 종료 → 다음 세력
+    issueCommand(state, { type: 'end-phase' }, 'human'); // 인간 페이즈 종료 → 다음 세력
     await this.runAiPhases();
   }
 
@@ -637,12 +638,11 @@ class App {
     while (!state.over && !isHumanTurn(state)) {
       const fid = state.current;
       this.hud.setAiThinking(fid);
-      // 행동·페이즈 전환을 동기적으로 확정한 뒤(페이즈 경계) 저장하고, 연출은 그 후 재생한다.
+      // 행동·페이즈 전환(END_PHASE 포함)을 동기적으로 확정한 뒤(페이즈 경계) 저장하고, 연출은 그 후 재생한다.
       // 연출 중 이탈해도 저장본은 항상 "다음 세력이 아직 행동하지 않은" 경계 상태라 중복 실행이 없다.
-      const log = runAiTurn(state, fid);
-      advancePhase(state);
+      const result = runAiTurn(state, fid);
       if (!state.over) saveGame(state);
-      await this.playAiLog(log);
+      await this.playEvents(result.events);
       this.hud.updateTop(state);
     }
     this.hud.setAiThinking(null);
@@ -669,7 +669,8 @@ class App {
     this.hud.setEndTurnEnabled(true);
   }
 
-  private async playAiLog(log: AiAction[]): Promise<void> {
+  /** 정본 이벤트를 순서대로 연출한다. 이벤트가 공격·사망 시점 좌표를 보존하므로 연출 생략이 없다. */
+  private async playEvents(events: GameEvent[]): Promise<void> {
     if (!this.scene) return;
     // 건너뛰기: 연출 없이 결과만 반영
     if (this.settings.aiSpeed === 0) {
@@ -677,44 +678,49 @@ class App {
       await delay(120);
       return;
     }
-    for (const action of log) {
-      switch (action.kind) {
-        case 'move': {
-          const last = action.path[action.path.length - 1];
-          this.scene.panTo(last, 200);
-          await this.scene.animateMove(action.unitId, action.path);
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      switch (ev.type) {
+        case 'unit-moved': {
+          this.scene.panTo(ev.to, 200);
+          await this.scene.animateMove(ev.unitId, ev.path);
           break;
         }
-        case 'attack': {
-          const target = unitById(this.state!, action.targetId);
-          const attacker = unitById(this.state!, action.unitId);
+        case 'unit-attacked': {
           sfx.attack();
-          // 사망한 유닛 좌표는 로그 시점 상태로 추정 불가하므로 생존 좌표만 사용
-          const defenderPos = target ? { q: target.q, r: target.r } : null;
-          if (defenderPos) {
-            await this.scene.animateAttack({
-              attackerId: action.unitId,
-              attackerType: action.attackerType,
-              defenderId: action.targetId,
-              defenderPos,
-              damage: action.damage,
-              counterDamage: action.counterDamage,
-              attackerPos: attacker ? { q: attacker.q, r: attacker.r } : undefined,
-            });
-          } else {
-            this.scene.refresh();
-            await delay(200);
+          // 같은 교전의 반격 이벤트를 찾아 함께 연출한다
+          let counter: number | undefined;
+          for (let j = i + 1; j < events.length; j++) {
+            const t = events[j];
+            if (t.type === 'unit-countered') {
+              counter = t.damage;
+              break;
+            }
+            if (t.type !== 'unit-damaged' && t.type !== 'unit-died') break;
           }
+          await this.scene.animateAttack({
+            attackerId: ev.attackerId,
+            attackerType: ev.attackerType,
+            defenderId: ev.defenderId,
+            defenderPos: ev.at,
+            damage: ev.damage,
+            counterDamage: counter,
+            attackerPos: ev.from,
+          });
           break;
         }
-        case 'capture': {
+        case 'unit-died':
+          sfx.hit();
+          break;
+        case 'building-captured': {
           sfx.capture();
-          const t = tileAt(this.state!, action.at.q, action.at.r);
-          await this.scene.animateCapture(action.at, t?.building !== 'village');
+          await this.scene.animateCapture(ev.at, ev.building !== 'village');
           break;
         }
-        case 'produce':
-          await this.scene.animateSpawn(action.unitId);
+        case 'unit-produced':
+          await this.scene.animateSpawn(ev.unitId);
+          break;
+        default:
           break;
       }
     }
