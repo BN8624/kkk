@@ -1,0 +1,412 @@
+{
+  "generatedAt": "2026-07-19T17:28:34.337Z",
+  "note": "실제 과거 리플레이를 재생한 것이 아니라 구조적 도착 분석 기반 증거이다.",
+  "oldCrownOffset": {
+    "col": 4,
+    "row": 5
+  },
+  "seeds": [
+    1,
+    2,
+    3,
+    7,
+    42
+  ],
+  "reports": [
+    {
+      "seed": 1,
+      "oldCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "newCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "startUnits": {
+        "azure": [
+          {
+            "type": "infantry",
+            "at": {
+              "q": 0,
+              "r": 10
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 0,
+              "r": 9
+            }
+          }
+        ],
+        "crimson": [
+          {
+            "type": "cavalry",
+            "at": {
+              "q": 0,
+              "r": 2
+            }
+          },
+          {
+            "type": "infantry",
+            "at": {
+              "q": -1,
+              "r": 3
+            }
+          }
+        ],
+        "violet": [
+          {
+            "type": "archer",
+            "at": {
+              "q": 7,
+              "r": 1
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 2
+            }
+          }
+        ]
+      },
+      "oldArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "newArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "oldMaxGap": 0,
+      "newMaxGap": 0,
+      "azureCostToOldCrown": 5,
+      "azureArrivalOld": 2,
+      "crimsonOldArrival": 2,
+      "oldUnfair": false,
+      "newFair": true
+    },
+    {
+      "seed": 2,
+      "oldCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "newCrown": {
+        "q": 3,
+        "r": 4
+      },
+      "startUnits": {
+        "azure": [
+          {
+            "type": "infantry",
+            "at": {
+              "q": 0,
+              "r": 10
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 0,
+              "r": 9
+            }
+          }
+        ],
+        "crimson": [
+          {
+            "type": "cavalry",
+            "at": {
+              "q": 0,
+              "r": 2
+            }
+          },
+          {
+            "type": "infantry",
+            "at": {
+              "q": -1,
+              "r": 3
+            }
+          }
+        ],
+        "violet": [
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 2
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 3
+            }
+          }
+        ]
+      },
+      "oldArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 3
+      },
+      "newArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "oldMaxGap": 1,
+      "newMaxGap": 0,
+      "azureCostToOldCrown": 5,
+      "azureArrivalOld": 2,
+      "crimsonOldArrival": 2,
+      "oldUnfair": true,
+      "newFair": true
+    },
+    {
+      "seed": 3,
+      "oldCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "newCrown": {
+        "q": 2,
+        "r": 6
+      },
+      "startUnits": {
+        "azure": [
+          {
+            "type": "infantry",
+            "at": {
+              "q": 0,
+              "r": 10
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 0,
+              "r": 9
+            }
+          }
+        ],
+        "crimson": [
+          {
+            "type": "cavalry",
+            "at": {
+              "q": 0,
+              "r": 2
+            }
+          },
+          {
+            "type": "infantry",
+            "at": {
+              "q": -1,
+              "r": 3
+            }
+          }
+        ],
+        "violet": [
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 2
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 3
+            }
+          }
+        ]
+      },
+      "oldArrivalByFaction": {
+        "azure": 2,
+        "crimson": 1,
+        "violet": 2
+      },
+      "newArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "oldMaxGap": 1,
+      "newMaxGap": 0,
+      "azureCostToOldCrown": 5,
+      "azureArrivalOld": 2,
+      "crimsonOldArrival": 1,
+      "oldUnfair": true,
+      "newFair": true
+    },
+    {
+      "seed": 7,
+      "oldCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "newCrown": {
+        "q": 2,
+        "r": 6
+      },
+      "startUnits": {
+        "azure": [
+          {
+            "type": "infantry",
+            "at": {
+              "q": 0,
+              "r": 10
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 0,
+              "r": 9
+            }
+          }
+        ],
+        "crimson": [
+          {
+            "type": "cavalry",
+            "at": {
+              "q": 0,
+              "r": 2
+            }
+          },
+          {
+            "type": "infantry",
+            "at": {
+              "q": -1,
+              "r": 3
+            }
+          }
+        ],
+        "violet": [
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 2
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 3
+            }
+          }
+        ]
+      },
+      "oldArrivalByFaction": {
+        "azure": 2,
+        "crimson": 1,
+        "violet": 2
+      },
+      "newArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "oldMaxGap": 1,
+      "newMaxGap": 0,
+      "azureCostToOldCrown": 5,
+      "azureArrivalOld": 2,
+      "crimsonOldArrival": 1,
+      "oldUnfair": true,
+      "newFair": true
+    },
+    {
+      "seed": 42,
+      "oldCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "newCrown": {
+        "q": 2,
+        "r": 5
+      },
+      "startUnits": {
+        "azure": [
+          {
+            "type": "infantry",
+            "at": {
+              "q": 0,
+              "r": 10
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 0,
+              "r": 9
+            }
+          }
+        ],
+        "crimson": [
+          {
+            "type": "cavalry",
+            "at": {
+              "q": 0,
+              "r": 2
+            }
+          },
+          {
+            "type": "infantry",
+            "at": {
+              "q": -1,
+              "r": 3
+            }
+          }
+        ],
+        "violet": [
+          {
+            "type": "archer",
+            "at": {
+              "q": 7,
+              "r": 1
+            }
+          },
+          {
+            "type": "archer",
+            "at": {
+              "q": 6,
+              "r": 2
+            }
+          }
+        ]
+      },
+      "oldArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "newArrivalByFaction": {
+        "azure": 2,
+        "crimson": 2,
+        "violet": 2
+      },
+      "oldMaxGap": 0,
+      "newMaxGap": 0,
+      "azureCostToOldCrown": 6,
+      "azureArrivalOld": 2,
+      "crimsonOldArrival": 2,
+      "oldUnfair": false,
+      "newFair": true
+    }
+  ],
+  "conclusion": {
+    "oldFixedBiased": true,
+    "newRuleFair": true,
+    "text": "구 고정 위치는 진홍 기병 선착으로 불공정, 신 규칙은 도착 공정성 충족"
+  }
+}

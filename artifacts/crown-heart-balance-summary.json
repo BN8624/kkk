@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-07-19T17:29:58.994Z",
+  "elapsedSec": 75.8,
+  "scenario": "crown-heart",
+  "seedsPerCombo": 24,
+  "totalGames": 1728,
+  "uniqueTrajectories": 1728,
+  "overallWinRates": {
+    "azure": 0.498,
+    "crimson": 0.237,
+    "violet": 0.263
+  },
+  "avgEndTurn": 9.24,
+  "endWithin4Rate": 0.001,
+  "firstCrownOwnerDist": {
+    "azure": 0.6,
+    "crimson": 0.28,
+    "violet": 0.12
+  },
+  "avgFirstCrownTurn": 3.49,
+  "avgCrownOwnerChanges": 1.39,
+  "avgContestedRounds": 1.06,
+  "avgArrivalByFaction": {
+    "azure": 2.01,
+    "crimson": 2,
+    "violet": 2.08
+  },
+  "endedBeforeHumanAction": 0,
+  "unfinishedGames": 0,
+  "illegalGames": 0,
+  "earlyAutoLossBeforeHuman": 0,
+  "turn1CrownCaptures": 0,
+  "arrivalGapViolations": 0,
+  "earlyCrownWinsByFaction": {
+    "azure": 0,
+    "crimson": 0,
+    "violet": 0
+  },
+  "crimsonEarlyRepeatTotal": 0,
+  "pass": true,
+  "failures": [],
+  "note": "이 수치는 인간 재미의 증명이 아니라 자동 대체 정책 통계이다."
+}
