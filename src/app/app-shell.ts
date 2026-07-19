@@ -231,6 +231,7 @@ export class AppShell implements AppContext, AppNavigation {
         onReplays: () => this.toReplayArchive(),
         onAnalysis: () => this.toAnalysis(),
         onRecords: () => this.toRecords(),
+        onDataManagement: () => this.playCtrl.showDataManagement(),
         onUpdate: () => this.activateUpdate(),
       },
     });
