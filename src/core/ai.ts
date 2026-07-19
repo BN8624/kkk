@@ -12,6 +12,7 @@ import { forecastAttack, terrainDefBonus, unitCost, unitRange } from './game';
 import { hexDistance, hexKey } from './hex';
 import { movementRange } from './pathfind';
 import { holdVictoryCondition } from './scenario/objectives';
+import type { VictoryCondition } from './scenario/types';
 import type {
   Axial,
   Difficulty,
@@ -81,7 +82,7 @@ const PROFILES: Record<Difficulty, AiProfile> = {
   },
 };
 
-type Role = 'defend' | 'garrison' | 'attack';
+type Role = 'defend' | 'garrison' | 'attack' | 'protect';
 
 interface Objective {
   q: number;
@@ -98,7 +99,18 @@ interface Analysis {
   /** hold-building 승리 조건이 있는 시나리오(왕관의 심장 등) */
   crownScenario: boolean;
   objectives: Objective[];
+  /** 사망이 패배(또는 생존이 승리 필수)인 유닛 태그 — 보호 역할을 받는다 */
+  protectedTags: Set<string>;
   turnsLeft: number;
+}
+
+function flattenVictory(conditions: VictoryCondition[]): VictoryCondition[] {
+  const out: VictoryCondition[] = [];
+  for (const c of conditions) {
+    if (c.type === 'all-of' || c.type === 'any-of') out.push(...flattenVictory(c.conditions));
+    else out.push(c);
+  }
+  return out;
 }
 
 /** AI 세력 하나의 턴을 명령 실행기 경유로 실행하고 명령·이벤트를 반환한다(END_PHASE 포함).
@@ -170,6 +182,28 @@ function analyze(state: GameState, faction: FactionId): Analysis {
           : 50;
     objectives.push({ q: t.q, r: t.r, value, claimed: 0 });
   }
+
+  // 목표 인식 계층: 승패 조건이 이 세력(인간 세력) 기준이면 미션 목표를 가중치·보호 대상에 반영한다
+  const protectedTags = new Set<string>();
+  if (state.config.humanFaction === faction) {
+    for (const c of flattenVictory(state.objectives.victory)) {
+      if (c.type === 'capture-building' || c.type === 'hold-building') {
+        const o = objectives.find((x) => x.q === c.at.q && x.r === c.at.r);
+        if (o) o.value = Math.max(o.value, 180);
+      } else if (c.type === 'capture-count') {
+        for (const o of objectives) {
+          const t = tileAt(state, o.q, o.r);
+          if (t?.building === c.building) o.value = Math.max(o.value, 130);
+        }
+      } else if (c.type === 'unit-alive') {
+        protectedTags.add(c.tag);
+      }
+    }
+    for (const c of state.objectives.defeat) {
+      if (c.type === 'unit-dies') protectedTags.add(c.tag);
+    }
+  }
+
   return {
     enemies,
     myCapital,
@@ -177,6 +211,7 @@ function analyze(state: GameState, faction: FactionId): Analysis {
     crownTile,
     crownScenario: isCrownScenario,
     objectives,
+    protectedTags,
     turnsLeft: state.maxTurns - state.turn,
   };
 }
@@ -192,10 +227,15 @@ function assignRoles(
   const roles = new Map<number, Role>();
   const units = unitsOf(state, faction);
 
+  // 보호 대상 유닛(사망 = 패배)은 항상 보호 역할이 최우선이다
+  for (const u of units) {
+    if (u.tag !== undefined && an.protectedTags.has(u.tag)) roles.set(u.id, 'protect');
+  }
+
   if (profile.defend && an.myCapital && an.capitalThreats.length > 0) {
     const cap = an.myCapital;
     const defenders = units
-      .slice()
+      .filter((u) => !roles.has(u.id))
       .sort((a, b) => hexDistance(a, cap) - hexDistance(b, cap))
       .slice(0, Math.min(2, an.capitalThreats.length));
     for (const d of defenders) roles.set(d.id, 'defend');
@@ -244,6 +284,21 @@ function actUnit(
       moveToward(state, unit, an.crownTile, profile, issue);
       return;
     }
+  }
+  if (role === 'protect') {
+    // 보호 대상(사망 = 패배): 제자리 사격만 하고, 적 위협권 밖 안전 타일로 물러난다
+    if (!unit.attacked) {
+      const range = unitRange(unit);
+      const target = an.enemies
+        .filter((e) => unitById(state, e.id) && hexDistance(unit, e) <= range)
+        .sort((a, b) => a.hp - b.hp)[0];
+      if (target) {
+        const fc = forecastAttack(state, unit, target);
+        if (!fc.attackerDies) issue({ type: 'attack-unit', attackerId: unit.id, defenderId: target.id });
+      }
+    }
+    retreatToSafety(state, unit, an, issue);
+    return;
   }
   // 공격 역할: 공격 → 점령 → 전진
   if (tryAttack(state, unit, an, profile, issue)) return;
@@ -331,6 +386,35 @@ function tryOccupy(state: GameState, unit: Unit, target: Tile, issue: IssueFn): 
   const key = hexKey(target.q, target.r);
   if (!reach.has(key)) return false;
   return issue({ type: 'move-unit', unitId: unit.id, to: { q: target.q, r: target.r } }).ok;
+}
+
+/** 적의 다음 턴 위협권 밖으로 물러난다(안전 타일이 없으면 위협이 가장 적은 곳으로). */
+function retreatToSafety(state: GameState, unit: Unit, an: Analysis, issue: IssueFn): void {
+  if (unit.moved) return;
+  const threat = (pos: Axial): number => {
+    let v = 0;
+    for (const e of an.enemies) {
+      if (!unitById(state, e.id)) continue;
+      if (hexDistance(pos, e) <= UNIT_STATS[e.type].move + unitRange(e)) v++;
+    }
+    return v;
+  };
+  const current = threat(unit);
+  if (current === 0) return; // 이미 안전하면 자리를 지킨다
+  const reach = movementRange(state, unit);
+  let best: { key: string; threat: number; def: number } | null = null;
+  for (const [key, e] of reach) {
+    if (key === hexKey(unit.q, unit.r)) continue;
+    if (unitAt(state, e.q, e.r)) continue;
+    const th = threat(e);
+    const def = terrainDefBonus(tileAt(state, e.q, e.r)!);
+    if (!best || th < best.threat || (th === best.threat && def > best.def)) {
+      best = { key, threat: th, def };
+    }
+  }
+  if (!best || best.threat >= current) return;
+  const entry = reach.get(best.key)!;
+  issue({ type: 'move-unit', unitId: unit.id, to: { q: entry.q, r: entry.r } });
 }
 
 function tryCapture(state: GameState, unit: Unit, an: Analysis, issue: IssueFn): boolean {
