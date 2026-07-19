@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 한 줄 목적: 세 왕관의 섬 앱 아이콘(세 세력 색 보석이 박힌 금관) -->
+  <rect width="64" height="64" rx="12" fill="#1d2a44"/>
+  <polygon points="32,8 52,20 52,44 32,56 12,44 12,20" fill="#24385e" stroke="#d9b64e" stroke-width="2"/>
+  <path d="M17 41 L17 25 L25 33 L32 19 L39 33 L47 25 L47 41 Z" fill="#d9b64e" stroke="#8a6d2a" stroke-width="1.5"/>
+  <rect x="17" y="41" width="30" height="5" rx="1.5" fill="#b3933a" stroke="#8a6d2a" stroke-width="1"/>
+  <circle cx="17" cy="23" r="3.4" fill="#31558f" stroke="#d9b64e" stroke-width="1.2"/>
+  <circle cx="32" cy="16" r="3.4" fill="#93313c" stroke="#d9b64e" stroke-width="1.2"/>
+  <circle cx="47" cy="23" r="3.4" fill="#5f3d75" stroke="#d9b64e" stroke-width="1.2"/>
+</svg>

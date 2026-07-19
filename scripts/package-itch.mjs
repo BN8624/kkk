@@ -8,7 +8,7 @@ if (!existsSync('dist/index.html')) {
   process.exit(1);
 }
 
-const out = 'three-crowns-itch.zip';
+const out = 'three-crowns-island.zip';
 if (platform() === 'win32') {
   execSync(
     `powershell -NoProfile -Command "if (Test-Path '${out}') { Remove-Item '${out}' }; Compress-Archive -Path dist/* -DestinationPath '${out}'"`,
