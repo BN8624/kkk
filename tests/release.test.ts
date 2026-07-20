@@ -8,9 +8,9 @@ function text(path: string): string {
 }
 
 describe('2.1 공개 릴리스 계약', () => {
-  it('패키지와 리플레이 게임 버전이 2.2.1으로 일치한다', () => {
+  it('패키지와 리플레이 게임 버전이 2.2.2으로 일치한다', () => {
     const pkg = JSON.parse(text('package.json')) as { version: string };
-    expect(pkg.version).toBe('2.2.1');
+    expect(pkg.version).toBe('2.2.2');
     expect(GAME_VERSION).toBe(pkg.version);
   });
 
