@@ -12,7 +12,7 @@ export type { ReplayObservation } from './types';
 
 export const REPLAY_SCHEMA_VERSION = 2;
 /** 리플레이를 기록한 게임 버전(공개판 마감 시 package.json과 함께 올린다). */
-export const GAME_VERSION = '2.2.0';
+export const GAME_VERSION = '2.2.1';
 
 // ---------------- 정본 직렬화·다이제스트 ----------------
 
@@ -79,6 +79,8 @@ export function canonicalGameState(state: GameState): unknown {
         hp: u.hp,
         moved: u.moved,
         attacked: u.attacked,
+        // 수호대만 movedThisTurn을 정본에 포함 — 공용 병종 1.5·2.0·2.1 digest는 유지
+        ...(u.type === 'guardian' ? { movedThisTurn: u.movedThisTurn === true } : {}),
         tag: u.tag,
       })),
     factions: FACTION_IDS.map((f) => ({

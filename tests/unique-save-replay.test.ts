@@ -2,37 +2,192 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeReplay } from '../src/core/analysis/replay-metrics';
 import { runAiTurn } from '../src/core/ai';
-import { newGame, newGameFromScenario } from '../src/core/game';
+import { CAMPAIGNS } from '../src/core/campaign/missions';
+import {
+  braceDefBonus,
+  damageBreakdown,
+  newGame,
+  newGameFromScenario,
+} from '../src/core/game';
 import {
   buildReplayDocument,
+  canonicalGameState,
+  GAME_VERSION,
+  stateDigest,
   verifyReplay,
 } from '../src/core/replay';
 import { checkReplayCompatibility } from '../src/core/replay-compat';
 import { deserialize, serialize } from '../src/core/save';
 import { normalizeScenario } from '../src/core/scenario/normalize';
-import { CAMPAIGNS } from '../src/core/campaign/missions';
-import { addUnit } from './helpers';
+import { addUnit, makeState } from './helpers';
+
+/** 캠페인 청람 미션2(수호대 소개)를 끝까지 플레이한 뒤 리플레이 문서를 만든다. */
+function playAzureGuardianMission(seed: number) {
+  const mission = CAMPAIGNS.find((c) => c.faction === 'azure')!.missions[1];
+  const snap = normalizeScenario(mission.scenario);
+  const state = newGameFromScenario(seed, snap, { mode: 'campaign', difficulty: 'normal' });
+  expect(state.units.some((u) => u.type === 'guardian')).toBe(true);
+  let guard = 0;
+  while (!state.over && guard < 200) {
+    guard++;
+    runAiTurn(state, state.current);
+  }
+  expect(state.over).toBe(true);
+  const doc = buildReplayDocument(state, {
+    replayId: `guardian-mission-${seed}`,
+    createdAt: '2026-07-20T00:00:00.000Z',
+  });
+  expect(doc).not.toBeNull();
+  return { state, doc: doc! };
+}
+
+describe('수호 태세 정본 digest', () => {
+  it('같은 guardian 상태에서 movedThisTurn false/true digest가 다르다', () => {
+    const state = makeState({ humanFaction: 'azure' });
+    const g = addUnit(state, { faction: 'azure', type: 'guardian', q: 0, r: 0 });
+    g.movedThisTurn = false;
+    const dFalse = stateDigest(state);
+    g.movedThisTurn = true;
+    const dTrue = stateDigest(state);
+    expect(dFalse).not.toBe(dTrue);
+  });
+
+  it('수호 태세 활성·비활성 피해와 digest가 모두 다르다', () => {
+    // 기병 atk7 vs 수호대 def4 → brace 시 피해1, 이동 후 피해3
+    const idle = makeState({ humanFaction: 'azure' });
+    const guardIdle = addUnit(idle, {
+      faction: 'azure',
+      type: 'guardian',
+      q: 1,
+      r: 1,
+      movedThisTurn: false,
+    });
+    const atkIdle = addUnit(idle, { faction: 'crimson', type: 'cavalry', q: 2, r: 1 });
+    const moved = makeState({ humanFaction: 'azure' });
+    const guardMoved = addUnit(moved, {
+      faction: 'azure',
+      type: 'guardian',
+      q: 1,
+      r: 1,
+      movedThisTurn: true,
+    });
+    const atkMoved = addUnit(moved, { faction: 'crimson', type: 'cavalry', q: 2, r: 1 });
+
+    expect(braceDefBonus(guardIdle)).toBe(2);
+    expect(braceDefBonus(guardMoved)).toBe(0);
+    const bdIdle = damageBreakdown(idle, atkIdle, guardIdle);
+    const bdMoved = damageBreakdown(moved, atkMoved, guardMoved);
+    expect(bdIdle.braceDef).toBe(2);
+    expect(bdMoved.braceDef).toBe(0);
+    expect(bdIdle.total).toBeLessThan(bdMoved.total);
+    expect(stateDigest(idle)).not.toBe(stateDigest(moved));
+  });
+
+  it('저장 왕복 후 guardian movedThisTurn=false가 보존된다', () => {
+    const state = makeState({ humanFaction: 'azure' });
+    addUnit(state, {
+      faction: 'azure',
+      type: 'guardian',
+      q: 0,
+      r: 1,
+      movedThisTurn: false,
+    });
+    const restored = deserialize(serialize(state));
+    expect(restored).not.toBeNull();
+    const rg = restored!.units.find((u) => u.type === 'guardian')!;
+    expect(rg.movedThisTurn).toBe(false);
+    const canonUnits = (
+      canonicalGameState(restored!) as { units: { type: string; movedThisTurn?: boolean }[] }
+    ).units;
+    const cg = canonUnits.find((u) => u.type === 'guardian')!;
+    expect(cg.movedThisTurn).toBe(false);
+  });
+
+  it('저장 왕복 후 guardian movedThisTurn=true가 보존된다', () => {
+    const state = makeState({ humanFaction: 'azure' });
+    addUnit(state, {
+      faction: 'azure',
+      type: 'guardian',
+      q: 0,
+      r: 1,
+      movedThisTurn: true,
+    });
+    const restored = deserialize(serialize(state));
+    expect(restored).not.toBeNull();
+    const rg = restored!.units.find((u) => u.type === 'guardian')!;
+    expect(rg.movedThisTurn).toBe(true);
+    const canonUnits = (
+      canonicalGameState(restored!) as { units: { type: string; movedThisTurn?: boolean }[] }
+    ).units;
+    const cg = canonUnits.find((u) => u.type === 'guardian')!;
+    expect(cg.movedThisTurn).toBe(true);
+  });
+
+  it('2.2 guardian 리플레이가 exact 검증을 통과한다', () => {
+    const { doc } = playAzureGuardianMission(20262201);
+    const v = verifyReplay(doc);
+    expect(v.ok, v.ok ? '' : `${v.reason}`).toBe(true);
+    expect(checkReplayCompatibility(doc).compatibility).toBe('exact');
+  });
+
+  it('guardian 수호 태세 정본 상태를 변조하면 digest 검증이 실패한다', () => {
+    const { state, doc } = playAzureGuardianMission(20262202);
+    expect(verifyReplay(doc).ok).toBe(true);
+
+    // 재생된 최종 상태에서 guardian movedThisTurn만 뒤집으면 digest가 달라져 불일치가 난다
+    const verified = verifyReplay(doc);
+    expect(verified.ok).toBe(true);
+    const live = verified.state!;
+    const g = live.units.find((u) => u.type === 'guardian');
+    if (g) {
+      const before = stateDigest(live);
+      g.movedThisTurn = !(g.movedThisTurn === true);
+      const after = stateDigest(live);
+      expect(after).not.toBe(before);
+      expect(after).not.toBe(doc.finalStateDigest);
+      // 기록된 최종 digest를 변조 상태로 바꾸면 재생 검증이 실패한다
+      expect(verifyReplay({ ...doc, finalStateDigest: after }).ok).toBe(false);
+    } else {
+      // 수호대가 전멸한 시드: 최종 digest 문자열 변조로 검출을 확인
+      expect(verifyReplay({ ...doc, finalStateDigest: 'deadbeefdeadbeef' }).ok).toBe(false);
+    }
+    void state;
+  });
+
+  it('공용 병종 정본에는 movedThisTurn이 없어 2.1 이하 digest 형식을 보존한다', () => {
+    const state = makeState();
+    addUnit(state, { faction: 'azure', type: 'infantry', q: 0, r: 0, movedThisTurn: true });
+    addUnit(state, { faction: 'crimson', type: 'cavalry', q: 1, r: 0, movedThisTurn: false });
+    addUnit(state, { faction: 'violet', type: 'archer', q: 2, r: 0 });
+    const baseCanon = canonicalGameState(state) as { units: Record<string, unknown>[] };
+    expect(
+      baseCanon.units.every((u) => !Object.prototype.hasOwnProperty.call(u, 'movedThisTurn')),
+    ).toBe(true);
+    addUnit(state, { faction: 'azure', type: 'guardian', q: 0, r: 1, movedThisTurn: true });
+    const canon = canonicalGameState(state) as {
+      units: { type: string; movedThisTurn?: boolean }[];
+    };
+    const shared = canon.units.filter((u) => u.type !== 'guardian');
+    expect(shared.every((u) => u.movedThisTurn === undefined)).toBe(true);
+    const g = canon.units.find((u) => u.type === 'guardian')!;
+    expect(g.movedThisTurn).toBe(true);
+  });
+});
 
 describe('고유 병종 저장·리플레이', () => {
   it('고유 병종·movedThisTurn·uniqueUnits 규칙을 저장 왕복으로 보존한다', () => {
     const state = newGame(101, { difficulty: 'normal' });
     expect(state.objectives.uniqueUnits).toBe(true);
-    // 수호대 배치 후 이동 플래그
     const g = addUnit(state, {
       faction: 'azure',
       type: 'guardian',
       q: state.units[0].q + 2,
       r: state.units[0].r,
     });
-    // 좌표 충돌 시 다른 자리
     if (state.units.filter((u) => u.q === g.q && u.r === g.r).length > 1) {
       g.q += 1;
     }
     g.movedThisTurn = false;
-    state.units.push(
-      ...[],
-    );
-    // 기존 유닛과 겹치면 제거 후 재배치
     const free = state.tiles.find(
       (t) => t.terrain !== 'water' && !state.units.some((u) => u.q === t.q && u.r === t.r),
     )!;
@@ -87,12 +242,10 @@ describe('고유 병종 저장·리플레이', () => {
       replayId: 'compat-22',
       createdAt: '2026-07-20T00:00:00.000Z',
     })!;
-    // GAME_VERSION is still 2.1 until release — force 2.2 for compat registry check
-    const as22 = { ...doc, gameVersion: '2.2.0' };
+    const as22 = { ...doc, gameVersion: GAME_VERSION.startsWith('2.2') ? GAME_VERSION : '2.2.0' };
     const d = checkReplayCompatibility(as22);
     expect(d.compatibility).toBe('exact');
   });
-
 });
 
 describe('고유 병종 분석 지표', () => {
