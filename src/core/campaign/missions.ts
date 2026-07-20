@@ -125,13 +125,18 @@ function azureMission1(): ScenarioDocumentV1 {
 
 function crimsonMission1(): ScenarioDocumentV1 {
   const b = new BoardBuilder(10, 10);
-  // 서쪽 진홍 기병대가 동쪽 청람 마을들을 급습한다
+  // 서쪽 진홍 기병대가 동쪽 청람 마을들을 급습한다.
+  // 목표 마을을 동쪽으로 벌리고 수비대를 거점에 세워 1라운드 동시 점령을 막는다.
   b.set(4, 4, { terrain: 'forest' })
     .set(4, 5, { terrain: 'forest' })
     .set(5, 3, { terrain: 'forest' })
     .set(5, 6, { terrain: 'forest' })
+    .set(3, 4, { terrain: 'forest' })
+    .set(3, 5, { terrain: 'forest' })
     .set(2, 1, { terrain: 'forest' })
     .set(2, 8, { terrain: 'forest' })
+    .set(6, 2, { terrain: 'forest' })
+    .set(6, 7, { terrain: 'forest' })
     .set(7, 0, { terrain: 'mountain' })
     .set(7, 9, { terrain: 'mountain' })
     .set(0, 0, { terrain: 'water' })
@@ -140,20 +145,23 @@ function crimsonMission1(): ScenarioDocumentV1 {
     .set(9, 9, { terrain: 'water' });
   b.set(1, 4, { building: 'capital', owner: 'crimson' })
     .set(8, 4, { building: 'capital', owner: 'azure' })
-    .set(6, 2, { building: 'village', owner: 'azure' })
-    .set(6, 7, { building: 'village', owner: 'azure' })
-    .set(7, 4, { building: 'village' });
+    // 북·남 목표 마을을 멀리 분리(한 라운드에 둘 다 닿지 않음)
+    .set(8, 1, { building: 'village', owner: 'azure' })
+    .set(8, 8, { building: 'village', owner: 'azure' })
+    // 중앙 중립 마을은 중간 거점(점령 1곳만으로는 승리 불가)
+    .set(5, 4, { building: 'village' });
 
   const units: ScenarioUnitSetup[] = [
-    // 진홍 돌격대: 기병 중심
+    // 진홍 돌격대: 기병 중심(시작을 서쪽에 두어 도달 턴을 확보)
     { faction: 'crimson', type: 'cavalry', ...b.at(2, 3) },
-    { faction: 'crimson', type: 'cavalry', ...b.at(3, 4) },
+    { faction: 'crimson', type: 'cavalry', ...b.at(2, 4) },
     { faction: 'crimson', type: 'cavalry', ...b.at(2, 5) },
     { faction: 'crimson', type: 'infantry', ...b.at(1, 3) },
-    // 청람 수비대
-    { faction: 'azure', type: 'infantry', ...b.at(5, 2) },
-    { faction: 'azure', type: 'infantry', ...b.at(5, 7) },
-    { faction: 'azure', type: 'archer', ...b.at(7, 3) },
+    // 청람 수비대: 목표 마을·접근로에 배치해 빈 거점 직점령을 막음
+    { faction: 'azure', type: 'infantry', ...b.at(8, 1) },
+    { faction: 'azure', type: 'infantry', ...b.at(8, 8) },
+    { faction: 'azure', type: 'infantry', ...b.at(6, 4) },
+    { faction: 'azure', type: 'archer', ...b.at(7, 4) },
   ];
 
   return {

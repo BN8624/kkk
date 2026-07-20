@@ -1,36 +1,42 @@
 {
-  "generatedAt": "2026-07-19T12:59:52.328Z",
-  "elapsedSec": 2.9,
-  "totalGames": 324,
+  "generatedAt": "2026-07-20T00:45:16.793Z",
+  "elapsedSec": 5.4,
+  "totalGames": 405,
   "noisySeeds": 8,
   "minUniqueTrajectories": 6,
   "pass": true,
   "reports": [
     {
       "missionId": "azure-1",
-      "games": 36,
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 36,
-      "winRate": 1,
-      "avgEndTurn": 9.7,
+      "uniqueTrajectories": 45,
+      "winRate": 0.956,
+      "avgEndTurn": 9.6,
       "starHistogram": [
         0,
-        25,
-        10,
-        1
+        27,
+        14,
+        2
       ],
-      "defeatCauses": {},
+      "defeatCauses": {
+        "전멸": 1,
+        "적 목표 달성": 1
+      },
       "victoryPaths": {
-        "목표 달성": 30,
-        "정복(전멸)": 6
+        "목표 달성": 36,
+        "정복(전멸)": 7
       },
       "unitUsage": {
-        "infantry": 279,
-        "archer": 104,
-        "cavalry": 2
+        "infantry": 323,
+        "archer": 132,
+        "cavalry": 13,
+        "guardian": 0,
+        "raider": 0,
+        "crossbow": 0
       },
-      "idleHumanTurns": 0,
+      "idleHumanTurns": 2,
       "autoWins": 0,
       "perPolicy": [
         {
@@ -61,8 +67,8 @@
           "wins": 3,
           "stars": [
             0,
-            2,
-            1,
+            3,
+            0,
             0
           ]
         },
@@ -80,11 +86,44 @@
         {
           "policy": "noisy",
           "games": 24,
-          "wins": 24,
+          "wins": 23,
           "stars": [
             0,
-            18,
+            17,
             6,
+            0
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            3,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 2,
+          "stars": [
+            0,
+            1,
+            1,
             0
           ]
         }
@@ -94,42 +133,45 @@
     },
     {
       "missionId": "azure-2",
-      "games": 36,
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 32,
-      "winRate": 0.944,
-      "avgEndTurn": 4.5,
+      "uniqueTrajectories": 37,
+      "winRate": 0.867,
+      "avgEndTurn": 5,
       "starHistogram": [
         0,
+        4,
         8,
-        7,
-        19
+        27
       ],
       "defeatCauses": {
-        "턴 제한": 2
+        "턴 제한": 6
       },
       "victoryPaths": {
-        "정복(전멸)": 16,
-        "목표 달성": 18
+        "정복(전멸)": 29,
+        "목표 달성": 10
       },
       "unitUsage": {
-        "infantry": 74,
-        "archer": 20,
-        "cavalry": 2
+        "infantry": 102,
+        "archer": 30,
+        "cavalry": 0,
+        "guardian": 0,
+        "raider": 0,
+        "crossbow": 0
       },
-      "idleHumanTurns": 5,
+      "idleHumanTurns": 8,
       "autoWins": 0,
       "perPolicy": [
         {
           "policy": "aggressive",
           "games": 3,
-          "wins": 2,
+          "wins": 3,
           "stars": [
             0,
-            2,
             0,
-            0
+            1,
+            2
           ]
         },
         {
@@ -139,8 +181,8 @@
           "stars": [
             0,
             0,
-            0,
-            2
+            1,
+            1
           ]
         },
         {
@@ -160,53 +202,350 @@
           "wins": 3,
           "stars": [
             0,
-            1,
-            2,
-            0
+            0,
+            0,
+            3
           ]
         },
         {
           "policy": "noisy",
           "games": 24,
-          "wins": 24,
+          "wins": 22,
           "stars": [
             0,
-            5,
-            5,
+            4,
+            4,
             14
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            1,
+            2
           ]
         }
       ],
-      "winlessPolicies": [],
+      "winlessPolicies": [
+        "human-like-cautious"
+      ],
       "warnings": []
     },
     {
       "missionId": "azure-3",
-      "games": 36,
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 34,
-      "winRate": 0.361,
-      "avgEndTurn": 5.2,
+      "uniqueTrajectories": 38,
+      "winRate": 0.089,
+      "avgEndTurn": 2.8,
       "starHistogram": [
         0,
-        3,
-        9,
+        1,
+        2,
         1
       ],
       "defeatCauses": {
-        "적 목표 달성": 23
+        "적 목표 달성": 41
       },
       "victoryPaths": {
-        "목표 달성": 4,
-        "정복(전멸)": 9
+        "목표 달성": 3,
+        "정복(전멸)": 1
       },
       "unitUsage": {
-        "infantry": 171,
-        "archer": 42,
-        "cavalry": 9
+        "infantry": 103,
+        "archer": 23,
+        "cavalry": 0,
+        "guardian": 5,
+        "raider": 0,
+        "crossbow": 0
       },
-      "idleHumanTurns": 1,
+      "idleHumanTurns": 0,
+      "autoWins": 0,
+      "perPolicy": [
+        {
+          "policy": "aggressive",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "defensive",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "economic",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "balanced",
+          "games": 3,
+          "wins": 2,
+          "stars": [
+            0,
+            0,
+            1,
+            1
+          ]
+        },
+        {
+          "policy": "noisy",
+          "games": 24,
+          "wins": 1,
+          "stars": [
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 1,
+          "stars": [
+            0,
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "winlessPolicies": [
+        "aggressive",
+        "defensive",
+        "economic",
+        "objective-denial",
+        "human-like-direct"
+      ],
+      "warnings": []
+    },
+    {
+      "missionId": "crimson-1",
+      "games": 45,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "uniqueTrajectories": 40,
+      "winRate": 0.333,
+      "avgEndTurn": 6.6,
+      "starHistogram": [
+        0,
+        1,
+        4,
+        10
+      ],
+      "defeatCauses": {
+        "턴 제한": 29,
+        "전멸": 1
+      },
+      "victoryPaths": {
+        "목표 달성": 7,
+        "정복(전멸)": 8
+      },
+      "unitUsage": {
+        "infantry": 124,
+        "archer": 65,
+        "cavalry": 3,
+        "guardian": 0,
+        "raider": 0,
+        "crossbow": 0
+      },
+      "idleHumanTurns": 0,
+      "autoWins": 0,
+      "perPolicy": [
+        {
+          "policy": "aggressive",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "defensive",
+          "games": 3,
+          "wins": 1,
+          "stars": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "policy": "economic",
+          "games": 3,
+          "wins": 1,
+          "stars": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "policy": "balanced",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            0,
+            3
+          ]
+        },
+        {
+          "policy": "noisy",
+          "games": 24,
+          "wins": 9,
+          "stars": [
+            0,
+            1,
+            4,
+            4
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 1,
+          "stars": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "winlessPolicies": [
+        "aggressive",
+        "objective-denial",
+        "human-like-direct"
+      ],
+      "warnings": []
+    },
+    {
+      "missionId": "crimson-2",
+      "games": 45,
+      "unfinished": 0,
+      "invalidStates": 0,
+      "uniqueTrajectories": 40,
+      "winRate": 0.467,
+      "avgEndTurn": 8.7,
+      "starHistogram": [
+        0,
+        6,
+        12,
+        3
+      ],
+      "defeatCauses": {
+        "턴 제한": 24
+      },
+      "victoryPaths": {
+        "목표 달성": 19,
+        "정복(전멸)": 2
+      },
+      "unitUsage": {
+        "infantry": 253,
+        "archer": 85,
+        "cavalry": 8,
+        "guardian": 0,
+        "raider": 6,
+        "crossbow": 0
+      },
+      "idleHumanTurns": 0,
       "autoWins": 0,
       "perPolicy": [
         {
@@ -227,23 +566,12 @@
           "stars": [
             0,
             0,
-            2,
-            0
+            1,
+            1
           ]
         },
         {
           "policy": "economic",
-          "games": 3,
-          "wins": 0,
-          "stars": [
-            0,
-            0,
-            0,
-            0
-          ]
-        },
-        {
-          "policy": "balanced",
           "games": 3,
           "wins": 3,
           "stars": [
@@ -254,48 +582,96 @@
           ]
         },
         {
-          "policy": "noisy",
-          "games": 24,
-          "wins": 8,
+          "policy": "balanced",
+          "games": 3,
+          "wins": 3,
           "stars": [
             0,
-            2,
-            6,
+            0,
+            3,
+            0
+          ]
+        },
+        {
+          "policy": "noisy",
+          "games": 24,
+          "wins": 12,
+          "stars": [
+            0,
+            5,
+            7,
+            0
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 1,
+          "stars": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 0,
+          "stars": [
+            0,
+            0,
+            0,
             0
           ]
         }
       ],
       "winlessPolicies": [
         "aggressive",
-        "economic"
+        "objective-denial",
+        "human-like-direct"
       ],
       "warnings": []
     },
     {
-      "missionId": "crimson-1",
-      "games": 36,
+      "missionId": "crimson-3",
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 34,
-      "winRate": 0.806,
-      "avgEndTurn": 4.7,
+      "uniqueTrajectories": 42,
+      "winRate": 0.8,
+      "avgEndTurn": 5.7,
       "starHistogram": [
         0,
-        3,
-        13,
-        13
+        8,
+        28,
+        0
       ],
       "defeatCauses": {
-        "턴 제한": 7
+        "적 목표 달성": 9
       },
       "victoryPaths": {
-        "정복(전멸)": 4,
-        "목표 달성": 25
+        "목표 달성": 34,
+        "정복(전멸)": 2
       },
       "unitUsage": {
-        "infantry": 82,
-        "archer": 20,
-        "cavalry": 0
+        "infantry": 180,
+        "archer": 49,
+        "cavalry": 28,
+        "guardian": 0,
+        "raider": 6,
+        "crossbow": 0
       },
       "idleHumanTurns": 0,
       "autoWins": 0,
@@ -303,34 +679,34 @@
         {
           "policy": "aggressive",
           "games": 3,
-          "wins": 1,
+          "wins": 3,
           "stars": [
             0,
-            0,
             1,
+            2,
             0
           ]
         },
         {
           "policy": "defensive",
           "games": 3,
-          "wins": 3,
+          "wins": 2,
           "stars": [
             0,
-            0,
             1,
-            2
+            1,
+            0
           ]
         },
         {
           "policy": "economic",
           "games": 3,
-          "wins": 3,
+          "wins": 2,
           "stars": [
             0,
             0,
-            0,
-            3
+            2,
+            0
           ]
         },
         {
@@ -339,8 +715,8 @@
           "wins": 3,
           "stars": [
             0,
-            1,
-            2,
+            0,
+            3,
             0
           ]
         },
@@ -350,136 +726,24 @@
           "wins": 19,
           "stars": [
             0,
-            2,
-            9,
-            8
-          ]
-        }
-      ],
-      "winlessPolicies": [],
-      "warnings": []
-    },
-    {
-      "missionId": "crimson-2",
-      "games": 36,
-      "unfinished": 0,
-      "invalidStates": 0,
-      "uniqueTrajectories": 36,
-      "winRate": 0.722,
-      "avgEndTurn": 6.9,
-      "starHistogram": [
-        0,
-        3,
-        11,
-        12
-      ],
-      "defeatCauses": {
-        "턴 제한": 9,
-        "전멸": 1
-      },
-      "victoryPaths": {
-        "목표 달성": 23,
-        "정복(전멸)": 3
-      },
-      "unitUsage": {
-        "infantry": 166,
-        "archer": 44,
-        "cavalry": 4
-      },
-      "idleHumanTurns": 0,
-      "autoWins": 0,
-      "perPolicy": [
-        {
-          "policy": "aggressive",
-          "games": 3,
-          "wins": 1,
-          "stars": [
-            0,
-            0,
-            0,
-            1
-          ]
-        },
-        {
-          "policy": "defensive",
-          "games": 3,
-          "wins": 0,
-          "stars": [
-            0,
-            0,
-            0,
+            3,
+            16,
             0
           ]
         },
         {
-          "policy": "economic",
-          "games": 3,
-          "wins": 2,
-          "stars": [
-            0,
-            0,
-            0,
-            2
-          ]
-        },
-        {
-          "policy": "balanced",
+          "policy": "objective-denial",
           "games": 3,
           "wins": 3,
           "stars": [
             0,
-            0,
             2,
-            1
+            1,
+            0
           ]
         },
         {
-          "policy": "noisy",
-          "games": 24,
-          "wins": 20,
-          "stars": [
-            0,
-            3,
-            9,
-            8
-          ]
-        }
-      ],
-      "winlessPolicies": [
-        "defensive"
-      ],
-      "warnings": []
-    },
-    {
-      "missionId": "crimson-3",
-      "games": 36,
-      "unfinished": 0,
-      "invalidStates": 0,
-      "uniqueTrajectories": 36,
-      "winRate": 0.667,
-      "avgEndTurn": 4.8,
-      "starHistogram": [
-        0,
-        0,
-        22,
-        2
-      ],
-      "defeatCauses": {
-        "적 목표 달성": 12
-      },
-      "victoryPaths": {
-        "목표 달성": 24
-      },
-      "unitUsage": {
-        "infantry": 130,
-        "archer": 21,
-        "cavalry": 0
-      },
-      "idleHumanTurns": 0,
-      "autoWins": 0,
-      "perPolicy": [
-        {
-          "policy": "aggressive",
+          "policy": "human-like-cautious",
           "games": 3,
           "wins": 1,
           "stars": [
@@ -490,47 +754,14 @@
           ]
         },
         {
-          "policy": "defensive",
-          "games": 3,
-          "wins": 2,
-          "stars": [
-            0,
-            0,
-            2,
-            0
-          ]
-        },
-        {
-          "policy": "economic",
+          "policy": "human-like-direct",
           "games": 3,
           "wins": 3,
           "stars": [
             0,
-            0,
-            3,
-            0
-          ]
-        },
-        {
-          "policy": "balanced",
-          "games": 3,
-          "wins": 2,
-          "stars": [
-            0,
-            0,
             1,
-            1
-          ]
-        },
-        {
-          "policy": "noisy",
-          "games": 24,
-          "wins": 16,
-          "stars": [
-            0,
-            0,
-            15,
-            1
+            2,
+            0
           ]
         }
       ],
@@ -539,29 +770,33 @@
     },
     {
       "missionId": "violet-1",
-      "games": 36,
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 36,
-      "winRate": 0.5,
+      "uniqueTrajectories": 42,
+      "winRate": 0.533,
       "avgEndTurn": 6.2,
       "starHistogram": [
         0,
-        1,
-        9,
-        8
+        0,
+        14,
+        10
       ],
       "defeatCauses": {
-        "적 목표 달성": 17,
-        "턴 제한": 1
+        "적 목표 달성": 19,
+        "턴 제한": 2
       },
       "victoryPaths": {
-        "목표 달성": 18
+        "목표 달성": 23,
+        "정복(전멸)": 1
       },
       "unitUsage": {
-        "infantry": 185,
-        "archer": 34,
-        "cavalry": 3
+        "infantry": 206,
+        "archer": 49,
+        "cavalry": 16,
+        "guardian": 0,
+        "raider": 0,
+        "crossbow": 0
       },
       "idleHumanTurns": 0,
       "autoWins": 0,
@@ -580,12 +815,12 @@
         {
           "policy": "defensive",
           "games": 3,
-          "wins": 3,
+          "wins": 2,
           "stars": [
             0,
             0,
             1,
-            2
+            1
           ]
         },
         {
@@ -595,8 +830,8 @@
           "stars": [
             0,
             0,
-            0,
-            2
+            1,
+            1
           ]
         },
         {
@@ -605,8 +840,8 @@
           "wins": 3,
           "stars": [
             0,
-            1,
-            1,
+            0,
+            2,
             1
           ]
         },
@@ -617,8 +852,41 @@
           "stars": [
             0,
             0,
-            6,
-            2
+            7,
+            1
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 2,
+          "stars": [
+            0,
+            0,
+            1,
+            1
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            0,
+            3
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 2,
+          "stars": [
+            0,
+            0,
+            1,
+            1
           ]
         }
       ],
@@ -627,26 +895,29 @@
     },
     {
       "missionId": "violet-2",
-      "games": 36,
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 30,
+      "uniqueTrajectories": 33,
       "winRate": 1,
-      "avgEndTurn": 4.9,
+      "avgEndTurn": 3.6,
       "starHistogram": [
         0,
-        12,
-        10,
-        14
+        4,
+        26,
+        15
       ],
       "defeatCauses": {},
       "victoryPaths": {
-        "목표 달성": 36
+        "목표 달성": 45
       },
       "unitUsage": {
-        "infantry": 154,
-        "archer": 19,
-        "cavalry": 7
+        "infantry": 112,
+        "archer": 28,
+        "cavalry": 15,
+        "guardian": 0,
+        "raider": 0,
+        "crossbow": 3
       },
       "idleHumanTurns": 0,
       "autoWins": 0,
@@ -657,8 +928,8 @@
           "wins": 3,
           "stars": [
             0,
-            2,
             1,
+            2,
             0
           ]
         },
@@ -679,8 +950,8 @@
           "wins": 3,
           "stars": [
             0,
-            1,
-            1,
+            0,
+            2,
             1
           ]
         },
@@ -690,9 +961,9 @@
           "wins": 3,
           "stars": [
             0,
-            0,
-            3,
-            0
+            1,
+            1,
+            1
           ]
         },
         {
@@ -701,9 +972,42 @@
           "wins": 24,
           "stars": [
             0,
-            9,
-            3,
-            12
+            0,
+            14,
+            10
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            1,
+            2,
+            0
           ]
         }
       ],
@@ -712,57 +1016,38 @@
     },
     {
       "missionId": "violet-3",
-      "games": 36,
+      "games": 45,
       "unfinished": 0,
       "invalidStates": 0,
-      "uniqueTrajectories": 36,
-      "winRate": 0.917,
-      "avgEndTurn": 10.9,
+      "uniqueTrajectories": 39,
+      "winRate": 0.911,
+      "avgEndTurn": 9,
       "starHistogram": [
         0,
-        13,
-        8,
-        12
+        7,
+        3,
+        31
       ],
       "defeatCauses": {
-        "턴 제한": 3
+        "턴 제한": 4
       },
       "victoryPaths": {
-        "정복(전멸)": 26,
-        "목표 달성": 7
+        "정복(전멸)": 29,
+        "목표 달성": 12
       },
       "unitUsage": {
-        "infantry": 351,
-        "archer": 82,
-        "cavalry": 22
+        "infantry": 310,
+        "archer": 73,
+        "cavalry": 67,
+        "guardian": 0,
+        "raider": 0,
+        "crossbow": 4
       },
       "idleHumanTurns": 0,
       "autoWins": 0,
       "perPolicy": [
         {
           "policy": "aggressive",
-          "games": 3,
-          "wins": 3,
-          "stars": [
-            0,
-            1,
-            1,
-            1
-          ]
-        },
-        {
-          "policy": "defensive",
-          "games": 3,
-          "wins": 3,
-          "stars": [
-            0,
-            1,
-            1,
-            1
-          ]
-        },
-        {
-          "policy": "economic",
           "games": 3,
           "wins": 2,
           "stars": [
@@ -773,25 +1058,80 @@
           ]
         },
         {
+          "policy": "defensive",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "policy": "economic",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            0,
+            3
+          ]
+        },
+        {
           "policy": "balanced",
           "games": 3,
           "wins": 3,
           "stars": [
             0,
-            2,
+            0,
             1,
-            0
+            2
           ]
         },
         {
           "policy": "noisy",
           "games": 24,
-          "wins": 22,
+          "wins": 23,
           "stars": [
             0,
-            9,
-            5,
-            8
+            7,
+            1,
+            15
+          ]
+        },
+        {
+          "policy": "objective-denial",
+          "games": 3,
+          "wins": 2,
+          "stars": [
+            0,
+            0,
+            0,
+            2
+          ]
+        },
+        {
+          "policy": "human-like-cautious",
+          "games": 3,
+          "wins": 3,
+          "stars": [
+            0,
+            0,
+            0,
+            3
+          ]
+        },
+        {
+          "policy": "human-like-direct",
+          "games": 3,
+          "wins": 2,
+          "stars": [
+            0,
+            0,
+            0,
+            2
           ]
         }
       ],

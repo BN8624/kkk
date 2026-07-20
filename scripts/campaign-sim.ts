@@ -21,6 +21,10 @@ interface MissionReport {
   unfinished: number;
   invalidStates: number;
   immediateEnds: number;
+  /** 인간 승리 중 종료 턴이 1인 횟수(첫 라운드 종료 승리) */
+  firstRoundWins: number;
+  /** 인간 승리 중 종료 턴이 2 미만인 횟수 */
+  winsBeforeTurn2: number;
   stalledFactions: string[];
   /** 인간 보통 실력 vs 미션 기본 난이도(normal) 승리 수 */
   normalWins: number;
@@ -46,6 +50,8 @@ for (const campaign of CAMPAIGNS) {
       unfinished: 0,
       invalidStates: 0,
       immediateEnds: 0,
+      firstRoundWins: 0,
+      winsBeforeTurn2: 0,
       stalledFactions: [],
       normalWins: 0,
       winRateAll: 0,
@@ -98,9 +104,12 @@ for (const campaign of CAMPAIGNS) {
               stalled.add(f);
             }
           }
-          turnSum += Math.min(state.turn, state.maxTurns);
+          const endTurn = Math.min(state.turn, state.maxTurns);
+          turnSum += endTurn;
           if (state.winner === human) {
             wins++;
+            if (endTurn <= 1) rep.firstRoundWins++;
+            if (endTurn < 2) rep.winsBeforeTurn2++;
             if (humanSkill === 'normal' && enemyDifficulty === 'normal') rep.normalWins++;
             const s = Math.min(3, starsEarned(state).filter(Boolean).length);
             rep.starHistogram[s]++;
@@ -116,7 +125,8 @@ for (const campaign of CAMPAIGNS) {
   }
 }
 
-// 강제 PASS 조건: 종료 불능·불법 상태·시작 즉시 승패 0, 모든 미션이 보통/보통에서 승리 가능, 행동 정체 없음
+// 강제 PASS 조건: 종료 불능·불법 상태·시작 즉시 승패 0, 첫 라운드 승리 0,
+// 모든 미션이 보통/보통에서 승리 가능, 행동 정체 없음
 const pass =
   totalGames >= 900 &&
   reports.every(
@@ -124,12 +134,24 @@ const pass =
       r.unfinished === 0 &&
       r.invalidStates === 0 &&
       r.immediateEnds === 0 &&
+      r.firstRoundWins === 0 &&
+      r.winsBeforeTurn2 === 0 &&
       r.normalWins >= 1 &&
       r.stalledFactions.length === 0,
   );
 
 const elapsedSec = +((Date.now() - startedAt) / 1000).toFixed(1);
-const summary = { generatedAt: new Date().toISOString(), elapsedSec, totalGames, pass, reports };
+const firstRoundWinsByMission = Object.fromEntries(
+  reports.map((r) => [r.missionId, r.firstRoundWins]),
+);
+const summary = {
+  generatedAt: new Date().toISOString(),
+  elapsedSec,
+  totalGames,
+  pass,
+  firstRoundWinsByMission,
+  reports,
+};
 writeFileSync(join(outDir, 'campaign-sim-summary.json'), JSON.stringify(summary, null, 2));
 
 const md = [
@@ -139,12 +161,15 @@ const md = [
   '- 주의: 고정 지도 + 결정론 AI라 같은 난이도 조합 안에서 시드는 궤적을 바꾸지 않는다.',
   '  이 수치는 안정성·상대 난이도 검증이며 인간 재미의 증거가 아니다.',
   '',
-  '| 미션 | 게임 | 종료불능 | 불법상태 | 즉시승패 | 정체 | 보통승리 | 전체승률 | 평균턴 | 별 0/1/2/3 |',
-  '|---|---|---|---|---|---|---|---|---|---|',
+  '| 미션 | 게임 | 종료불능 | 불법상태 | 즉시승패 | 1R승리 | <2턴승 | 정체 | 보통승리 | 전체승률 | 평균턴 | 별 0/1/2/3 |',
+  '|---|---|---|---|---|---|---|---|---|---|---|---|',
   ...reports.map(
     (r) =>
-      `| ${r.missionId} | ${r.games} | ${r.unfinished} | ${r.invalidStates} | ${r.immediateEnds} | ${r.stalledFactions.join(',') || '-'} | ${r.normalWins} | ${(r.winRateAll * 100).toFixed(0)}% | ${r.avgEndTurn} | ${r.starHistogram.join('/')} |`,
+      `| ${r.missionId} | ${r.games} | ${r.unfinished} | ${r.invalidStates} | ${r.immediateEnds} | ${r.firstRoundWins} | ${r.winsBeforeTurn2} | ${r.stalledFactions.join(',') || '-'} | ${r.normalWins} | ${(r.winRateAll * 100).toFixed(0)}% | ${r.avgEndTurn} | ${r.starHistogram.join('/')} |`,
   ),
+  '',
+  '### 미션별 첫 라운드 승리 횟수',
+  ...reports.map((r) => `- ${r.missionId}: firstRoundWins=${r.firstRoundWins}, winsBeforeTurn2=${r.winsBeforeTurn2}`),
   '',
   `## 판정: ${pass ? 'PASS' : 'FAIL'}`,
   '',

@@ -127,6 +127,36 @@ describe('캠페인 미션 문서', () => {
       expect(unitsOf(state, state.config.humanFaction).length).toBeGreaterThan(0);
     }
   });
+
+  it('crimson-1은 첫 라운드 승리를 내지 않고 평균 종료 턴이 1을 넘는다', () => {
+    const m = ALL_MISSIONS.find((x) => x.id === 'crimson-1')!;
+    expect(m.scenario.title).toBe('첫 번째 돌격');
+    expect(m.scenario.rules.maxTurns).toBe(8);
+    expect(m.scenario.victoryConditions).toEqual([
+      { type: 'capture-count', building: 'village', count: 2 },
+    ]);
+    expect(m.scenario.units.every((u) => !['guardian', 'raider', 'crossbow'].includes(u.type))).toBe(
+      true,
+    );
+    const snapshot = normalizeScenario(m.scenario);
+    let firstRoundWins = 0;
+    let turnSum = 0;
+    let finished = 0;
+    for (let i = 0; i < 12; i++) {
+      const state = newGameFromScenario(20270500 + i, snapshot, {
+        mode: 'campaign',
+        difficulty: 'normal',
+      });
+      playFullGame(state);
+      expect(state.over).toBe(true);
+      finished++;
+      const endTurn = Math.min(state.turn, state.maxTurns);
+      turnSum += endTurn;
+      if (state.winner === state.config.humanFaction && endTurn <= 1) firstRoundWins++;
+    }
+    expect(firstRoundWins).toBe(0);
+    expect(turnSum / finished).toBeGreaterThan(1);
+  });
 });
 
 describe('캠페인 진행 저장', () => {
