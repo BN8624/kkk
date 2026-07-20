@@ -1,0 +1,1132 @@
+{
+  "schemaVersion": 2,
+  "gameVersion": "2.2.0",
+  "replayId": "fixture-2.2.0-guardian-azure-m2",
+  "createdAt": "2026-07-20T00:00:00.000Z",
+  "scenario": {
+    "schemaVersion": 1,
+    "id": "campaign-azure-2",
+    "title": "포위망 돌파",
+    "board": {
+      "cols": 9,
+      "rows": 12,
+      "tiles": [
+        {
+          "q": 0,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 0,
+          "terrain": "plains",
+          "building": "capital",
+          "owner": "crimson"
+        },
+        {
+          "q": 5,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 6,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 7,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 8,
+          "r": 0,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 5,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 6,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 7,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": 8,
+          "r": 1,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 2,
+          "terrain": "water"
+        },
+        {
+          "q": 0,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 5,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 6,
+          "r": 2,
+          "terrain": "plains"
+        },
+        {
+          "q": 7,
+          "r": 2,
+          "terrain": "plains",
+          "building": "capital",
+          "owner": "violet"
+        },
+        {
+          "q": -1,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 3,
+          "terrain": "forest"
+        },
+        {
+          "q": 2,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 5,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 6,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": 7,
+          "r": 3,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 5,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": 6,
+          "r": 4,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 5,
+          "terrain": "plains",
+          "building": "capital",
+          "owner": "azure"
+        },
+        {
+          "q": 3,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": 5,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": 6,
+          "r": 5,
+          "terrain": "plains"
+        },
+        {
+          "q": -3,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 6,
+          "terrain": "mountain"
+        },
+        {
+          "q": -1,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 6,
+          "terrain": "forest"
+        },
+        {
+          "q": 4,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": 5,
+          "r": 6,
+          "terrain": "plains"
+        },
+        {
+          "q": -3,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 7,
+          "terrain": "mountain"
+        },
+        {
+          "q": 5,
+          "r": 7,
+          "terrain": "plains"
+        },
+        {
+          "q": -4,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": -3,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 8,
+          "terrain": "forest"
+        },
+        {
+          "q": 0,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 8,
+          "terrain": "plains"
+        },
+        {
+          "q": -4,
+          "r": 9,
+          "terrain": "plains"
+        },
+        {
+          "q": -3,
+          "r": 9,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 9,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 9,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 9,
+          "terrain": "forest"
+        },
+        {
+          "q": 1,
+          "r": 9,
+          "terrain": "forest"
+        },
+        {
+          "q": 2,
+          "r": 9,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 9,
+          "terrain": "plains"
+        },
+        {
+          "q": 4,
+          "r": 9,
+          "terrain": "water"
+        },
+        {
+          "q": -5,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": -4,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": -3,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 10,
+          "terrain": "forest"
+        },
+        {
+          "q": -1,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": 0,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 10,
+          "terrain": "plains"
+        },
+        {
+          "q": -5,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": -4,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": -3,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": -2,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": -1,
+          "r": 11,
+          "terrain": "plains",
+          "building": "village"
+        },
+        {
+          "q": 0,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": 1,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": 2,
+          "r": 11,
+          "terrain": "plains"
+        },
+        {
+          "q": 3,
+          "r": 11,
+          "terrain": "plains"
+        }
+      ]
+    },
+    "factions": [
+      {
+        "id": "azure",
+        "active": true,
+        "controller": "human",
+        "startGold": 40,
+        "useDoctrine": true
+      },
+      {
+        "id": "crimson",
+        "active": true,
+        "controller": "ai",
+        "startGold": 15,
+        "useDoctrine": true
+      },
+      {
+        "id": "violet",
+        "active": true,
+        "controller": "ai",
+        "startGold": 15,
+        "useDoctrine": true
+      }
+    ],
+    "units": [
+      {
+        "faction": "azure",
+        "type": "cavalry",
+        "q": 3,
+        "r": 3,
+        "hp": 14,
+        "canAct": true
+      },
+      {
+        "faction": "azure",
+        "type": "archer",
+        "q": 2,
+        "r": 4,
+        "hp": 10,
+        "canAct": true
+      },
+      {
+        "faction": "azure",
+        "type": "infantry",
+        "q": 1,
+        "r": 5,
+        "hp": 12,
+        "canAct": true
+      },
+      {
+        "faction": "azure",
+        "type": "guardian",
+        "q": 2,
+        "r": 5,
+        "hp": 16,
+        "canAct": true
+      },
+      {
+        "faction": "azure",
+        "type": "infantry",
+        "q": 3,
+        "r": 5,
+        "hp": 12,
+        "canAct": true
+      },
+      {
+        "faction": "azure",
+        "type": "infantry",
+        "q": 1,
+        "r": 6,
+        "hp": 12,
+        "canAct": true
+      },
+      {
+        "faction": "crimson",
+        "type": "cavalry",
+        "q": 2,
+        "r": 2,
+        "hp": 14,
+        "canAct": true
+      },
+      {
+        "faction": "crimson",
+        "type": "infantry",
+        "q": 3,
+        "r": 2,
+        "hp": 12,
+        "canAct": true
+      },
+      {
+        "faction": "violet",
+        "type": "archer",
+        "q": 5,
+        "r": 4,
+        "hp": 10,
+        "canAct": true
+      },
+      {
+        "faction": "violet",
+        "type": "infantry",
+        "q": -1,
+        "r": 11,
+        "hp": 6,
+        "canAct": true
+      }
+    ],
+    "rules": {
+      "maxTurns": 12,
+      "turnLimit": "defeat",
+      "doctrines": true,
+      "uniqueUnits": true
+    },
+    "victoryConditions": [
+      {
+        "type": "capture-building",
+        "at": {
+          "q": -1,
+          "r": 11
+        }
+      }
+    ],
+    "defeatConditions": [
+      {
+        "type": "human-eliminated"
+      },
+      {
+        "type": "turn-limit"
+      }
+    ],
+    "starConditions": [
+      {
+        "type": "win"
+      },
+      {
+        "type": "win-within-turns",
+        "turns": 4
+      },
+      {
+        "type": "units-lost-at-most",
+        "count": 1
+      }
+    ]
+  },
+  "scenarioDigest": "0571652e307c7d53",
+  "initialConfig": {
+    "mode": "campaign",
+    "scenario": "campaign-azure-2",
+    "difficulty": "normal",
+    "humanFaction": "azure"
+  },
+  "seed": 2200001,
+  "initialStateDigest": "cd9ffc20e7879bb3",
+  "commands": [
+    {
+      "v": 1,
+      "seq": 0,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 1,
+      "to": {
+        "q": 4,
+        "r": 0
+      }
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 2,
+      "defenderId": 7
+    },
+    {
+      "v": 1,
+      "seq": 2,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 3,
+      "to": {
+        "q": 1,
+        "r": 3
+      }
+    },
+    {
+      "v": 1,
+      "seq": 3,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 3,
+      "defenderId": 7
+    },
+    {
+      "v": 1,
+      "seq": 4,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 4,
+      "to": {
+        "q": 2,
+        "r": 3
+      }
+    },
+    {
+      "v": 1,
+      "seq": 5,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 4,
+      "defenderId": 7
+    },
+    {
+      "v": 1,
+      "seq": 6,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 5,
+      "to": {
+        "q": 4,
+        "r": 5
+      }
+    },
+    {
+      "v": 1,
+      "seq": 7,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 5,
+      "defenderId": 9
+    },
+    {
+      "v": 1,
+      "seq": 8,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 6,
+      "to": {
+        "q": 4,
+        "r": 4
+      }
+    },
+    {
+      "v": 1,
+      "seq": 9,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 6,
+      "defenderId": 9
+    },
+    {
+      "v": 1,
+      "seq": 10,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "produce-unit",
+      "at": {
+        "q": 2,
+        "r": 5
+      },
+      "unitType": "archer"
+    },
+    {
+      "v": 1,
+      "seq": 11,
+      "turn": 1,
+      "faction": "azure",
+      "client": "ai",
+      "type": "end-phase"
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "turn": 1,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 7,
+      "to": {
+        "q": 7,
+        "r": 2
+      }
+    },
+    {
+      "v": 1,
+      "seq": 13,
+      "turn": 1,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 8,
+      "to": {
+        "q": 3,
+        "r": 3
+      }
+    },
+    {
+      "v": 1,
+      "seq": 14,
+      "turn": 1,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 8,
+      "defenderId": 2
+    },
+    {
+      "v": 1,
+      "seq": 15,
+      "turn": 1,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "end-phase"
+    },
+    {
+      "v": 1,
+      "seq": 16,
+      "turn": 1,
+      "faction": "violet",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 10,
+      "to": {
+        "q": 0,
+        "r": 8
+      }
+    },
+    {
+      "v": 1,
+      "seq": 17,
+      "turn": 1,
+      "faction": "violet",
+      "client": "ai",
+      "type": "end-phase"
+    },
+    {
+      "v": 1,
+      "seq": 18,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 1,
+      "to": {
+        "q": 7,
+        "r": 1
+      }
+    },
+    {
+      "v": 1,
+      "seq": 19,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 1,
+      "defenderId": 7
+    },
+    {
+      "v": 1,
+      "seq": 20,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 2,
+      "to": {
+        "q": 0,
+        "r": 6
+      }
+    },
+    {
+      "v": 1,
+      "seq": 21,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 2,
+      "defenderId": 10
+    },
+    {
+      "v": 1,
+      "seq": 22,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 3,
+      "to": {
+        "q": 3,
+        "r": 2
+      }
+    },
+    {
+      "v": 1,
+      "seq": 23,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 3,
+      "defenderId": 8
+    },
+    {
+      "v": 1,
+      "seq": 24,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 4,
+      "defenderId": 8
+    },
+    {
+      "v": 1,
+      "seq": 25,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 5,
+      "to": {
+        "q": 7,
+        "r": 2
+      }
+    },
+    {
+      "v": 1,
+      "seq": 26,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 6,
+      "to": {
+        "q": 1,
+        "r": 7
+      }
+    },
+    {
+      "v": 1,
+      "seq": 27,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 6,
+      "defenderId": 10
+    },
+    {
+      "v": 1,
+      "seq": 28,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 11,
+      "defenderId": 8
+    },
+    {
+      "v": 1,
+      "seq": 29,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "produce-unit",
+      "at": {
+        "q": 4,
+        "r": 0
+      },
+      "unitType": "archer"
+    },
+    {
+      "v": 1,
+      "seq": 30,
+      "turn": 2,
+      "faction": "azure",
+      "client": "ai",
+      "type": "end-phase"
+    },
+    {
+      "v": 1,
+      "seq": 31,
+      "turn": 2,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 8,
+      "to": {
+        "q": 1,
+        "r": 5
+      }
+    },
+    {
+      "v": 1,
+      "seq": 32,
+      "turn": 2,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 8,
+      "defenderId": 2
+    },
+    {
+      "v": 1,
+      "seq": 33,
+      "turn": 2,
+      "faction": "crimson",
+      "client": "ai",
+      "type": "end-phase"
+    },
+    {
+      "v": 1,
+      "seq": 34,
+      "turn": 2,
+      "faction": "violet",
+      "client": "ai",
+      "type": "end-phase"
+    },
+    {
+      "v": 1,
+      "seq": 35,
+      "turn": 3,
+      "faction": "azure",
+      "client": "ai",
+      "type": "move-unit",
+      "unitId": 1,
+      "to": {
+        "q": 2,
+        "r": 4
+      }
+    },
+    {
+      "v": 1,
+      "seq": 36,
+      "turn": 3,
+      "faction": "azure",
+      "client": "ai",
+      "type": "attack-unit",
+      "attackerId": 1,
+      "defenderId": 8
+    }
+  ],
+  "result": {
+    "winner": "azure",
+    "turns": 3,
+    "score": 117,
+    "stars": 3
+  },
+  "finalStateDigest": "3b0401e8da1eb195"
+}

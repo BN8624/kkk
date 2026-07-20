@@ -12,7 +12,7 @@ export type { ReplayObservation } from './types';
 
 export const REPLAY_SCHEMA_VERSION = 2;
 /** 리플레이를 기록한 게임 버전(공개판 마감 시 package.json과 함께 올린다). */
-export const GAME_VERSION = '2.2.1';
+export const GAME_VERSION = '2.2.2';
 
 // ---------------- 정본 직렬화·다이제스트 ----------------
 
@@ -103,6 +103,91 @@ export function canonicalGameState(state: GameState): unknown {
 /** 게임 상태의 정본 다이제스트. 같은 상태는 배열 순서와 무관하게 항상 같은 값을 낸다. */
 export function stateDigest(state: GameState): string {
   return digestString(canonicalJson(canonicalGameState(state)));
+}
+
+/**
+ * 2.2.0(5a7bbac) 정본 형태 — 유닛에 movedThisTurn을 넣지 않는다.
+ * git show 5a7bbac:src/core/replay.ts 의 canonicalGameState와 바이트 동등 구조.
+ * 2.2.0 리플레이 legacy digest 검증·마이그레이션 전용(현행 exact 검증에 쓰지 않는다).
+ */
+export function canonicalGameStateV220(state: GameState): unknown {
+  return {
+    seed: state.seed,
+    config: {
+      mode: state.config.mode,
+      scenario: state.config.scenario,
+      difficulty: state.config.difficulty,
+      humanFaction: state.config.humanFaction,
+      modifier: state.config.modifier,
+    },
+    turn: state.turn,
+    maxTurns: state.maxTurns,
+    order: state.order,
+    current: state.current,
+    controllers: FACTION_IDS.map((f) => ({ id: f, controller: state.controllers[f] })),
+    tiles: [...state.tiles]
+      .sort((a, b) => a.r - b.r || a.q - b.q)
+      .map((t) => ({ q: t.q, r: t.r, terrain: t.terrain, building: t.building, owner: t.owner })),
+    units: [...state.units]
+      .sort((a, b) => a.id - b.id)
+      .map((u) => ({
+        id: u.id,
+        type: u.type,
+        faction: u.faction,
+        q: u.q,
+        r: u.r,
+        hp: u.hp,
+        moved: u.moved,
+        attacked: u.attacked,
+        tag: u.tag,
+      })),
+    factions: FACTION_IDS.map((f) => ({
+      id: f,
+      gold: state.factions[f].gold,
+      eliminated: state.factions[f].eliminated,
+    })),
+    stats: FACTION_IDS.map((f) => ({ id: f, ...state.stats[f] })),
+    nextUnitId: state.nextUnitId,
+    over: state.over,
+    winner: state.winner,
+    crownHold: state.crownHold
+      ? { owner: state.crownHold.owner, turns: state.crownHold.turns }
+      : undefined,
+    objectives: state.objectives,
+    cmdSeq: state.cmdSeq ?? 0,
+  };
+}
+
+/** 2.2.0 legacy 정본 다이제스트(5a7bbac 방식). */
+export function stateDigestV220(state: GameState): string {
+  return digestString(canonicalJson(canonicalGameStateV220(state)));
+}
+
+/**
+ * 2.2.0 리플레이를 legacy digest로 검증한 뒤 현행 digest·GAME_VERSION 문서로 변환한다.
+ * 검증 실패·명령 실패 시 null. 예외를 던지지 않는다.
+ */
+export function migrateReplayDocumentV220(doc: ReplayDocument): ReplayDocument | null {
+  try {
+    if (doc.schemaVersion !== REPLAY_SCHEMA_VERSION) return null;
+    if (!Array.isArray(doc.commands)) return null;
+    const state = replayInitialState(doc);
+    if (stateDigestV220(state) !== doc.initialStateDigest) return null;
+    for (const command of doc.commands) {
+      const r = executeCommand(state, command);
+      if (!r.ok) return null;
+    }
+    if (stateDigestV220(state) !== doc.finalStateDigest) return null;
+    const initial = replayInitialState(doc);
+    return {
+      ...doc,
+      gameVersion: GAME_VERSION,
+      initialStateDigest: stateDigest(initial),
+      finalStateDigest: stateDigest(state),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** 시나리오 스냅샷의 정본 다이제스트. */

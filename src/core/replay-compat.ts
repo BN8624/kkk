@@ -1,5 +1,5 @@
 // 한 줄 목적: 리플레이의 게임 규칙 버전 호환 판정(exact·migratable·playable-unverified·unsupported)과 마이그레이션
-import type { ReplayDocument } from './replay';
+import { migrateReplayDocumentV220, type ReplayDocument } from './replay';
 
 /**
  * 호환 등급.
@@ -54,14 +54,21 @@ export function parseVersion(version: string): [number, number, number] | null {
 /**
  * 규칙 버전 레지스트리. 전투 수치·규칙이 실제로 바뀔 때만 항목을 추가한다.
  * 1.5.x·2.0.x 비-crown 은 규칙 동일(exact). 2.0 crown-heart 는 왕관 규칙 변경으로 별도 강등.
- * 2.1.x 가 현재 exact 계열이다.
+ * 2.1.x 공용 exact. 2.2.0 은 guardian movedThisTurn 미포함 legacy digest → 명시적 migration.
+ * 2.2.1 이후(2.2.x) 는 현행 guardian digest exact. 레지스트리는 순차 매칭이므로 2.2.0 을 2.2.x 앞에 둔다.
  */
 export const REPLAY_RULE_VERSIONS: ReplayRuleVersion[] = [
   { versionRange: '1.5.x', compatibility: 'exact' },
   { versionRange: '2.0.x', compatibility: 'exact' },
   // 2.1.x: 공용 3병종 exact. 2.2에서 고유 병종 추가 — 공용 리플레이 digest는 유지
   { versionRange: '2.1.x', compatibility: 'exact' },
-  // 2.2.x: 고유 병종 생산·능력 exact
+  // 2.2.0: 5a7bbac digest(guardian movedThisTurn 없음) — legacy 검증 후 현행 digest로 변환
+  {
+    versionRange: '2.2.0',
+    compatibility: 'migratable',
+    migrate: migrateReplayDocumentV220,
+  },
+  // 2.2.1+: 고유 병종·guardian brace 상태 포함 exact
   { versionRange: '2.2.x', compatibility: 'exact' },
 ];
 
