@@ -1,6 +1,7 @@
 {
-  "generatedAt": "2026-07-20T00:45:19.558Z",
-  "seedsPerQuick": 12,
+  "generatedAt": "2026-07-21T15:00:35.850Z",
+  "seedsPerQuick": 36,
+  "seedBase": 20262200,
   "pass": true,
   "gates": [
     {
@@ -17,167 +18,206 @@
       "label": "official",
       "ok": true,
       "notes": []
+    },
+    {
+      "label": "composition-probe",
+      "ok": true,
+      "notes": []
     }
   ],
+  "violetQuick": {
+    "archer": 139,
+    "crossbow": 33,
+    "infantry": 127,
+    "cavalry": 18,
+    "rangedArcherShare": 0.8081395348837209,
+    "rangedCrossbowShare": 0.19186046511627908,
+    "gamesWithArcher": 32,
+    "gamesWithUnique": 24,
+    "games": 36
+  },
+  "compositionProbes": {
+    "soft": {
+      "archer": 24,
+      "crossbow": 0,
+      "other": 0,
+      "total": 24
+    },
+    "hard": {
+      "archer": 0,
+      "crossbow": 24,
+      "other": 0,
+      "total": 24
+    }
+  },
   "buckets": [
     {
       "label": "quick-battle",
-      "games": 12,
+      "games": 36,
       "unfinished": 0,
       "illegal": 0,
       "byFaction": {
         "azure": {
           "produced": {
-            "infantry": 75,
-            "archer": 23,
-            "cavalry": 10,
-            "guardian": 17,
+            "infantry": 207,
+            "archer": 102,
+            "cavalry": 45,
+            "guardian": 42,
             "raider": 0,
             "crossbow": 0
           },
-          "uniqueProduced": 17,
-          "sharedProduced": 108,
-          "gamesWithUnique": 10,
-          "games": 12
+          "uniqueProduced": 42,
+          "sharedProduced": 354,
+          "gamesWithUnique": 31,
+          "gamesWithArcher": 32,
+          "games": 36
         },
         "crimson": {
           "produced": {
-            "infantry": 53,
-            "archer": 15,
-            "cavalry": 21,
+            "infantry": 138,
+            "archer": 75,
+            "cavalry": 54,
             "guardian": 0,
-            "raider": 52,
+            "raider": 166,
             "crossbow": 0
           },
-          "uniqueProduced": 52,
-          "sharedProduced": 89,
-          "gamesWithUnique": 12,
-          "games": 12
+          "uniqueProduced": 166,
+          "sharedProduced": 267,
+          "gamesWithUnique": 36,
+          "gamesWithArcher": 31,
+          "games": 36
         },
         "violet": {
           "produced": {
-            "infantry": 51,
-            "archer": 5,
-            "cavalry": 11,
+            "infantry": 127,
+            "archer": 139,
+            "cavalry": 18,
             "guardian": 0,
             "raider": 0,
-            "crossbow": 27
+            "crossbow": 33
           },
-          "uniqueProduced": 27,
-          "sharedProduced": 67,
-          "gamesWithUnique": 11,
-          "games": 12
+          "uniqueProduced": 33,
+          "sharedProduced": 284,
+          "gamesWithUnique": 24,
+          "gamesWithArcher": 32,
+          "games": 36
         }
       },
-      "braceHits": 45,
-      "plunderEvents": 34,
-      "pierceAttacks": 90
+      "braceHits": 105,
+      "plunderEvents": 81,
+      "pierceAttacks": 100
     },
     {
       "label": "campaign-m2-m3",
-      "games": 18,
+      "games": 36,
       "unfinished": 0,
       "illegal": 0,
       "byFaction": {
         "azure": {
           "produced": {
-            "infantry": 21,
-            "archer": 12,
-            "cavalry": 12,
-            "guardian": 6,
+            "infantry": 30,
+            "archer": 36,
+            "cavalry": 18,
+            "guardian": 0,
             "raider": 0,
             "crossbow": 0
           },
-          "uniqueProduced": 6,
-          "sharedProduced": 45,
-          "gamesWithUnique": 3,
-          "games": 18
+          "uniqueProduced": 0,
+          "sharedProduced": 84,
+          "gamesWithUnique": 0,
+          "gamesWithArcher": 24,
+          "games": 36
         },
         "crimson": {
           "produced": {
-            "infantry": 15,
-            "archer": 0,
+            "infantry": 12,
+            "archer": 18,
             "cavalry": 0,
             "guardian": 0,
-            "raider": 12,
+            "raider": 18,
             "crossbow": 0
           },
-          "uniqueProduced": 12,
-          "sharedProduced": 15,
-          "gamesWithUnique": 6,
-          "games": 18
+          "uniqueProduced": 18,
+          "sharedProduced": 30,
+          "gamesWithUnique": 12,
+          "gamesWithArcher": 18,
+          "games": 36
         },
         "violet": {
           "produced": {
-            "infantry": 27,
-            "archer": 0,
+            "infantry": 12,
+            "archer": 42,
+            "cavalry": 0,
+            "guardian": 0,
+            "raider": 0,
+            "crossbow": 6
+          },
+          "uniqueProduced": 6,
+          "sharedProduced": 54,
+          "gamesWithUnique": 6,
+          "gamesWithArcher": 18,
+          "games": 36
+        }
+      },
+      "braceHits": 60,
+      "plunderEvents": 24,
+      "pierceAttacks": 48
+    },
+    {
+      "label": "official",
+      "games": 24,
+      "unfinished": 0,
+      "illegal": 0,
+      "byFaction": {
+        "azure": {
+          "produced": {
+            "infantry": 88,
+            "archer": 76,
+            "cavalry": 92,
+            "guardian": 16,
+            "raider": 0,
+            "crossbow": 0
+          },
+          "uniqueProduced": 16,
+          "sharedProduced": 256,
+          "gamesWithUnique": 8,
+          "gamesWithArcher": 24,
+          "games": 24
+        },
+        "crimson": {
+          "produced": {
+            "infantry": 64,
+            "archer": 56,
+            "cavalry": 8,
+            "guardian": 0,
+            "raider": 48,
+            "crossbow": 0
+          },
+          "uniqueProduced": 48,
+          "sharedProduced": 128,
+          "gamesWithUnique": 12,
+          "gamesWithArcher": 16,
+          "games": 24
+        },
+        "violet": {
+          "produced": {
+            "infantry": 64,
+            "archer": 96,
             "cavalry": 0,
             "guardian": 0,
             "raider": 0,
             "crossbow": 12
           },
           "uniqueProduced": 12,
-          "sharedProduced": 27,
-          "gamesWithUnique": 9,
-          "games": 18
+          "sharedProduced": 160,
+          "gamesWithUnique": 4,
+          "gamesWithArcher": 12,
+          "games": 24
         }
       },
-      "braceHits": 24,
+      "braceHits": 52,
       "plunderEvents": 12,
-      "pierceAttacks": 39
-    },
-    {
-      "label": "official",
-      "games": 12,
-      "unfinished": 0,
-      "illegal": 0,
-      "byFaction": {
-        "azure": {
-          "produced": {
-            "infantry": 76,
-            "archer": 22,
-            "cavalry": 32,
-            "guardian": 10,
-            "raider": 0,
-            "crossbow": 0
-          },
-          "uniqueProduced": 10,
-          "sharedProduced": 130,
-          "gamesWithUnique": 6,
-          "games": 12
-        },
-        "crimson": {
-          "produced": {
-            "infantry": 56,
-            "archer": 18,
-            "cavalry": 22,
-            "guardian": 0,
-            "raider": 34,
-            "crossbow": 0
-          },
-          "uniqueProduced": 34,
-          "sharedProduced": 96,
-          "gamesWithUnique": 6,
-          "games": 12
-        },
-        "violet": {
-          "produced": {
-            "infantry": 28,
-            "archer": 2,
-            "cavalry": 4,
-            "guardian": 0,
-            "raider": 0,
-            "crossbow": 20
-          },
-          "uniqueProduced": 20,
-          "sharedProduced": 34,
-          "gamesWithUnique": 6,
-          "games": 12
-        }
-      },
-      "braceHits": 2,
-      "plunderEvents": 12,
-      "pierceAttacks": 86
+      "pierceAttacks": 92
     }
   ]
 }
