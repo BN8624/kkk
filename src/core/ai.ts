@@ -837,20 +837,23 @@ function scoreProductionType(
   score -= cost * 0.05;
 
   // 공용 비율 목표
+  // 자원(violet) 궁병은 장궁 교리 골격 — 시작 2기 이후에도 범용 원거리 비율을 유지한다.
   if (type === 'infantry') {
     const target = Math.ceil((count + 1) * 0.35);
     score += ofType < target ? 25 : 5 - ofType * 3;
   } else if (type === 'archer') {
-    const target = Math.ceil((count + 1) * 0.25);
-    score += ofType < target ? 20 : 4 - ofType * 3;
+    const archerRatio = faction === 'violet' ? 0.32 : 0.25;
+    const target = Math.ceil((count + 1) * archerRatio);
+    const under = ofType < target;
+    score += under ? (faction === 'violet' ? 26 : 20) : 4 - ofType * (faction === 'violet' ? 2 : 3);
   } else if (type === 'cavalry') {
     score += ofType <= Math.ceil((count + 1) * 0.25) ? 18 : 2 - ofType * 4;
   }
 
   // 고유 병종: 최소 1기는 유도, 과다 생산 억제
   if (isUniqueUnit(type)) {
-    if (ofType === 0) score += 28;
-    else if (ofType === 1) score += 8;
+    if (ofType === 0) score += 22;
+    else if (ofType === 1) score += 6;
     else score -= 12 * ofType; // 과사용 금지
   }
 
@@ -878,12 +881,44 @@ function scoreProductionType(
     if (an.turnsLeft <= 2) score -= 15;
   }
 
-  // 쇠뇌대: 고방어·수호대 대응
+  // 궁병: 범용 원거리 — 연·중방어 상대 비용효율, 자원 장궁 교리 가치
+  if (type === 'archer') {
+    if (faction === 'violet') {
+      // 장궁(사거리 +1)이 실제 생산 이유로 남도록 세력 보너스
+      score += 10;
+    }
+    if (an.enemies.length > 0) {
+      // 기본 방어 2 이하·비수호 = 연·중방어. 관통 특화가 불필요한 상대.
+      const softMed = an.enemies.filter(
+        (e) => e.type !== 'guardian' && UNIT_STATS[e.type].def <= 2,
+      ).length;
+      const softRatio = softMed / an.enemies.length;
+      if (softRatio >= 0.5) score += 14;
+      else if (softRatio >= 0.3) score += 7;
+      // 고방어가 지배적이면 쇠뇌대에 양보 (완전 제외는 아님)
+      const highArmor = an.enemies.filter(
+        (e) => e.type === 'guardian' || UNIT_STATS[e.type].def >= 3,
+      ).length;
+      if (highArmor / an.enemies.length >= 0.4) score -= 6;
+    }
+  }
+
+  // 쇠뇌대: 고방어·수호대 관통 전용 (일반 보병 def=2는 고방어로 치지 않음)
   if (type === 'crossbow') {
-    const armored = an.enemies.filter(
-      (e) => e.type === 'guardian' || e.type === 'infantry' || UNIT_STATS[e.type].def >= 2,
+    const highArmor = an.enemies.filter(
+      (e) => e.type === 'guardian' || UNIT_STATS[e.type].def >= 3,
     ).length;
-    if (an.enemies.length > 0 && armored / an.enemies.length >= 0.25) score += 20;
+    if (an.enemies.length > 0) {
+      const hardRatio = highArmor / an.enemies.length;
+      if (hardRatio >= 0.2) score += 24;
+      else if (hardRatio > 0) score += 12;
+      else score -= 10; // 고방어 없으면 궁병·보병이 비용효율 우위
+      // 연·중방어 다수면 쇠뇌대 억제 (전 상황 상위호환 방지)
+      const softMed = an.enemies.filter(
+        (e) => e.type !== 'guardian' && UNIT_STATS[e.type].def <= 2,
+      ).length;
+      if (softMed / an.enemies.length >= 0.55) score -= 12;
+    }
     if (an.enemies.some((e) => e.type === 'guardian')) score += 16;
     // 기병·약탈 다수면 억제
     const fast = an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length;
@@ -906,7 +941,10 @@ function scoreProductionType(
     if (enemyArc >= 0.4) {
       if (type === 'cavalry' || type === 'raider') score += 14;
     }
+    // 수호대 비중 높을 때만 쇠뇌대 가산 (연·중방어 일반 보병과 분리)
     if (enemyGuard >= 0.2 && type === 'crossbow') score += 18;
+    // 자원 궁병: adaptive에서도 범용 원거리 골격 유지
+    if (faction === 'violet' && type === 'archer' && enemyGuard < 0.25) score += 6;
   }
 
   // 지도 크기(거점 수) — 넓은 지도는 기동 병종

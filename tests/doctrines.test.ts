@@ -131,6 +131,14 @@ describe('자원 후국 — 장궁과 경제', () => {
     );
     expect(state.factions.azure.gold).toBe(azureBefore + BUILDING_INCOME.village);
   });
+
+  it('자원 궁병 생산 비용이 교리 할인만큼 싸다', () => {
+    expect(unitCost('violet', 'archer')).toBe(
+      UNIT_STATS.archer.cost + DOCTRINES.violet.unitCostDelta.archer!,
+    );
+    expect(unitCost('azure', 'archer')).toBe(UNIT_STATS.archer.cost);
+    expect(unitCost('violet', 'crossbow')).toBe(UNIT_STATS.crossbow.cost);
+  });
 });
 
 describe('시작 배치·예측 일관성', () => {
