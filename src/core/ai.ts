@@ -44,7 +44,7 @@ interface AiProfile {
   avoidBadTrades: boolean;
   /** 수도 위협 시 방어 역할 배정 */
   defend: boolean;
-  /** 부상당한 적 집중 공격 가중치 강화 */
+  /** 부상당한 적 집중 공격 가중치 강화(어려움) */
   focusFire: boolean;
   /** 공격 위치 선정 시 지형 방어 선호 */
   seekTerrain: boolean;
@@ -56,6 +56,28 @@ interface AiProfile {
    * 자신이 이길 수 없어도 상대 즉시 승리를 막는 행동을 우선한다.
    */
   crownDenyBonus: number;
+  /** 처치 성공 시 기본 가산 */
+  killBonusBase: number;
+  /** 처치 시 적 가치 배율 */
+  killValueScale: number;
+  /** 부상당한 적(잃은 HP) 가중 계수 */
+  woundedWeight: number;
+  /** 반격 피해 감점 계수(counterAware일 때만) */
+  counterWeight: number;
+  /** 반격 사망 시 감점 배율 */
+  suicidePenaltyScale: number;
+  /**
+   * 같은 라운드(동일 turn)에 이미 맞은 적에 대한 집중 감쇠 계수.
+   * 인간/AI 구분 없이 적용 — controller 라벨을 읽지 않는다.
+   */
+  multiHitDampening: number;
+  /**
+   * 최고 점수 대비 이 폭 안의 후보 중 위협·거리 2차 기준으로 결정론 선택.
+   * 0이면 순수 최고 점수만 고른다.
+   */
+  softCandidateBand: number;
+  /** 전진 목표로 부상당한 적을 쫓는 가중 */
+  chaseWoundedWeight: number;
 }
 
 const PROFILES: Record<Difficulty, AiProfile> = {
@@ -69,6 +91,14 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     horizon: 3,
     production: 'cycle',
     crownDenyBonus: 0,
+    killBonusBase: 18,
+    killValueScale: 1.5,
+    woundedWeight: 0.15,
+    counterWeight: 0,
+    suicidePenaltyScale: 0,
+    multiHitDampening: 0,
+    softCandidateBand: 0,
+    chaseWoundedWeight: 1,
   },
   normal: {
     moveAttack: true,
@@ -79,6 +109,15 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     seekTerrain: false,
     production: 'balanced',
     crownDenyBonus: 0,
+    // 보통: 처치·부상 집결과 완벽한 반격 최적화를 완화해 교환비를 낮춘다
+    killBonusBase: 12,
+    killValueScale: 1,
+    woundedWeight: 0.1,
+    counterWeight: 0.4,
+    suicidePenaltyScale: 2,
+    multiHitDampening: 14,
+    softCandidateBand: 6,
+    chaseWoundedWeight: 0.5,
   },
   hard: {
     moveAttack: true,
@@ -89,6 +128,14 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     seekTerrain: true,
     production: 'adaptive',
     crownDenyBonus: 200,
+    killBonusBase: 25,
+    killValueScale: 2,
+    woundedWeight: 0.6,
+    counterWeight: 0.8,
+    suicidePenaltyScale: 3,
+    multiHitDampening: 0,
+    softCandidateBand: 0,
+    chaseWoundedWeight: 2,
   },
 };
 
@@ -515,6 +562,63 @@ interface AttackPlan {
   destKey: string | null;
   target: Unit;
   score: number;
+  /** softCandidateBand 2차 정렬용(위협·근접, 높을수록 우선) */
+  threatTie: number;
+}
+
+/**
+ * 같은 라운드(동일 turn 번호)에 이미 해당 유닛을 공격한 횟수.
+ * commandLog가 없으면 0 — 인간 controller 여부는 절대 보지 않는다.
+ */
+function priorAttacksOnTargetThisRound(state: GameState, defenderId: number): number {
+  const log = state.commandLog;
+  if (!log || log.length === 0) return 0;
+  let n = 0;
+  for (const c of log) {
+    if (c.turn !== state.turn) continue;
+    if (c.type === 'attack-unit' && c.defenderId === defenderId) n++;
+  }
+  return n;
+}
+
+/**
+ * 후보 위협 2차 점수: 아군 수도·왕관에 가까운 적, 전투력이 높은 적을 선호.
+ * controller=human 라벨은 사용하지 않는다.
+ */
+function attackThreatTie(unit: Unit, enemy: Unit, an: Analysis): number {
+  let t = UNIT_STATS[enemy.type].atk * 2 + UNIT_STATS[enemy.type].hp;
+  // 풀피·근접 위협 가산 — 이미 빈사 유닛 마무리보다 실위협 우선에 도움
+  const missing = UNIT_STATS[enemy.type].hp - enemy.hp;
+  t -= missing * 0.5;
+  t -= hexDistance(unit, enemy) * 3;
+  if (an.myCapital) t += Math.max(0, 6 - hexDistance(enemy, an.myCapital)) * 4;
+  if (an.crownTile && an.crownOwner && an.crownOwner !== unit.faction) {
+    t += Math.max(0, 5 - hexDistance(enemy, an.crownTile)) * 3;
+  }
+  // 결정론 안정: 동일 위협이면 id가 작은 쪽
+  t -= enemy.id * 0.001;
+  return t;
+}
+
+/** 점수 비교: 1차 score, soft band 안이면 threatTie, 동점이면 target id */
+function isBetterPlan(
+  candidate: AttackPlan,
+  best: AttackPlan,
+  band: number,
+): boolean {
+  if (band <= 0) {
+    if (candidate.score !== best.score) return candidate.score > best.score;
+    return candidate.target.id < best.target.id;
+  }
+  // band 안 후보는 위협 2차 기준, 그다음 점수, 그다음 id
+  const inBandOfBest = candidate.score >= best.score - band;
+  const bestInBandOfCand = best.score >= candidate.score - band;
+  if (inBandOfBest && bestInBandOfCand) {
+    if (candidate.threatTie !== best.threatTie) return candidate.threatTie > best.threatTie;
+    if (candidate.score !== best.score) return candidate.score > best.score;
+    return candidate.target.id < best.target.id;
+  }
+  return candidate.score > best.score;
 }
 
 // ---------------- 8.3 전투 평가 ----------------
@@ -555,11 +659,25 @@ function tryAttack(
       if (profile.avoidBadTrades && fc.attackerDies && !fc.defenderDies) continue;
 
       let score = fc.damage.total;
-      if (fc.defenderDies) score += 25 + unitValue(enemy) * 2;
-      score += (UNIT_STATS[enemy.type].hp - enemy.hp) * (profile.focusFire ? 0.6 : 0.3);
+      if (fc.defenderDies) {
+        score += profile.killBonusBase + unitValue(enemy) * profile.killValueScale;
+      }
+      const missingHp = UNIT_STATS[enemy.type].hp - enemy.hp;
+      score += missingHp * profile.woundedWeight;
       if (profile.counterAware && fc.counter) {
-        score -= fc.counter.total * 0.8;
-        if (fc.attackerDies) score -= 25 + unitValue(unit) * 3;
+        score -= fc.counter.total * profile.counterWeight;
+        if (fc.attackerDies) {
+          score -= profile.killBonusBase + unitValue(unit) * profile.suicidePenaltyScale;
+        }
+      }
+      // 다중 AI·다유닛 연속 집중 완화(세력/controller 비의존)
+      if (profile.multiHitDampening > 0) {
+        const prior = priorAttacksOnTargetThisRound(state, enemy.id);
+        if (prior > 0) {
+          score -= prior * profile.multiHitDampening;
+          // 이미 맞은 대상의 처치 가산 일부 상쇄 — 라운드 마무리 경쟁 완화
+          if (fc.defenderDies) score -= profile.killBonusBase * 0.45 * prior;
+        }
       }
       if (profile.seekTerrain && pos.key) {
         const t = tileAt(state, pos.q, pos.r)!;
@@ -579,7 +697,13 @@ function tryAttack(
       if (unit.type === 'raider' && isHardBuildingDefense(state, enemy) && !fc.defenderDies) {
         score -= 18;
       }
-      if (!best || score > best.score) best = { destKey: pos.key, target: enemy, score };
+      const plan: AttackPlan = {
+        destKey: pos.key,
+        target: enemy,
+        score,
+        threatTie: attackThreatTie(unit, enemy, an),
+      };
+      if (!best || isBetterPlan(plan, best, profile.softCandidateBand)) best = plan;
     }
   }
   if (!best) return false;
@@ -795,7 +919,11 @@ function tryAdvance(
   for (const e of an.enemies) {
     if (!unitById(state, e.id)) continue;
     if (hexDistance(unit, e) > horizon) continue;
-    const score = 40 + (UNIT_STATS[e.type].hp - e.hp) * 2 - hexDistance(unit, e) * 8;
+    // controller 라벨 비의존 — 부상 추격 가중만 난이도 프로파일로 조절
+    const score =
+      40 +
+      (UNIT_STATS[e.type].hp - e.hp) * profile.chaseWoundedWeight -
+      hexDistance(unit, e) * 8;
     if (score > goalScore) {
       goalScore = score;
       goal = { q: e.q, r: e.r };
