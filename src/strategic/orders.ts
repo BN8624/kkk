@@ -1,4 +1,5 @@
-// 한 줄 목적: 전략 이동·대기 명령의 순수 검증과 immutable 적용을 제공한다
+// 한 줄 목적: 전략 이동·대기·보충 명령의 순수 검증과 immutable 적용을 제공한다
+import { UNIT_STATS } from '../core/data';
 import type { FactionId } from '../core/types';
 import { buildBattleContext } from './battle-bridge';
 import { cloneStrategicState } from './state';
@@ -9,6 +10,9 @@ import type {
   StrategicResult,
 } from './types';
 import { validateStrategicState } from './validate';
+
+/** V0 보충 비용(국고). */
+export const REPLENISH_COST = 10;
 
 function fail(reason: string): StrategicResult<StrategicGameState> {
   return { ok: false, reason };
@@ -26,15 +30,29 @@ function armiesInRegion(state: StrategicGameState, regionId: string): StrategicA
   return state.armies.filter((a) => a.regionId === regionId);
 }
 
+/** 수도·도시·요새 정착지 여부. */
+export function isStrategicSettlement(region: { settlement?: string } | undefined): boolean {
+  return (
+    region?.settlement === 'capital' ||
+    region?.settlement === 'town' ||
+    region?.settlement === 'fort'
+  );
+}
+
+/** 군단에 손상(HP < max) 유닛이 하나라도 있는지. */
+export function armyHasDamagedUnits(army: StrategicArmy): boolean {
+  return army.units.some((u) => u.hp < UNIT_STATS[u.type].hp);
+}
+
 /** 명령 사전 검증(상태 변경 없음). */
 export function validateStrategicOrder(
   state: StrategicGameState,
   order: StrategicOrder,
   actingFaction?: FactionId,
 ): StrategicResult<true> {
-  if (state.phase !== 'orders') return { ok: false, reason: 'not-orders-phase' };
-  if (state.pendingBattle) return { ok: false, reason: 'battle-pending' };
   if (state.winner !== undefined) return { ok: false, reason: 'game-ended' };
+  if (state.pendingBattle) return { ok: false, reason: 'battle-pending' };
+  if (state.phase !== 'orders') return { ok: false, reason: 'not-orders-phase' };
 
   const faction = actingFaction ?? state.currentFaction;
   const army = armyById(state, order.armyId);
@@ -44,6 +62,16 @@ export function validateStrategicOrder(
   if (army.units.length === 0) return { ok: false, reason: 'empty-army' };
 
   if (order.type === 'hold-army') return { ok: true, value: true };
+
+  if (order.type === 'replenish-army') {
+    const region = regionById(state, army.regionId);
+    if (!region) return { ok: false, reason: 'origin-missing' };
+    if (!isStrategicSettlement(region)) return { ok: false, reason: 'not-settlement' };
+    if (region.owner !== faction) return { ok: false, reason: 'not-own-settlement' };
+    if (state.treasury[faction] < REPLENISH_COST) return { ok: false, reason: 'insufficient-treasury' };
+    if (!armyHasDamagedUnits(army)) return { ok: false, reason: 'no-damaged-units' };
+    return { ok: true, value: true };
+  }
 
   if (order.type === 'move-army') {
     const to = regionById(state, order.toRegionId);
@@ -86,6 +114,19 @@ export function applyStrategicOrder(
 
   if (order.type === 'hold-army') {
     army.moved = true;
+    const check = validateStrategicState(next);
+    if (!check.ok) return fail(check.reason);
+    return { ok: true, value: next };
+  }
+
+  if (order.type === 'replenish-army') {
+    // 생존 유닛 HP를 최대 1씩 회복(병종 최대 이하). 사망 유닛·신규 유닛 없음.
+    for (const u of army.units) {
+      const maxHp = UNIT_STATS[u.type].hp;
+      if (u.hp < maxHp) u.hp = Math.min(maxHp, u.hp + 1);
+    }
+    army.moved = true;
+    next.treasury[faction] -= REPLENISH_COST;
     const check = validateStrategicState(next);
     if (!check.ok) return fail(check.reason);
     return { ok: true, value: next };

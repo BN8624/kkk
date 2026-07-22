@@ -78,6 +78,10 @@ export type StrategicOrder =
   | {
       type: 'hold-army';
       armyId: string;
+    }
+  | {
+      type: 'replenish-army';
+      armyId: string;
     };
 
 export interface TacticalBattleReport {
