@@ -87,7 +87,7 @@ export function injectStrategicStyles(): void {
   display: block;
   touch-action: manipulation;
   flex: 1 1 auto;
-  /* 세로 모바일 비율 viewBox와 맞춰 레터박스 없이 래퍼를 채움 */
+  /* Match the portrait-mobile viewBox aspect so it fills the wrapper without letterboxing */
   object-fit: contain;
 }
 .strategic-map-svg .st-army-hit,

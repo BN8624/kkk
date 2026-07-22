@@ -229,7 +229,7 @@ export function armyBannerTokenSvg(opts: {
       <text class="st-army-count" y="8" text-anchor="middle" dominant-baseline="central">${opts.unitCount}</text>
       ${hpBar}
       ${actedMark}
-      <!-- 모바일 배율에서 ≥48×48 CSS px 터치 영역 (viewBox 단위 r≈26) -->
+      <!-- >=48x48 CSS px touch target at mobile scale (viewBox units r~26) -->
       <circle class="st-army-hit" r="26" fill="transparent"/>
       <rect class="st-army-hit-box" x="-26" y="-28" width="52" height="52" fill="transparent"/>`;
 }
