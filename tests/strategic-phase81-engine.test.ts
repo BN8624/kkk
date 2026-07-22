@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FACTION_IDS, UNIT_STATS } from '../src/core/data';
 import { newGame } from '../src/core/game';
 import { SAVE_KEY, SAVE_VERSION, deserialize, serialize } from '../src/core/save';
-import type { FactionId, GameState, Unit } from '../src/core/types';
+import type { FactionId } from '../src/core/types';
 import { runStrategicAiFaction, chooseStrategicAiOrder } from '../src/strategic/ai';
 import {
   autoResolveAndApply,
@@ -12,7 +12,6 @@ import {
 } from '../src/strategic/auto-resolve';
 import {
   applyTacticalBattleReport,
-  buildTacticalBattleReport,
   prepareStrategicBattle,
   validateTacticalBattleReport,
 } from '../src/strategic/battle-bridge';
@@ -41,11 +40,7 @@ import {
   resolveStrategicRound,
   strategicFactionOrder,
 } from '../src/strategic/turn';
-import type {
-  StrategicBattleContext,
-  StrategicGameState,
-  TacticalBattleReport,
-} from '../src/strategic/types';
+import type { StrategicGameState } from '../src/strategic/types';
 
 function forceArmyAt(state: StrategicGameState, armyId: string, regionId: string): void {
   const army = state.armies.find((a) => a.id === armyId);
@@ -61,7 +56,7 @@ function damageArmy(state: StrategicGameState, armyId: string): void {
 }
 
 function startAiVsAiBattle(seed = 77, human: FactionId = 'azure'): StrategicGameState {
-  let state = createStrategicState(seed, human);
+  const state = createStrategicState(seed, human);
   const attacker = state.armies.find((a) => a.faction === 'crimson' && a.regionId === 'r03')!;
   const defender = state.armies.find((a) => a.faction === 'violet' && a.regionId === 'r08')!;
   forceArmyAt(state, defender.id, 'r07');
@@ -74,36 +69,6 @@ function startAiVsAiBattle(seed = 77, human: FactionId = 'azure'): StrategicGame
   );
   if (!moved.ok) throw new Error(moved.reason);
   return moved.value;
-}
-
-function finishedStateFromContext(
-  ctx: StrategicBattleContext,
-  opts: { winner: FactionId | 'draw'; survivors: Record<string, number>; turn?: number },
-): GameState {
-  const base = newGame(1, { humanFaction: ctx.humanFaction });
-  base.over = true;
-  base.winner = opts.winner;
-  base.turn = opts.turn ?? 3;
-  base.units = [];
-  let nextId = 1;
-  for (const b of ctx.unitBindings) {
-    const hp = opts.survivors[b.strategicUnitId];
-    if (hp === undefined) continue;
-    const u: Unit = {
-      id: nextId++,
-      type: b.type,
-      faction: b.faction,
-      q: 0,
-      r: 0,
-      hp,
-      moved: false,
-      attacked: false,
-      tag: b.tacticalTag,
-    };
-    base.units.push(u);
-  }
-  base.nextUnitId = nextId;
-  return base;
 }
 
 describe('Phase 8-1 — 전략 턴', () => {
@@ -251,7 +216,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('10. 비정착지 거부', () => {
-    let state = createStrategicState(21, 'azure');
+    const state = createStrategicState(21, 'azure');
     const army = state.armies.find((a) => a.faction === 'azure')!;
     forceArmyAt(state, army.id, 'r02'); // 중립 평원(정착지 없음)
     // 소유를 azure로 바꿔도 settlement 없으면 거부
@@ -263,7 +228,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('11. 적 소유 정착지 거부', () => {
-    let state = createStrategicState(22, 'azure');
+    const state = createStrategicState(22, 'azure');
     const army = state.armies.find((a) => a.faction === 'azure')!;
     forceArmyAt(state, army.id, 'r03'); // crimson capital
     damageArmy(state, army.id);
@@ -273,7 +238,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('12. 국고 부족 거부', () => {
-    let state = setupReplenish();
+    const state = setupReplenish();
     state.treasury.azure = 9;
     const army = state.armies.find((a) => a.faction === 'azure' && a.regionId === 'r00')!;
     const r = applyStrategicOrder(state, { type: 'replenish-army', armyId: army.id });
@@ -290,7 +255,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('14. 최대 HP 초과 없음', () => {
-    let state = setupReplenish();
+    const state = setupReplenish();
     const army = state.armies.find((a) => a.faction === 'azure' && a.regionId === 'r00')!;
     // 한 유닛만 1 깎고 나머지는 full
     army.units[0].hp = UNIT_STATS[army.units[0].type].hp - 1;
@@ -307,7 +272,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('15. 사망 유닛 복원 없음', () => {
-    let state = setupReplenish();
+    const state = setupReplenish();
     const army = state.armies.find((a) => a.faction === 'azure' && a.regionId === 'r00')!;
     const beforeCount = army.units.length;
     const removed = army.units.pop()!;
@@ -320,7 +285,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('16. 보충 후 moved=true', () => {
-    let state = setupReplenish();
+    const state = setupReplenish();
     const army = state.armies.find((a) => a.faction === 'azure' && a.regionId === 'r00')!;
     const r = applyStrategicOrder(state, { type: 'replenish-army', armyId: army.id });
     expect(r.ok).toBe(true);
@@ -329,7 +294,7 @@ describe('Phase 8-1 — 보충', () => {
   });
 
   it('17. 국고 정확히 차감', () => {
-    let state = setupReplenish();
+    const state = setupReplenish();
     const army = state.armies.find((a) => a.faction === 'azure' && a.regionId === 'r00')!;
     const gold = state.treasury.azure;
     const r = applyStrategicOrder(state, { type: 'replenish-army', armyId: army.id });
@@ -420,18 +385,13 @@ describe('Phase 8-1 — 전략 AI', () => {
   });
 
   it('23. 유효 후보 없을 때 대기', () => {
-    let state = createStrategicState(35, 'azure');
+    const state = createStrategicState(35, 'azure');
     const army = state.armies.find((a) => a.faction === 'azure')!;
     // 모든 이웃에 아군 배치해 이동 불가
     const region = state.regions.find((r) => r.id === army.regionId)!;
-    let i = 0;
     for (const nid of region.neighbors) {
       const ally = state.armies.find((a) => a.faction === 'azure' && a.id !== army.id);
       if (ally) forceArmyAt(state, ally.id, nid);
-      else {
-        // 가상 — 없으면 hold 유도
-        i++;
-      }
     }
     // 이웃이 아군으로 막히면 hold
     const freeNeighbors = region.neighbors.filter(
@@ -595,7 +555,7 @@ describe('Phase 8-1 — 자동전투', () => {
 
 describe('Phase 8-1 — 승패', () => {
   it('35. 세 수도 점령 즉시 승리', () => {
-    let state = createStrategicState(60, 'azure');
+    const state = createStrategicState(60, 'azure');
     for (const r of state.regions) {
       if (r.settlement === 'capital') r.owner = 'azure';
     }
@@ -611,7 +571,7 @@ describe('Phase 8-1 — 승패', () => {
   });
 
   it('36. 10턴 점수 승리', () => {
-    let state = createStrategicState(61, 'azure');
+    const state = createStrategicState(61, 'azure');
     state.turn = 10;
     // azure에 유리한 점수: 모든 지역 소유
     for (const r of state.regions) r.owner = 'azure';
@@ -623,7 +583,7 @@ describe('Phase 8-1 — 승패', () => {
   });
 
   it('37. 동점 draw', () => {
-    let state = createStrategicState(62, 'azure');
+    const state = createStrategicState(62, 'azure');
     state.turn = 10;
     // 점수 균등화: 지역 균등 분배, 군단·HP 제거로 단순화
     state.armies = [];
@@ -640,7 +600,7 @@ describe('Phase 8-1 — 승패', () => {
   });
 
   it('38. 종료 후 명령 거부', () => {
-    let state = createStrategicState(63, 'azure');
+    const state = createStrategicState(63, 'azure');
     state.phase = 'ended';
     state.winner = 'azure';
     const army = state.armies[0];

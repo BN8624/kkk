@@ -25,7 +25,10 @@ function armyById(state: StrategicGameState, id: string): StrategicArmy | undefi
 }
 
 /** 유닛 전투력(결정론). 전술 엔진과 동일하다고 주장하지 않는다. */
-function unitPower(u: StrategicUnit, sideBonus: number): number {
+function unitPower(
+  u: { type: StrategicUnit['type']; hp: number },
+  sideBonus: number,
+): number {
   const st = UNIT_STATS[u.type];
   return Math.max(1, st.atk * 3 + st.def + u.hp + sideBonus);
 }
