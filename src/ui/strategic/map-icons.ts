@@ -229,7 +229,9 @@ export function armyBannerTokenSvg(opts: {
       <text class="st-army-count" y="8" text-anchor="middle" dominant-baseline="central">${opts.unitCount}</text>
       ${hpBar}
       ${actedMark}
-      <circle class="st-army-hit" r="18" fill="transparent"/>`;
+      <!-- 모바일 배율에서 ≥48×48 CSS px 터치 영역 (viewBox 단위 r≈26) -->
+      <circle class="st-army-hit" r="26" fill="transparent"/>
+      <rect class="st-army-hit-box" x="-26" y="-28" width="52" height="52" fill="transparent"/>`;
 }
 
 /** aria 등 접근성용 짧은 세력 표기(시각 토큰에는 사용하지 않음). */

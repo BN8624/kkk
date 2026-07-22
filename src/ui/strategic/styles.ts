@@ -21,12 +21,12 @@ export function injectStrategicStyles(): void {
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px 10px;
-  padding: 5px 8px 5px 10px;
+  padding: 4px 8px 4px 10px;
   background: linear-gradient(180deg, rgba(12,18,26,.96) 0%, rgba(10,16,24,.92) 100%);
   border-bottom: 1px solid rgba(201,162,39,.4);
   flex-shrink: 0;
-  max-height: 12%;
-  min-height: 40px;
+  max-height: 10%;
+  min-height: 36px;
   box-shadow: 0 2px 10px rgba(0,0,0,.35);
 }
 .strategic-hud .hud-crest {
@@ -87,6 +87,12 @@ export function injectStrategicStyles(): void {
   display: block;
   touch-action: manipulation;
   flex: 1 1 auto;
+  /* 세로 모바일 비율 viewBox와 맞춰 레터박스 없이 래퍼를 채움 */
+  object-fit: contain;
+}
+.strategic-map-svg .st-army-hit,
+.strategic-map-svg .st-army-hit-box {
+  pointer-events: all;
 }
 .st-ocean { cursor: default; }
 .st-island-base { pointer-events: none; }
@@ -209,8 +215,9 @@ export function injectStrategicStyles(): void {
   box-shadow: 0 -6px 20px rgba(0,0,0,.45);
 }
 .strategic-panel--hint {
-  max-height: 9%;
-  padding: 7px 12px calc(7px + env(safe-area-inset-bottom, 0));
+  max-height: 7%;
+  min-height: 36px;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0));
   background: linear-gradient(180deg, rgba(22,28,36,.94) 0%, rgba(14,18,24,.96) 100%);
   border-top: 1px solid rgba(201,162,39,.3);
 }
