@@ -1,20 +1,33 @@
-// 한 줄 목적: 12지역 자연 섬 SVG 영토 path·해안·앵커 정본을 제공한다
+// 한 줄 목적: 12지역 자연 섬 SVG 영토 path·공유 경계·해안·앵커 정본을 제공한다
 import {
   STRATEGIC_REGION_IDS,
   type StrategicRegionId,
   createStrategicRegions,
 } from '../../strategic/map';
 
-/** 모바일 세로 우선 viewBox — 섬이 화면 대부분을 채운다. */
+/**
+ * 모바일 세로 비율(≈0.53)에 맞춘 viewBox.
+ * meet 사용 시 레터박스 없이 지도 래퍼를 채운다.
+ */
 export const STRATEGIC_MAP_VIEWBOX = {
-  width: 360,
-  height: 480,
-  attr: '0 0 360 480',
+  width: 280,
+  height: 530,
+  attr: '0 0 280 530',
 } as const;
 
 export interface Point2D {
   x: number;
   y: number;
+}
+
+export interface SharedEdgeGeometry {
+  a: StrategicRegionId;
+  b: StrategicRegionId;
+  /** 공유 경계 path (a→b 방향, 열린 path). */
+  path: string;
+  mid: Point2D;
+  aCenter: Point2D;
+  bCenter: Point2D;
 }
 
 export interface StrategicRegionGeometry {
@@ -27,209 +40,302 @@ export interface StrategicRegionGeometry {
   coastal: boolean;
 }
 
+type Pt = Point2D;
+
+function pt(x: number, y: number): Pt {
+  return { x, y };
+}
+
+function mid(a: Pt, b: Pt): Pt {
+  return pt((a.x + b.x) / 2, (a.y + b.y) / 2);
+}
+
+function avg(points: Pt[]): Pt {
+  const n = points.length || 1;
+  let x = 0;
+  let y = 0;
+  for (const p of points) {
+    x += p.x;
+    y += p.y;
+  }
+  return pt(x / n, y / n);
+}
+
+function fmt(p: Pt): string {
+  return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+}
+
+/** 이차 곡선 한 변: start → end, 제어점 control. */
+function qEdge(start: Pt, control: Pt, end: Pt): string {
+  return `M ${fmt(start)} Q ${fmt(control)} ${fmt(end)}`;
+}
+
+/**
+ * 4×3 격자 코너 정점(행 0..3, 열 0..4).
+ * 바깥 해안은 유기적으로, 내부는 약간 흔들리게 배치해 퍼즐 조각 느낌을 피한다.
+ *
+ * 격자:
+ * r00 r01 r02 r03
+ * r04 r05 r06 r07
+ * r08 r09 r10 r11
+ */
+const CORNERS: Pt[][] = [
+  // row 0 — 북 해안
+  [pt(38, 52), pt(92, 36), pt(148, 30), pt(204, 40), pt(248, 62)],
+  // row 1
+  [pt(24, 175), pt(88, 168), pt(145, 160), pt(205, 168), pt(262, 182)],
+  // row 2
+  [pt(28, 320), pt(90, 312), pt(148, 308), pt(208, 316), pt(258, 328)],
+  // row 3 — 남 해안
+  [pt(46, 468), pt(100, 488), pt(155, 500), pt(210, 486), pt(248, 458)],
+];
+
+/** 가로 변 제어점 H[row][col]: CORNERS[row][col] → CORNERS[row][col+1] */
+const H_CTRL: Pt[][] = [
+  [pt(62, 28), pt(118, 22), pt(176, 26), pt(230, 42)],
+  [pt(54, 158), pt(116, 152), pt(174, 154), pt(236, 170)],
+  [pt(56, 300), pt(118, 296), pt(178, 302), pt(236, 318)],
+  [pt(70, 492), pt(128, 508), pt(184, 504), pt(232, 468)],
+];
+
+/** 세로 변 제어점 V[row][col]: CORNERS[row][col] → CORNERS[row+1][col] */
+const V_CTRL: Pt[][] = [
+  [pt(18, 110), pt(78, 98), pt(140, 92), pt(210, 100), pt(268, 118)],
+  [pt(16, 245), pt(80, 238), pt(142, 232), pt(212, 240), pt(266, 252)],
+  [pt(26, 392), pt(86, 400), pt(148, 408), pt(214, 400), pt(260, 390)],
+];
+
+function hEdge(row: number, col: number): { start: Pt; ctrl: Pt; end: Pt } {
+  return {
+    start: CORNERS[row]![col]!,
+    ctrl: H_CTRL[row]![col]!,
+    end: CORNERS[row]![col + 1]!,
+  };
+}
+
+function vEdge(row: number, col: number): { start: Pt; ctrl: Pt; end: Pt } {
+  return {
+    start: CORNERS[row]![col]!,
+    ctrl: V_CTRL[row]![col]!,
+    end: CORNERS[row + 1]![col]!,
+  };
+}
+
+/** 사각형 영역 path: 상→우→하(역)→좌(역). 인접 영토와 동일 제어점 공유. */
+function regionPath(row: number, col: number): string {
+  const top = hEdge(row, col);
+  const right = vEdge(row, col + 1);
+  const bot = hEdge(row + 1, col);
+  const left = vEdge(row, col);
+  // 시계방향: NW → NE → SE → SW → NW
+  return [
+    `M ${fmt(top.start)}`,
+    `Q ${fmt(top.ctrl)} ${fmt(top.end)}`,
+    `Q ${fmt(right.ctrl)} ${fmt(right.end)}`,
+    `Q ${fmt(bot.ctrl)} ${fmt(bot.start)}`,
+    `Q ${fmt(left.ctrl)} ${fmt(left.start)}`,
+    'Z',
+  ].join(' ');
+}
+
+function regionCenter(row: number, col: number): Pt {
+  return avg([
+    CORNERS[row]![col]!,
+    CORNERS[row]![col + 1]!,
+    CORNERS[row + 1]![col]!,
+    CORNERS[row + 1]![col + 1]!,
+  ]);
+}
+
+function edgeMidFrom(start: Pt, ctrl: Pt, end: Pt): Pt {
+  // 이차 베지어 t=0.5: 0.25P0 + 0.5C + 0.25P1
+  return pt(
+    0.25 * start.x + 0.5 * ctrl.x + 0.25 * end.x,
+    0.25 * start.y + 0.5 * ctrl.y + 0.25 * end.y,
+  );
+}
+
+function isCoastalCell(row: number, col: number): boolean {
+  return row === 0 || row === 2 || col === 0 || col === 3;
+}
+
+function buildGeometry(): {
+  regions: StrategicRegionGeometry[];
+  sharedEdges: SharedEdgeGeometry[];
+  islandOutline: string;
+  islandShoal: string;
+} {
+  const regions: StrategicRegionGeometry[] = [];
+  const idAt = (row: number, col: number): StrategicRegionId =>
+    STRATEGIC_REGION_IDS[row * 4 + col]!;
+
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 4; col++) {
+      const regionId = idAt(row, col);
+      const c = regionCenter(row, col);
+      const edgeMidpoints: Partial<Record<StrategicRegionId, Point2D>> = {};
+
+      // east
+      if (col < 3) {
+        const e = vEdge(row, col + 1);
+        edgeMidpoints[idAt(row, col + 1)] = edgeMidFrom(e.start, e.ctrl, e.end);
+      }
+      // west
+      if (col > 0) {
+        const e = vEdge(row, col);
+        edgeMidpoints[idAt(row, col - 1)] = edgeMidFrom(e.start, e.ctrl, e.end);
+      }
+      // south
+      if (row < 2) {
+        const e = hEdge(row + 1, col);
+        edgeMidpoints[idAt(row + 1, col)] = edgeMidFrom(e.start, e.ctrl, e.end);
+      }
+      // north
+      if (row > 0) {
+        const e = hEdge(row, col);
+        edgeMidpoints[idAt(row - 1, col)] = edgeMidFrom(e.start, e.ctrl, e.end);
+      }
+
+      // 구조·군단 앵커를 중심 안쪽에 배치 (해안 잘림 방지)
+      const structureAnchor = pt(c.x, c.y - 14);
+      const armyAnchors = [
+        pt(c.x - 16, c.y + 18),
+        pt(c.x + 14, c.y + 22),
+      ];
+
+      regions.push({
+        regionId,
+        path: regionPath(row, col),
+        labelAnchor: c,
+        structureAnchor,
+        armyAnchors,
+        edgeMidpoints,
+        coastal: isCoastalCell(row, col),
+      });
+    }
+  }
+
+  const sharedEdges: SharedEdgeGeometry[] = [];
+  // 가로 내부 경계 (row 1..2의 가로선 = 남북 인접)
+  for (let row = 1; row <= 2; row++) {
+    for (let col = 0; col < 4; col++) {
+      const north = idAt(row - 1, col);
+      const south = idAt(row, col);
+      const e = hEdge(row, col);
+      const a = north < south ? north : south;
+      const b = north < south ? south : north;
+      sharedEdges.push({
+        a,
+        b,
+        path: qEdge(e.start, e.ctrl, e.end),
+        mid: edgeMidFrom(e.start, e.ctrl, e.end),
+        aCenter: regionCenter(Math.floor(STRATEGIC_REGION_IDS.indexOf(a) / 4), STRATEGIC_REGION_IDS.indexOf(a) % 4),
+        bCenter: regionCenter(Math.floor(STRATEGIC_REGION_IDS.indexOf(b) / 4), STRATEGIC_REGION_IDS.indexOf(b) % 4),
+      });
+    }
+  }
+  // 세로 내부 경계 (col 1..3의 세로선 = 동서 인접)
+  for (let row = 0; row < 3; row++) {
+    for (let col = 1; col <= 3; col++) {
+      const west = idAt(row, col - 1);
+      const east = idAt(row, col);
+      const e = vEdge(row, col);
+      const a = west < east ? west : east;
+      const b = west < east ? east : west;
+      sharedEdges.push({
+        a,
+        b,
+        path: qEdge(e.start, e.ctrl, e.end),
+        mid: edgeMidFrom(e.start, e.ctrl, e.end),
+        aCenter: regionCenter(Math.floor(STRATEGIC_REGION_IDS.indexOf(a) / 4), STRATEGIC_REGION_IDS.indexOf(a) % 4),
+        bCenter: regionCenter(Math.floor(STRATEGIC_REGION_IDS.indexOf(b) / 4), STRATEGIC_REGION_IDS.indexOf(b) % 4),
+      });
+    }
+  }
+
+  // 섬 외곽: 북→동→남→서 시계방향 (외곽 변 연결)
+  const outlineParts: string[] = [];
+  // north coast left→right
+  {
+    const first = hEdge(0, 0);
+    outlineParts.push(`M ${fmt(first.start)}`);
+    for (let col = 0; col < 4; col++) {
+      const e = hEdge(0, col);
+      outlineParts.push(`Q ${fmt(e.ctrl)} ${fmt(e.end)}`);
+    }
+  }
+  // east coast top→bottom (col=4 verticals)
+  for (let row = 0; row < 3; row++) {
+    const e = vEdge(row, 4);
+    outlineParts.push(`Q ${fmt(e.ctrl)} ${fmt(e.end)}`);
+  }
+  // south coast right→left
+  for (let col = 3; col >= 0; col--) {
+    const e = hEdge(3, col);
+    outlineParts.push(`Q ${fmt(e.ctrl)} ${fmt(e.start)}`);
+  }
+  // west coast bottom→top (col=0 verticals reversed)
+  for (let row = 2; row >= 0; row--) {
+    const e = vEdge(row, 0);
+    outlineParts.push(`Q ${fmt(e.ctrl)} ${fmt(e.start)}`);
+  }
+  outlineParts.push('Z');
+  const islandOutline = outlineParts.join(' ');
+
+  // 얕은 여울: 외곽을 약간 바깥으로 확장한 근사
+  const islandShoal =
+    'M 30,60 C 28,28 70,12 110,18 C 150,8 190,14 230,32 C 255,48 272,80 270,120 ' +
+    'C 276,170 278,220 272,270 C 278,320 276,370 268,410 C 272,450 250,490 210,505 ' +
+    'C 170,520 120,518 80,498 C 45,480 22,440 20,390 C 14,340 12,280 18,230 ' +
+    'C 12,180 14,120 22,90 C 24,72 26,65 30,60 Z';
+
+  return { regions, sharedEdges, islandOutline, islandShoal };
+}
+
+const BUILT = buildGeometry();
+
 /**
  * 세로형 자연 섬 위 12영토. 인접 그래프(4×3)는 정본과 일치.
- * 퍼즐 격자·동일 크기 조각이 아닌 유기 해안·내륙 형태.
+ * 모든 인접 쌍이 동일 경계 제어점을 공유해 중복·공백 없이 섬을 덮는다.
  */
-export const STRATEGIC_REGION_GEOMETRY: readonly StrategicRegionGeometry[] = [
-  {
-    regionId: 'r00',
-    path: 'M 28,70 C 24,40 48,18 88,14 C 120,12 148,28 158,52 L 164,118 C 148,138 112,148 78,140 C 48,132 30,104 28,70 Z',
-    labelAnchor: { x: 96, y: 78 },
-    structureAnchor: { x: 100, y: 52 },
-    armyAnchors: [
-      { x: 72, y: 100 },
-      { x: 118, y: 108 },
-    ],
-    edgeMidpoints: {
-      r01: { x: 160, y: 84 },
-      r04: { x: 100, y: 142 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r01',
-    path: 'M 158,52 C 172,28 204,18 236,28 C 256,36 268,54 270,78 L 266,132 C 246,148 206,152 176,140 L 164,118 Z',
-    labelAnchor: { x: 214, y: 88 },
-    structureAnchor: { x: 218, y: 58 },
-    armyAnchors: [
-      { x: 192, y: 112 },
-      { x: 236, y: 118 },
-    ],
-    edgeMidpoints: {
-      r00: { x: 160, y: 84 },
-      r02: { x: 268, y: 104 },
-      r05: { x: 214, y: 144 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r02',
-    path: 'M 270,78 C 280,48 310,36 336,48 C 348,56 352,76 348,100 L 340,140 C 320,152 288,148 270,138 L 266,132 Z',
-    labelAnchor: { x: 304, y: 100 },
-    structureAnchor: { x: 308, y: 70 },
-    armyAnchors: [
-      { x: 286, y: 118 },
-      { x: 322, y: 124 },
-    ],
-    edgeMidpoints: {
-      r01: { x: 268, y: 104 },
-      r03: { x: 340, y: 138 },
-      r06: { x: 300, y: 146 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r03',
-    path: 'M 340,140 C 348,116 356,108 358,128 C 360,152 358,172 350,188 C 344,198 338,194 336,182 L 340,154 Z',
-    labelAnchor: { x: 346, y: 152 },
-    structureAnchor: { x: 348, y: 126 },
-    armyAnchors: [
-      { x: 334, y: 168 },
-      { x: 350, y: 172 },
-    ],
-    edgeMidpoints: {
-      r02: { x: 340, y: 138 },
-      r07: { x: 342, y: 186 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r04',
-    path: 'M 24,148 C 20,124 40,112 72,108 C 100,104 128,116 138,140 L 144,220 C 124,242 80,250 48,236 C 28,224 22,182 24,148 Z',
-    labelAnchor: { x: 82, y: 176 },
-    structureAnchor: { x: 86, y: 146 },
-    armyAnchors: [
-      { x: 58, y: 200 },
-      { x: 108, y: 206 },
-    ],
-    edgeMidpoints: {
-      r00: { x: 100, y: 142 },
-      r05: { x: 140, y: 178 },
-      r08: { x: 86, y: 236 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r05',
-    path: 'M 138,140 C 158,120 196,116 228,130 C 246,140 256,158 258,180 L 252,236 C 228,256 180,258 150,242 L 144,220 Z',
-    labelAnchor: { x: 196, y: 188 },
-    structureAnchor: { x: 200, y: 156 },
-    armyAnchors: [
-      { x: 170, y: 210 },
-      { x: 220, y: 216 },
-    ],
-    edgeMidpoints: {
-      r01: { x: 214, y: 144 },
-      r04: { x: 140, y: 178 },
-      r06: { x: 256, y: 206 },
-      r09: { x: 198, y: 246 },
-    },
-    coastal: false,
-  },
-  {
-    regionId: 'r06',
-    path: 'M 258,180 C 272,148 308,140 336,154 C 348,164 354,184 352,206 L 346,250 C 320,268 276,268 254,250 L 252,236 Z',
-    labelAnchor: { x: 300, y: 200 },
-    structureAnchor: { x: 304, y: 168 },
-    armyAnchors: [
-      { x: 274, y: 224 },
-      { x: 324, y: 230 },
-    ],
-    edgeMidpoints: {
-      r02: { x: 300, y: 146 },
-      r05: { x: 256, y: 206 },
-      r07: { x: 348, y: 224 },
-      r10: { x: 298, y: 258 },
-    },
-    coastal: false,
-  },
-  {
-    regionId: 'r07',
-    path: 'M 336,154 C 348,138 356,144 358,166 C 360,192 356,216 348,236 L 336,252 C 324,258 316,248 318,232 L 346,250 L 352,206 Z',
-    labelAnchor: { x: 340, y: 196 },
-    structureAnchor: { x: 342, y: 168 },
-    armyAnchors: [
-      { x: 324, y: 218 },
-      { x: 348, y: 222 },
-    ],
-    edgeMidpoints: {
-      r03: { x: 342, y: 186 },
-      r06: { x: 348, y: 224 },
-      r11: { x: 340, y: 252 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r08',
-    path: 'M 28,248 C 22,224 42,210 76,206 C 108,202 132,214 142,236 L 148,320 C 128,348 78,360 42,344 C 22,330 20,280 28,248 Z',
-    labelAnchor: { x: 86, y: 280 },
-    structureAnchor: { x: 90, y: 244 },
-    armyAnchors: [
-      { x: 60, y: 304 },
-      { x: 112, y: 310 },
-    ],
-    edgeMidpoints: {
-      r04: { x: 86, y: 236 },
-      r09: { x: 144, y: 276 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r09',
-    path: 'M 142,236 C 164,216 204,212 240,228 C 256,238 264,256 266,278 L 258,348 C 230,372 176,374 148,354 L 148,320 Z',
-    labelAnchor: { x: 200, y: 290 },
-    structureAnchor: { x: 204, y: 252 },
-    armyAnchors: [
-      { x: 172, y: 316 },
-      { x: 228, y: 322 },
-    ],
-    edgeMidpoints: {
-      r05: { x: 198, y: 246 },
-      r08: { x: 144, y: 276 },
-      r10: { x: 262, y: 310 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r10',
-    path: 'M 266,278 C 280,250 318,242 348,258 C 358,268 360,290 356,312 L 348,368 C 320,392 274,390 254,366 L 258,348 Z',
-    labelAnchor: { x: 304, y: 312 },
-    structureAnchor: { x: 308, y: 274 },
-    armyAnchors: [
-      { x: 280, y: 338 },
-      { x: 330, y: 344 },
-    ],
-    edgeMidpoints: {
-      r06: { x: 298, y: 258 },
-      r09: { x: 262, y: 310 },
-      r11: { x: 348, y: 336 },
-    },
-    coastal: true,
-  },
-  {
-    regionId: 'r11',
-    path: 'M 336,252 C 348,232 358,242 358,270 C 358,310 350,348 334,372 C 318,390 294,388 278,370 L 348,368 L 356,312 Z',
-    labelAnchor: { x: 328, y: 318 },
-    structureAnchor: { x: 330, y: 284 },
-    armyAnchors: [
-      { x: 304, y: 348 },
-      { x: 340, y: 352 },
-    ],
-    edgeMidpoints: {
-      r07: { x: 340, y: 252 },
-      r10: { x: 348, y: 336 },
-    },
-    coastal: true,
-  },
+export const STRATEGIC_REGION_GEOMETRY: readonly StrategicRegionGeometry[] = BUILT.regions;
+
+/** 인접 영토 공유 경계(전선·동맹 경계 렌더용). */
+export const STRATEGIC_SHARED_EDGES: readonly SharedEdgeGeometry[] = BUILT.sharedEdges;
+
+export const ISLAND_OUTLINE_PATH = BUILT.islandOutline;
+
+export const ISLAND_SHOAL_PATH = BUILT.islandShoal;
+
+export const RIVER_PATH =
+  'M 148,42 C 155,110 158,180 152,250 C 146,320 150,390 155,470';
+
+export const ROAD_PATHS: readonly string[] = [
+  'M 92,50 C 78,140 70,230 72,320 C 74,390 88,450 100,480',
+  'M 248,70 C 255,150 258,240 252,330 C 246,400 238,450 230,475',
+  'M 50,175 C 100,168 150,162 200,168 C 230,172 250,178 260,182',
+  'M 45,320 C 95,312 150,308 200,316 C 230,320 250,325 255,328',
 ];
 
 const GEOMETRY_BY_ID = new Map(
   STRATEGIC_REGION_GEOMETRY.map((g) => [g.regionId, g] as const),
 );
 
+const SHARED_EDGE_BY_KEY = new Map<string, SharedEdgeGeometry>();
+for (const e of STRATEGIC_SHARED_EDGES) {
+  SHARED_EDGE_BY_KEY.set(`${e.a}|${e.b}`, e);
+  SHARED_EDGE_BY_KEY.set(`${e.b}|${e.a}`, e);
+}
+
 export function getRegionGeometry(regionId: string): StrategicRegionGeometry | undefined {
   return GEOMETRY_BY_ID.get(regionId as StrategicRegionId);
+}
+
+export function getSharedEdge(
+  a: string,
+  b: string,
+): SharedEdgeGeometry | undefined {
+  return SHARED_EDGE_BY_KEY.get(`${a}|${b}`);
 }
 
 export function isPointInViewBox(p: Point2D, pad = 0): boolean {
@@ -243,24 +349,42 @@ export function isPointInViewBox(p: Point2D, pad = 0): boolean {
 
 export function isValidSvgPath(d: string): boolean {
   if (!d || d.length < 8) return false;
-  return /^[MLCZmlcz0-9.,\s-]+$/.test(d) && /[Mm]/.test(d) && /[Zz]/.test(d);
+  return /^[MLCZmlcz0-9.,\s-Qq]+$/.test(d) && /[Mm]/.test(d) && /[Zz]/.test(d);
 }
 
-export const ISLAND_OUTLINE_PATH =
-  'M 28,70 C 24,40 48,18 88,14 C 130,10 170,22 200,36 C 240,22 290,24 330,42 C 348,54 356,80 348,110 C 356,140 360,180 354,220 C 360,260 360,310 348,350 C 358,380 348,420 318,438 C 278,458 220,466 160,456 C 110,466 60,448 36,408 C 18,368 16,320 24,280 C 14,240 16,190 24,150 C 16,120 18,95 28,70 Z';
-
-export const ISLAND_SHOAL_PATH =
-  'M 36,78 C 34,50 56,28 92,24 C 132,20 170,32 198,46 C 236,34 284,36 322,52 C 340,64 348,88 340,116 C 348,146 352,186 346,224 C 352,264 352,312 340,350 C 348,376 338,412 312,428 C 274,446 218,454 164,444 C 116,454 70,436 48,398 C 32,360 30,312 38,274 C 28,236 30,190 38,152 C 30,124 30,100 36,78 Z';
-
-export const RIVER_PATH =
-  'M 190,48 C 200,90 206,130 212,170 C 220,220 228,270 232,320 C 234,360 236,400 230,430';
-
-export const ROAD_PATHS: readonly string[] = [
-  'M 100,56 C 92,110 86,160 82,210 C 78,260 88,300 92,340',
-  'M 348,128 C 344,180 342,230 340,280 C 338,330 334,370 330,400',
-  'M 90,176 C 140,188 190,194 240,200 C 280,204 320,210 340,216',
-  'M 90,284 C 140,298 190,306 240,312 C 280,316 320,324 340,332',
-];
+/**
+ * 앵커가 해당 영토 bounding box 안에 있는지 대략 검증.
+ * (path 내부 정밀 검사는 브라우저 isPointInFill에 위임)
+ */
+export function anchorsInsideRegionBounds(g: StrategicRegionGeometry): boolean {
+  // path 좌표에서 min/max 추출
+  const nums = g.path.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  if (nums.length < 4) return false;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    const x = nums[i]!;
+    const y = nums[i + 1]!;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  // 경계에서 약간 안쪽 여유
+  const pad = 2;
+  const inside = (p: Point2D) =>
+    p.x >= minX + pad &&
+    p.x <= maxX - pad &&
+    p.y >= minY + pad &&
+    p.y <= maxY - pad;
+  if (!inside(g.labelAnchor) || !inside(g.structureAnchor)) return false;
+  for (const a of g.armyAnchors) {
+    if (!inside(a)) return false;
+  }
+  return true;
+}
 
 export function geometryAdjacencyMatchesCanon(): {
   ok: boolean;
@@ -312,15 +436,15 @@ export function buildMovePathPoints(
   if (!from || !to) return [];
   const start = from.armyAnchors[0] ?? from.labelAnchor;
   const end = to.armyAnchors[0] ?? to.labelAnchor;
-  const mid =
+  const midPt =
     from.edgeMidpoints[toRegionId as StrategicRegionId] ??
     to.edgeMidpoints[fromRegionId as StrategicRegionId] ?? {
       x: (start.x + end.x) / 2,
       y: (start.y + end.y) / 2,
     };
   const ctrl: Point2D = {
-    x: mid.x + (mid.y - start.y) * 0.06,
-    y: mid.y - (mid.x - start.x) * 0.06,
+    x: midPt.x + (midPt.y - start.y) * 0.06,
+    y: midPt.y - (midPt.x - start.x) * 0.06,
   };
   return [start, ctrl, end];
 }
@@ -335,33 +459,32 @@ export function listSharedEdges(): Array<{
   mid: Point2D;
   aCenter: Point2D;
   bCenter: Point2D;
+  path: string;
 }> {
-  const edges: Array<{
-    a: StrategicRegionId;
-    b: StrategicRegionId;
-    mid: Point2D;
-    aCenter: Point2D;
-    bCenter: Point2D;
-  }> = [];
+  return STRATEGIC_SHARED_EDGES.map((e) => ({
+    a: e.a,
+    b: e.b,
+    mid: e.mid,
+    aCenter: e.aCenter,
+    bCenter: e.bCenter,
+    path: e.path,
+  }));
+}
+
+/** 공유 경계 수가 정본 인접 수와 같은지. */
+export function sharedEdgesMatchCanonCount(): boolean {
+  const adj = geometryAdjacencyMatchesCanon();
+  if (!adj.ok) return false;
+  const regions = createStrategicRegions();
+  let undirected = 0;
   const seen = new Set<string>();
-  for (const g of STRATEGIC_REGION_GEOMETRY) {
-    for (const [nid, mid] of Object.entries(g.edgeMidpoints) as [
-      StrategicRegionId,
-      Point2D,
-    ][]) {
-      const key = g.regionId < nid ? `${g.regionId}|${nid}` : `${nid}|${g.regionId}`;
+  for (const r of regions) {
+    for (const n of r.neighbors) {
+      const key = r.id < n ? `${r.id}|${n}` : `${n}|${r.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const other = getRegionGeometry(nid);
-      if (!other || !mid) continue;
-      edges.push({
-        a: g.regionId,
-        b: nid,
-        mid,
-        aCenter: g.labelAnchor,
-        bCenter: other.labelAnchor,
-      });
+      undirected++;
     }
   }
-  return edges;
+  return STRATEGIC_SHARED_EDGES.length === undirected;
 }

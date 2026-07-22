@@ -7,14 +7,18 @@ import {
   ROAD_PATHS,
   STRATEGIC_MAP_VIEWBOX,
   STRATEGIC_REGION_GEOMETRY,
+  STRATEGIC_SHARED_EDGES,
+  anchorsInsideRegionBounds,
   assertGeometryCoverage,
   buildMovePathPoints,
   geometryAdjacencyMatchesCanon,
   getRegionGeometry,
+  getSharedEdge,
   isPointInViewBox,
   isValidSvgPath,
   listSharedEdges,
   pointsToSvg,
+  sharedEdgesMatchCanonCount,
 } from '../src/ui/strategic/map-geometry';
 import { prefersReducedMotion, pointAlongPath } from '../src/ui/strategic/map-animation';
 import {
@@ -72,10 +76,25 @@ describe('strategic map geometry', () => {
     expect(isPointInViewBox(mid, 2)).toBe(true);
   });
 
-  it('viewBox 상수가 양의 크기다(세로 우선)', () => {
-    expect(STRATEGIC_MAP_VIEWBOX.width).toBe(360);
-    expect(STRATEGIC_MAP_VIEWBOX.height).toBe(480);
-    expect(STRATEGIC_MAP_VIEWBOX.attr).toBe('0 0 360 480');
+  it('viewBox 상수가 양의 크기이고 모바일 세로 비율에 가깝다', () => {
+    expect(STRATEGIC_MAP_VIEWBOX.width).toBe(280);
+    expect(STRATEGIC_MAP_VIEWBOX.height).toBe(530);
+    expect(STRATEGIC_MAP_VIEWBOX.attr).toBe('0 0 280 530');
+    const aspect = STRATEGIC_MAP_VIEWBOX.width / STRATEGIC_MAP_VIEWBOX.height;
+    expect(aspect).toBeGreaterThan(0.45);
+    expect(aspect).toBeLessThan(0.6);
+  });
+
+  it('모든 앵커가 해당 영토 bounds 안이고 공유 경계가 정본과 일치한다', () => {
+    for (const g of STRATEGIC_REGION_GEOMETRY) {
+      expect(anchorsInsideRegionBounds(g)).toBe(true);
+    }
+    expect(sharedEdgesMatchCanonCount()).toBe(true);
+    expect(STRATEGIC_SHARED_EDGES.length).toBeGreaterThanOrEqual(12);
+    for (const e of STRATEGIC_SHARED_EDGES) {
+      expect(e.path.length).toBeGreaterThan(8);
+      expect(getSharedEdge(e.a, e.b)?.path).toBe(e.path);
+    }
   });
 
   it('섬 외곽·강·도로 레이어 path가 유효하다', () => {
@@ -116,7 +135,7 @@ describe('strategic map render contracts', () => {
       moveTargets: [],
     });
     expect(html).toContain('strategic-map-svg');
-    expect(html).toContain('viewBox="0 0 360 480"');
+    expect(html).toContain('viewBox="0 0 280 530"');
     expect(html).toContain('st-ocean');
     expect(html).not.toMatch(/grid-template-columns:\s*repeat\(4/);
     expect(html).not.toContain('strategic-links');
@@ -220,6 +239,9 @@ describe('strategic map render contracts', () => {
     expect(banner).toContain('st-army-banner');
     expect(banner).toContain('st-army-count');
     expect(banner).toContain('>4<');
+    expect(banner).toContain('st-army-hit');
+    // 터치 영역: r≥24 (모바일에서 ≥48 CSS px)
+    expect(banner).toMatch(/st-army-hit"[^>]*r="(?:2[4-9]|[3-9]\d)/);
   });
 
   it('거점·지형 decor SVG가 비어 있지 않다', () => {

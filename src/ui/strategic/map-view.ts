@@ -120,53 +120,47 @@ export interface MapViewRenderOpts {
   pathPreview?: { from: string; to: string } | null;
 }
 
-/** 동맹 내륙 경계 vs 적대 전선 구분. */
+/** 동맹 내륙 경계 vs 적대 전선 — 실제 공유 경계 path 전체에 맞춤. */
 function frontLineSvg(state: StrategicGameState): string {
   const byId = new Map(state.regions.map((r) => [r.id, r]));
   const parts: string[] = [];
   for (const edge of listSharedEdges()) {
     const ra = byId.get(edge.a);
     const rb = byId.get(edge.b);
-    if (!ra || !rb) continue;
+    if (!ra || !rb || !edge.path) continue;
     const oa = ra.owner;
     const ob = rb.owner;
-    // 같은 세력: 얇은 내륙 경계
+    const d = edge.path;
+    // 같은 세력: 공유 경계 전체에 얇은 동맹 선
     if (oa && oa === ob) {
       parts.push(
-        `<line class="st-border-ally" x1="${edge.aCenter.x}" y1="${edge.aCenter.y}" x2="${edge.bCenter.x}" y2="${edge.bCenter.y}"
-          stroke="${ownerStroke(oa)}" stroke-width="0.9" stroke-opacity="0.35" pointer-events="none"/>`,
+        `<path class="st-border-ally" d="${d}" fill="none"
+          stroke="${ownerStroke(oa)}" stroke-width="1.1" stroke-opacity="0.4"
+          stroke-linecap="round" pointer-events="none"/>`,
       );
       continue;
     }
-    // 서로 다른 소유(또는 한쪽 중립이 아닌 적대 접촉): 전선
     const hostile =
       (oa && ob && oa !== ob) ||
       (oa && !ob) ||
       (!oa && ob);
     if (!hostile) continue;
     if (!oa || !ob) {
-      // 중립 접경 — 약한 점선
+      // 중립 접경 — 공유 경계 약한 점선
       parts.push(
-        `<line class="st-border-neutral" x1="${edge.mid.x - 6}" y1="${edge.mid.y - 4}" x2="${edge.mid.x + 6}" y2="${edge.mid.y + 4}"
-          stroke="#cfc8b8" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.5" pointer-events="none"/>`,
+        `<path class="st-border-neutral" d="${d}" fill="none"
+          stroke="#cfc8b8" stroke-width="1.4" stroke-dasharray="3 2.5" stroke-opacity="0.55"
+          stroke-linecap="round" pointer-events="none"/>`,
       );
       continue;
     }
-    // 적대 전선: 중점에 이중 색 짧은 호
-    const dx = edge.bCenter.x - edge.aCenter.x;
-    const dy = edge.bCenter.y - edge.aCenter.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const nx = (-dy / len) * 7;
-    const ny = (dx / len) * 7;
-    const mx = edge.mid.x;
-    const my = edge.mid.y;
+    // 적대 전선: 공유 경계 전체 + 이중 색(아래 적/위 아군 느낌)
     parts.push(
       `<g class="st-front-line" data-front="${escapeHtml(edge.a)}-${escapeHtml(edge.b)}" pointer-events="none">
-        <line x1="${mx - nx}" y1="${my - ny}" x2="${mx + nx}" y2="${my + ny}"
-          stroke="${ownerStroke(oa)}" stroke-width="2.4" stroke-opacity="0.85" stroke-linecap="round"/>
-        <line x1="${mx - nx * 0.55}" y1="${my - ny * 0.55}" x2="${mx + nx * 0.55}" y2="${my + ny * 0.55}"
-          stroke="${ownerStroke(ob)}" stroke-width="2.4" stroke-opacity="0.75" stroke-linecap="round"
-          transform="translate(${nx * 0.35},${ny * 0.35})"/>
+        <path d="${d}" fill="none" stroke="${ownerStroke(oa)}" stroke-width="3.2"
+          stroke-opacity="0.9" stroke-linecap="round"/>
+        <path d="${d}" fill="none" stroke="${ownerStroke(ob)}" stroke-width="1.8"
+          stroke-opacity="0.85" stroke-linecap="round" stroke-dasharray="5 3"/>
       </g>`,
     );
   }
