@@ -1,4 +1,5 @@
 // 한 줄 목적: Strategic Layer V0의 순수 상태·명령·전투 브리지 타입을 정의한다
+import type { ScenarioDocumentV1 } from '../core/scenario/types';
 import type { FactionId, UnitTypeId } from '../core/types';
 
 export type StrategicPhase = 'orders' | 'battle' | 'resolution' | 'ended';
@@ -104,3 +105,15 @@ export interface TacticalBattleReport {
 export type StrategicResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: string };
+
+/** 전술 UI 진입 vs AI 자동 해결 필요 분류(Phase 8-0 fail-closed). */
+export type StrategicBattlePreparation =
+  | {
+      kind: 'human-tactical';
+      context: StrategicBattleContext;
+      scenario: ScenarioDocumentV1;
+    }
+  | {
+      kind: 'auto-resolve-required';
+      context: StrategicBattleContext;
+    };

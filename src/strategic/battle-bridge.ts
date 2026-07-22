@@ -5,10 +5,16 @@ import { digestString, canonicalJson } from '../core/replay';
 import type { ScenarioDocumentV1, ScenarioTile } from '../core/scenario/types';
 import type { FactionId, GameState } from '../core/types';
 import { isKnownUnitType } from '../core/units';
+import {
+  battleFnv,
+  deriveBattleIdentity,
+  type BattleContextRequest,
+} from './battle-identity';
 import { cloneStrategicState } from './state';
 import type {
   StrategicArmy,
   StrategicBattleContext,
+  StrategicBattlePreparation,
   StrategicGameState,
   StrategicRegionTerrain,
   StrategicResult,
@@ -17,28 +23,15 @@ import type {
 } from './types';
 import { validateStrategicState } from './validate';
 
+export { deriveBattleIdentity } from './battle-identity';
+export type { BattleContextRequest } from './battle-identity';
+
 function fail<T>(reason: string): StrategicResult<T> {
   return { ok: false, reason };
 }
 
-function fnv(str: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
-
 function armyById(state: StrategicGameState, id: string): StrategicArmy | undefined {
   return state.armies.find((a) => a.id === id);
-}
-
-export interface BattleContextRequest {
-  attackerArmyId: string;
-  defenderArmyId: string;
-  regionId: string;
-  attackerOriginRegionId: string;
 }
 
 /**
@@ -86,23 +79,14 @@ export function buildBattleContext(
   }
   bindings.sort((a, b) => a.strategicUnitId.localeCompare(b.strategicUnitId));
 
-  const idPayload = {
-    seed: state.seed,
-    turn: state.turn,
-    regionId: req.regionId,
-    attackerArmyId: req.attackerArmyId,
-    defenderArmyId: req.defenderArmyId,
-    origin: req.attackerOriginRegionId,
-    units: bindings.map((b) => [b.strategicUnitId, b.type, b.startingHp]),
-  };
-  const battleId = digestString(canonicalJson(idPayload));
-  const battleSeed = fnv(`${state.seed}|${battleId}|${state.turn}`) >>> 0;
+  const identity = deriveBattleIdentity(state, req);
+  if (!identity.ok) return fail(identity.reason);
 
   const ctx: StrategicBattleContext = {
     schemaVersion: 1,
-    battleId,
+    battleId: identity.value.battleId,
     strategicTurn: state.turn,
-    battleSeed,
+    battleSeed: identity.value.battleSeed,
     regionId: req.regionId,
     attackerArmyId: attacker.id,
     defenderArmyId: defender.id,
@@ -139,8 +123,23 @@ function oddRKey(col: number, row: number): { q: number; r: number } {
   return { q, r: row };
 }
 
+/** 인간 세력이 공격·방어 중 정확히 한쪽에 참여하는지. */
+function humanParticipatesInBattle(
+  context: StrategicBattleContext,
+  strategicState: StrategicGameState,
+): boolean {
+  const attacker = armyById(strategicState, context.attackerArmyId);
+  const defender = armyById(strategicState, context.defenderArmyId);
+  if (!attacker || !defender) return false;
+  return (
+    attacker.faction === strategicState.humanFaction ||
+    defender.faction === strategicState.humanFaction
+  );
+}
+
 /**
  * 전투 context → ScenarioDocumentV1.
+ * 인간 참여 전투만 문서 생성. AI 대 AI는 fail-closed(human-not-participant).
  * 8×8 고정 보드, 생산 거점 없음, uniqueUnits·doctrines 활성, 턴 10, 적 섬멸 승리.
  */
 export function buildTacticalScenario(
@@ -154,6 +153,14 @@ export function buildTacticalScenario(
   const attacker = armyById(strategicState, context.attackerArmyId);
   const defender = armyById(strategicState, context.defenderArmyId);
   if (!attacker || !defender) return fail('army-missing');
+
+  // AI 대 AI: 임시 human controller 부여 금지
+  if (!humanParticipatesInBattle(context, strategicState)) {
+    return fail('human-not-participant');
+  }
+  if (context.humanFaction !== strategicState.humanFaction) {
+    return fail('human-faction-mismatch');
+  }
 
   // 바인딩 완전성·1:1
   const expectedIds = new Set<string>();
@@ -187,7 +194,7 @@ export function buildTacticalScenario(
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const { q, r } = oddRKey(col, row);
-      const roll = fnv(`${context.battleSeed}|${col}|${row}`);
+      const roll = battleFnv(`${context.battleSeed}|${col}|${row}`);
       tiles.push({ q, r, terrain: pickTerrain(weights, roll) });
     }
   }
@@ -220,14 +227,13 @@ export function buildTacticalScenario(
   place(defenderBindings, 6);
 
   const activeFactions = new Set<FactionId>([attacker.faction, defender.faction]);
-  const humanInBattle = activeFactions.has(context.humanFaction)
-    ? context.humanFaction
-    : attacker.faction;
+  // 인간 참여 전투만 이 경로에 도달 — humanFaction만 controller=human
+  const humanFaction = strategicState.humanFaction;
 
   const factions: ScenarioDocumentV1['factions'] = FACTION_IDS.map((id) => ({
     id,
     active: activeFactions.has(id),
-    controller: id === humanInBattle ? ('human' as const) : ('ai' as const),
+    controller: id === humanFaction ? ('human' as const) : ('ai' as const),
     startGold: 0,
     useDoctrine: true,
   }));
@@ -237,7 +243,7 @@ export function buildTacticalScenario(
 
   // 승리: 인간 참여 시 상대 섬멸. 제한 턴 종료 시 점수 규칙으로 승자·무승부.
   const enemyOfHuman =
-    humanInBattle === attacker.faction ? defender.faction : attacker.faction;
+    humanFaction === attacker.faction ? defender.faction : attacker.faction;
 
   const doc: ScenarioDocumentV1 = {
     schemaVersion: 1,
@@ -266,8 +272,42 @@ export function buildTacticalScenario(
 }
 
 /**
+ * pendingBattle을 인간 전술 진입 또는 auto-resolve-required로 분류한다.
+ * AI 대 AI는 시나리오를 만들지 않고 구조화 결과만 반환한다.
+ */
+export function prepareStrategicBattle(
+  state: StrategicGameState,
+): StrategicResult<StrategicBattlePreparation> {
+  if (!state.pendingBattle) return fail('no-pending-battle');
+  if (state.phase !== 'battle') return fail('not-battle-phase');
+
+  const integrity = validateStrategicState(state);
+  if (!integrity.ok) return fail(integrity.reason);
+
+  const context = state.pendingBattle;
+  if (!humanParticipatesInBattle(context, state)) {
+    return {
+      ok: true,
+      value: { kind: 'auto-resolve-required', context },
+    };
+  }
+
+  const scenario = buildTacticalScenario(context, state);
+  if (!scenario.ok) return fail(scenario.reason);
+
+  return {
+    ok: true,
+    value: {
+      kind: 'human-tactical',
+      context,
+      scenario: scenario.value,
+    },
+  };
+}
+
+/**
  * 종료된 전술 GameState + context → 전투 보고서.
- * 미종료·태그 불명·중복·HP 범위 위반은 fail-closed.
+ * 무태그 생존 유닛·태그 불명·중복·HP 범위 위반은 fail-closed.
  */
 export function buildTacticalBattleReport(
   context: StrategicBattleContext,
@@ -279,11 +319,11 @@ export function buildTacticalBattleReport(
   const bindingByTag = new Map(context.unitBindings.map((b) => [b.tacticalTag, b]));
   const bindingByUnit = new Map(context.unitBindings.map((b) => [b.strategicUnitId, b]));
 
-  // 전술 유닛에 등장한 태그 수집
+  // 전술 유닛에 등장한 태그 수집 — 무태그는 거절
   const seenTags = new Set<string>();
   const survivors: TacticalBattleReport['survivingUnits'] = [];
   for (const u of finishedGameState.units) {
-    if (!u.tag) continue;
+    if (!u.tag) return fail('unexpected-untagged-unit');
     if (!bindingByTag.has(u.tag)) return fail('unknown-tactical-tag');
     if (seenTags.has(u.tag)) return fail('duplicate-tag-in-state');
     seenTags.add(u.tag);
@@ -291,7 +331,14 @@ export function buildTacticalBattleReport(
     if (!isKnownUnitType(u.type) || u.type !== b.type) return fail('type-mismatch');
     if (u.faction !== b.faction) return fail('faction-mismatch');
     const maxHp = UNIT_STATS[u.type].hp;
-    if (!Number.isInteger(u.hp) || u.hp < 1 || u.hp > maxHp) return fail('bad-survivor-hp');
+    // 전투 중 회복 계약 없음 — startingHp 초과 거절
+    if (
+      !Number.isInteger(u.hp) ||
+      u.hp < 1 ||
+      u.hp > maxHp ||
+      u.hp > b.startingHp
+    )
+      return fail('bad-survivor-hp');
     survivors.push({
       strategicUnitId: b.strategicUnitId,
       armyId: b.armyId,
@@ -380,6 +427,111 @@ export function buildTacticalBattleReport(
   return { ok: true, value: report };
 }
 
+/**
+ * 외부 입력 전투 보고서를 context·pendingBattle과 필수 대조한다.
+ * apply 전에 반드시 통과해야 한다.
+ */
+export function validateTacticalBattleReport(
+  state: StrategicGameState,
+  report: TacticalBattleReport,
+): StrategicResult<true> {
+  if (report.schemaVersion !== 1) return fail('bad-report-schema');
+  if (!state.pendingBattle) return fail('no-pending-battle');
+  if (state.phase !== 'battle') return fail('not-battle-phase');
+  if (state.pendingBattle.battleId !== report.battleId) return fail('battle-id-mismatch');
+
+  const ctx = state.pendingBattle;
+  const attacker = armyById(state, ctx.attackerArmyId);
+  const defender = armyById(state, ctx.defenderArmyId);
+  if (!attacker || !defender) return fail('army-missing');
+
+  const attackerFaction = attacker.faction;
+  const defenderFaction = defender.faction;
+
+  // 6.1 기본 구조
+  if (report.winner !== 'draw' && report.winner !== attackerFaction && report.winner !== defenderFaction)
+    return fail('bad-winner');
+  if (!Array.isArray(report.survivingUnits)) return fail('survivors-not-array');
+  if (!Array.isArray(report.losses)) return fail('losses-not-array');
+  if (!Array.isArray(report.retreatingArmyIds)) return fail('retreat-not-array');
+  if (!Number.isInteger(report.turns) || report.turns < 1) return fail('bad-turns');
+
+  if (!report.scoreByFaction || typeof report.scoreByFaction !== 'object')
+    return fail('bad-scoreByFaction');
+  for (const fid of FACTION_IDS) {
+    const sc = report.scoreByFaction[fid];
+    if (typeof sc !== 'number' || !Number.isFinite(sc) || Number.isNaN(sc) || sc < 0)
+      return fail('bad-score');
+  }
+  for (const key of Object.keys(report.scoreByFaction)) {
+    if (!(FACTION_IDS as string[]).includes(key)) return fail('unknown-score-faction');
+  }
+
+  // 6.2 유닛 완전 분할
+  const bindingById = new Map(ctx.unitBindings.map((b) => [b.strategicUnitId, b]));
+  const reportIds = new Set<string>();
+
+  for (const s of report.survivingUnits) {
+    if (typeof s.strategicUnitId !== 'string') return fail('bad-survivor-id');
+    if (reportIds.has(s.strategicUnitId)) return fail('dup-survivor');
+    reportIds.add(s.strategicUnitId);
+    const b = bindingById.get(s.strategicUnitId);
+    if (!b) return fail('unknown-report-unit');
+
+    // 6.3 메타데이터 필수 대조
+    if (s.armyId !== b.armyId) return fail('report-army-mismatch');
+    if (s.faction !== b.faction) return fail('report-faction-mismatch');
+    if (s.type !== b.type) return fail('report-type-mismatch');
+
+    // 6.4 survivor HP
+    const maxHp = UNIT_STATS[b.type].hp;
+    if (!Number.isInteger(s.hp) || s.hp < 1 || s.hp > maxHp) return fail('bad-survivor-hp');
+    if (s.hp > b.startingHp) return fail('survivor-hp-above-starting');
+  }
+
+  for (const l of report.losses) {
+    if (typeof l.strategicUnitId !== 'string') return fail('bad-loss-id');
+    if (reportIds.has(l.strategicUnitId)) return fail('overlap-loss');
+    reportIds.add(l.strategicUnitId);
+    const b = bindingById.get(l.strategicUnitId);
+    if (!b) return fail('unknown-report-unit');
+    if (l.armyId !== b.armyId) return fail('report-army-mismatch');
+    if (l.faction !== b.faction) return fail('report-faction-mismatch');
+    if (l.type !== b.type) return fail('report-type-mismatch');
+  }
+
+  if (reportIds.size !== bindingById.size) return fail('incomplete-units');
+  for (const id of bindingById.keys()) {
+    if (!reportIds.has(id)) return fail('missing-report-unit');
+  }
+
+  // 6.5 retreatingArmyIds — 맵·생존 상태에서 계산한 예상 집합과 정확 일치
+  const survivorArmyAlive = {
+    attacker: report.survivingUnits.some((s) => s.armyId === ctx.attackerArmyId),
+    defender: report.survivingUnits.some((s) => s.armyId === ctx.defenderArmyId),
+  };
+  const expectedRetreat: string[] = [];
+  if (report.winner === 'draw') {
+    if (survivorArmyAlive.attacker) expectedRetreat.push(ctx.attackerArmyId);
+  } else if (report.winner === attackerFaction) {
+    if (survivorArmyAlive.defender) expectedRetreat.push(ctx.defenderArmyId);
+  } else if (report.winner === defenderFaction) {
+    if (survivorArmyAlive.attacker) expectedRetreat.push(ctx.attackerArmyId);
+  }
+
+  const retreatSet = new Set(report.retreatingArmyIds);
+  if (retreatSet.size !== report.retreatingArmyIds.length) return fail('dup-retreat-id');
+  for (const id of report.retreatingArmyIds) {
+    if (id !== ctx.attackerArmyId && id !== ctx.defenderArmyId) return fail('bad-retreat-id');
+  }
+  if (retreatSet.size !== expectedRetreat.length) return fail('retreat-set-mismatch');
+  for (const id of expectedRetreat) {
+    if (!retreatSet.has(id)) return fail('retreat-set-mismatch');
+  }
+
+  return { ok: true, value: true };
+}
+
 function pickRetreatRegion(
   state: StrategicGameState,
   army: StrategicArmy,
@@ -406,40 +558,22 @@ function pickRetreatRegion(
 /**
  * 전투 보고서를 전략 상태에 결정론적으로 반영한다.
  * pendingBattle과 battleId가 일치해야 하며 동일 보고 재적용은 거절.
+ * 병종·세력·군단 소속은 context 정본, survivor HP만 반영.
  */
 export function applyTacticalBattleReport(
   state: StrategicGameState,
   report: TacticalBattleReport,
 ): StrategicResult<StrategicGameState> {
-  if (report.schemaVersion !== 1) return fail('bad-report-schema');
-  if (!state.pendingBattle) return fail('no-pending-battle');
-  if (state.pendingBattle.battleId !== report.battleId) return fail('battle-id-mismatch');
-  if (state.phase !== 'battle') return fail('not-battle-phase');
+  const validated = validateTacticalBattleReport(state, report);
+  if (!validated.ok) return fail(validated.reason);
 
-  const ctx = state.pendingBattle;
+  const ctx = state.pendingBattle!;
   const next = cloneStrategicState(state);
-
-  // 보고서 유닛 집합이 context 바인딩과 일치하는지
-  const boundIds = new Set(ctx.unitBindings.map((b) => b.strategicUnitId));
-  const reportIds = new Set<string>();
-  for (const s of report.survivingUnits) {
-    if (reportIds.has(s.strategicUnitId)) return fail('dup-survivor');
-    reportIds.add(s.strategicUnitId);
-    if (!boundIds.has(s.strategicUnitId)) return fail('unknown-survivor');
-    const maxHp = UNIT_STATS[s.type].hp;
-    if (!Number.isInteger(s.hp) || s.hp < 1 || s.hp > maxHp) return fail('bad-hp');
-  }
-  for (const l of report.losses) {
-    if (reportIds.has(l.strategicUnitId)) return fail('overlap-loss');
-    reportIds.add(l.strategicUnitId);
-    if (!boundIds.has(l.strategicUnitId)) return fail('unknown-loss');
-  }
-  if (reportIds.size !== boundIds.size) return fail('incomplete-units');
-
+  const bindingById = new Map(ctx.unitBindings.map((b) => [b.strategicUnitId, b]));
   const survivorMap = new Map(report.survivingUnits.map((s) => [s.strategicUnitId, s]));
   const lossSet = new Set(report.losses.map((l) => l.strategicUnitId));
 
-  // 군단 유닛 갱신
+  // 군단 유닛 갱신 — type/faction/armyId는 원본 유지, HP만 survivor에서
   for (const army of next.armies) {
     if (army.id !== ctx.attackerArmyId && army.id !== ctx.defenderArmyId) continue;
     const kept = [];
@@ -447,8 +581,14 @@ export function applyTacticalBattleReport(
       if (lossSet.has(u.id)) continue;
       const surv = survivorMap.get(u.id);
       if (!surv) return fail('unit-not-in-report');
-      if (surv.armyId !== army.id) return fail('army-mismatch');
-      kept.push({ id: u.id, type: surv.type, hp: surv.hp });
+      const original = bindingById.get(u.id);
+      if (!original) return fail('binding-missing');
+      if (original.armyId !== army.id) return fail('army-mismatch');
+      kept.push({
+        id: original.strategicUnitId,
+        type: original.type,
+        hp: surv.hp,
+      });
     }
     army.units = kept;
   }
@@ -502,11 +642,6 @@ export function applyTacticalBattleReport(
   // 재조회(제거 반영)
   att = next.armies.find((a) => a.id === ctx.attackerArmyId) ?? null;
   def = next.armies.find((a) => a.id === ctx.defenderArmyId) ?? null;
-
-  // retreatingArmyIds 검증(보고서와 실제 이동 일치 — 정보 필드, 위치는 위 규칙이 정본)
-  for (const id of report.retreatingArmyIds) {
-    if (id !== ctx.attackerArmyId && id !== ctx.defenderArmyId) return fail('bad-retreat-id');
-  }
 
   delete next.pendingBattle;
   next.phase = 'orders';

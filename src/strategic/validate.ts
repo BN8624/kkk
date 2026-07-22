@@ -2,6 +2,7 @@
 import { FACTION_IDS, UNIT_STATS } from '../core/data';
 import { isKnownUnitType } from '../core/units';
 import type { FactionId } from '../core/types';
+import { deriveBattleIdentity } from './battle-identity';
 import { assertSymmetricNeighbors, isRegionGraphConnected } from './map';
 import type {
   StrategicArmy,
@@ -68,15 +69,36 @@ function validateBattleContext(
   const regionIds = new Set(state.regions.map((r) => r.id));
   if (!regionIds.has(ctx.regionId)) return 'pendingBattle.regionId';
   if (!regionIds.has(ctx.attackerOriginRegionId)) return 'pendingBattle.origin';
+
+  // 8.1 턴·인간 세력
+  if (ctx.strategicTurn !== state.turn) return 'pendingBattle.strategicTurn mismatch';
+  if (ctx.humanFaction !== state.humanFaction) return 'pendingBattle.humanFaction mismatch';
+  if (!isFactionId(ctx.humanFaction)) return 'pendingBattle.humanFaction';
+
+  // 8.2 군단 위치
+  if (ctx.attackerOriginRegionId === ctx.regionId) return 'pendingBattle.origin equals region';
+  const originRegion = state.regions.find((r) => r.id === ctx.attackerOriginRegionId);
+  if (!originRegion) return 'pendingBattle.origin';
+  if (!originRegion.neighbors.includes(ctx.regionId)) return 'pendingBattle.not adjacent';
+
   const att = state.armies.find((a) => a.id === ctx.attackerArmyId);
   const def = state.armies.find((a) => a.id === ctx.defenderArmyId);
   if (!att) return 'pendingBattle.attacker missing';
   if (!def) return 'pendingBattle.defender missing';
   if (att.id === def.id) return 'pendingBattle.same army';
-  if (!isFactionId(ctx.humanFaction)) return 'pendingBattle.humanFaction';
+  if (att.faction === def.faction) return 'pendingBattle.same faction';
+  if (att.regionId !== ctx.attackerOriginRegionId) return 'pendingBattle.attacker origin mismatch';
+  if (def.regionId !== ctx.regionId) return 'pendingBattle.defender region mismatch';
+
+  // 8.3 전투 지역 점유 — 지정 방어군만, 제3 군단 없음
+  const armiesAtBattle = state.armies.filter((a) => a.regionId === ctx.regionId);
+  if (!armiesAtBattle.some((a) => a.id === def.id)) return 'pendingBattle.defender not at region';
+  if (armiesAtBattle.some((a) => a.id !== def.id)) return 'pendingBattle.extra army at region';
+
   if (!Array.isArray(ctx.unitBindings) || ctx.unitBindings.length === 0)
     return 'pendingBattle.bindings empty';
 
+  // 8.4 바인딩
   const bindingUnitIds = new Set<string>();
   const tags = new Set<string>();
   const expected = new Map<string, { armyId: string; faction: FactionId; type: string; hp: number }>();
@@ -99,10 +121,30 @@ function validateBattleContext(
     if (b.startingHp !== exp.hp) return 'pendingBattle.binding hp';
     if (typeof b.tacticalTag !== 'string' || b.tacticalTag.length === 0)
       return 'pendingBattle.tag';
+    // 공격 바인딩은 공격군에만, 방어는 방어군에만
+    if (b.armyId === att.id) {
+      if (b.faction !== att.faction) return 'pendingBattle.attacker binding faction';
+    } else if (b.armyId === def.id) {
+      if (b.faction !== def.faction) return 'pendingBattle.defender binding faction';
+    } else {
+      return 'pendingBattle.binding army not participant';
+    }
   }
   for (const id of expected.keys()) {
     if (!bindingUnitIds.has(id)) return 'pendingBattle.missing binding';
   }
+
+  // 8.5 battleId·battleSeed 재계산 일치
+  const identity = deriveBattleIdentity(state, {
+    attackerArmyId: ctx.attackerArmyId,
+    defenderArmyId: ctx.defenderArmyId,
+    regionId: ctx.regionId,
+    attackerOriginRegionId: ctx.attackerOriginRegionId,
+  });
+  if (!identity.ok) return `pendingBattle.identity: ${identity.reason}`;
+  if (ctx.battleId !== identity.value.battleId) return 'pendingBattle.battleId mismatch';
+  if (ctx.battleSeed !== identity.value.battleSeed) return 'pendingBattle.battleSeed mismatch';
+
   return null;
 }
 

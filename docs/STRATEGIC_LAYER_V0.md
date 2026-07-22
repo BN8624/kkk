@@ -131,12 +131,29 @@ type StrategicOrder =
 - 같은 전략 유닛 두 번 매핑 거절
 - context는 해당 전투가 끝날 때까지 변경하지 않음
 
+### 전투 준비 분류 (`prepareStrategicBattle`)
+
+인간 참여 전투만 전술 UI 대상이다. AI 대 AI는 `auto-resolve-required`로 명시 분류한다.
+
+```ts
+type StrategicBattlePreparation =
+  | { kind: 'human-tactical'; context: StrategicBattleContext; scenario: ScenarioDocumentV1 }
+  | { kind: 'auto-resolve-required'; context: StrategicBattleContext };
+```
+
+- 공격군 또는 방어군이 `state.humanFaction`일 때만 `human-tactical` + ScenarioDocument 생성
+- 인간 미참여(AI 대 AI) → `auto-resolve-required` (시나리오 없음)
+- auto-resolve 시뮬레이터는 Phase 8-1 이후 별도 구현
+- AI 세력을 임시 human controller로 바꾸지 않음
+- `buildTacticalScenario`를 AI 대 AI context에 직접 호출하면 `human-not-participant`로 실패
+
 ### ScenarioDocument 생성
 
 `buildTacticalScenario(context, strategicState)`
 
 - 충돌 세력만 active, 세 번째 세력 inactive
-- 인간 세력 군단이 참여한 전투만 직접 전술 문서 생성 대상(V0 브리지는 양측 AI 충돌도 문서 생성 가능, UI 연동은 후속)
+- **인간 세력 군단이 참여한 전투만** 문서 생성(AI 대 AI 거절)
+- 인간 세력만 `controller=human`, 상대는 `ai`, 비참여 세력 `active=false`
 - fixed 8×8 보드, 지역 terrain에 따라 평원·숲·산 비중
 - doctrines·uniqueUnits 활성, 전투 제한 턴 10
 - 생산 가능 거점 미배치(신규 전술 유닛 미생성 구조)
@@ -148,18 +165,41 @@ type StrategicOrder =
 `buildTacticalBattleReport(context, finishedGameState)`
 
 - 미종료 전투 거절
+- 전술 전투의 **모든** 살아 있는 유닛에 strategic binding tag 필수(무태그·신규 생산 유닛 거절)
 - context의 모든 전략 유닛이 survivor 또는 loss에 정확히 한 곳
-- 알 수 없는 tag·중복 ID·HP 범위 위반·다른 battleId 거절
+- 알 수 없는 tag·중복 tag·병종/세력 mismatch·HP 범위 위반 거절
+- survivor HP는 1 이상·병종 최대 HP 이하·**startingHp 이하**(전투 중 회복 계약 없음)
 - 전술 승자와 보고서 승자 일치, draw 정상 상태
+
+### 보고서 검증 (`validateTacticalBattleReport`)
+
+`TacticalBattleReport`는 비신뢰 입력이다. `applyTacticalBattleReport`는 상태 변경 전에 반드시 이 validator를 통과해야 한다.
+
+- schemaVersion·battleId·winner·turns·scoreByFaction 구조 검사
+- survivor/loss가 context binding과 완전 분할(누락·중복·양쪽 동시 존재 거절)
+- 각 항목의 `strategicUnitId`·`armyId`·`faction`·`type`이 context binding과 필수 일치
+- `retreatingArmyIds`는 맵·생존 결과에서 계산한 예상 집합과 정확 일치(위치 결정 권한 없음)
 
 ### 전략 반영
 
 `applyTacticalBattleReport(state, report)`
 
+- validator 통과 후에만 반영
+- 전략 유닛 병종·세력·군단 소속은 **context가 정본** — 보고서 type으로 덮어쓰지 않음
+- 실제로 반영하는 전술 결과는 survivor HP·loss 제거·군단 이동뿐
 - loss 제거, survivor HP 반영, 빈 군단 제거
 - 공격 승리: 공격군 전투 지역 이동·점령, 방어 생존은 결정론적 인접 우호 지역 퇴각(없으면 해산)
 - 방어 승리·draw: 방어 유지, 공격 생존은 원래 지역 복귀
 - pendingBattle 제거, 동일 report 재적용·다른 battleId 거절
+
+### pendingBattle 상태 정합·이상 저장 거절
+
+`validateStrategicState`는 pendingBattle이 현재 전략 턴·세력·군단 위치·인접성·바인딩·battleId/battleSeed와 완전 일치하는지 검사한다.
+
+- `deriveBattleIdentity(state, request)`가 battleId·battleSeed 단일 정본
+- 저장된 battleId/battleSeed가 재계산 값과 다르면 실패
+- 전투 지역에 지정 방어군 외 제3 군단 있으면 실패
+- `deserializeStrategic`은 강화된 검증 실패 시 **null**(이상 pending battle 복원 거절)
 
 ## 전략 저장
 
