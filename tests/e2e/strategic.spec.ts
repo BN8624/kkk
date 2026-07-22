@@ -61,6 +61,7 @@ async function startAzure(page: Page, seed: number): Promise<void> {
 }
 
 test('전략: 시작·SVG 섬·12영토·HUD·카드 부재', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 4242);
   await expect(page.locator('#strategic-map')).toBeVisible();
   await expect(page.locator('svg.strategic-map-svg')).toBeVisible();
@@ -69,9 +70,39 @@ test('전략: 시작·SVG 섬·12영토·HUD·카드 부재', async ({ page }) =
   // 구 카드 그리드 부재
   await expect(page.locator('button.strategic-region')).toHaveCount(0);
   await expect(page.locator('.strategic-links')).toHaveCount(0);
-  // 수도 3 + 도시/요새 아이콘
+  // 수도 3 + 도시/요새 랜드마크
   await expect(page.locator('.st-capital')).toHaveCount(3);
+  // 자연 섬 레이어: 해안·강·도로·전선·지형
+  await expect(page.locator('.st-coast')).toHaveCount(2);
+  await expect(page.locator('.st-river')).toHaveCount(1);
+  await expect(page.locator('.st-road').first()).toBeVisible();
+  await expect(page.locator('.st-front-line').first()).toBeVisible();
+  await expect(page.locator('.st-army-banner').first()).toBeVisible();
+  // compact HUD
+  await expect(page.locator('.strategic-hud .hud-main')).toBeVisible();
+  await expect(page.locator('.strategic-hud .chip')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '전략 턴 종료' })).toBeVisible();
+  // 기본 하단은 힌트(사이안 마키 없음)
+  await expect(page.locator('.strategic-panel--hint')).toBeVisible();
+  const layout = await page.evaluate(() => {
+    const root = document.getElementById('strategic-root')!;
+    const map = document.getElementById('strategic-map')!;
+    const hud = document.querySelector('.strategic-hud') as HTMLElement;
+    const panel = document.getElementById('strategic-panel')!;
+    const rw = root.clientWidth;
+    const rh = root.clientHeight;
+    return {
+      mapWidthRatio: map.clientWidth / rw,
+      mapHeightRatio: map.clientHeight / rh,
+      hudHeightRatio: hud.clientHeight / rh,
+      panelHeightRatio: panel.clientHeight / rh,
+      noHScroll: root.scrollWidth <= root.clientWidth + 1,
+    };
+  });
+  expect(layout.mapWidthRatio).toBeGreaterThanOrEqual(0.92);
+  expect(layout.mapHeightRatio).toBeGreaterThanOrEqual(0.7);
+  expect(layout.hudHeightRatio).toBeLessThanOrEqual(0.15);
+  expect(layout.noHScroll).toBe(true);
   const snap = await page.evaluate(() => {
     const s = window.__tc!.strategicState!();
     return { n: s!.regions.length, a: s!.armies.length, t: s!.turn, h: s!.humanFaction };
@@ -84,6 +115,7 @@ test('전략: 시작·SVG 섬·12영토·HUD·카드 부재', async ({ page }) =
 });
 
 test('전략: 군단 토큰 선택·이동 강조·저장 이어하기', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 1001);
 
   const armyId = await page.evaluate(() => {
@@ -101,7 +133,12 @@ test('전략: 군단 토큰 선택·이동 강조·저장 이어하기', async (
   await expect(page.locator('path.strategic-region.move-target').first()).toBeVisible({
     timeout: 10_000,
   });
+  await expect(page.locator('.strategic-army.selected')).toBeVisible();
   await expect(page.getByRole('button', { name: '대기' })).toBeEnabled();
+  // 군단 패널 (게임형 하단 시트)
+  await expect(page.locator('#strategic-panel')).toBeVisible();
+  await expect(page.locator('#strategic-panel h3')).toBeVisible();
+  await expect(page.locator('.strategic-panel--hint')).toHaveCount(0);
   await page.screenshot({
     path: path.join(shotDir, 'army-selected.png'),
     fullPage: false,

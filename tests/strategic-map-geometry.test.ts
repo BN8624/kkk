@@ -1,7 +1,10 @@
-// 한 줄 목적: 전략 섬 geometry 정본·인접 일치·이동 경로 계약을 단위 검증한다
+// 한 줄 목적: 전략 섬 geometry 정본·인접 일치·자연 해안·군단 토큰 계약을 단위 검증한다
 import { describe, expect, it } from 'vitest';
 import { createStrategicState } from '../src/strategic/state';
 import {
+  ISLAND_OUTLINE_PATH,
+  RIVER_PATH,
+  ROAD_PATHS,
   STRATEGIC_MAP_VIEWBOX,
   STRATEGIC_REGION_GEOMETRY,
   assertGeometryCoverage,
@@ -10,15 +13,24 @@ import {
   getRegionGeometry,
   isPointInViewBox,
   isValidSvgPath,
+  listSharedEdges,
   pointsToSvg,
 } from '../src/ui/strategic/map-geometry';
 import { prefersReducedMotion, pointAlongPath } from '../src/ui/strategic/map-animation';
-import { ownerFillUrl, ownerStroke } from '../src/ui/strategic/map-icons';
+import {
+  armyBannerTokenSvg,
+  ownerFillUrl,
+  ownerStroke,
+  ownerTintFill,
+  settlementIconSvg,
+  terrainDecorSvg,
+} from '../src/ui/strategic/map-icons';
 import {
   renderStrategicMapHtml,
   strategicRegionName,
 } from '../src/ui/strategic/map-view';
 import { renderSelectionPanel } from '../src/ui/strategic/map-panel';
+import { buildStrategicScreenHtml, renderCompactHud } from '../src/ui/strategic';
 import { setLocale } from '../src/i18n';
 
 describe('strategic map geometry', () => {
@@ -39,6 +51,7 @@ describe('strategic map geometry', () => {
       for (const a of g.armyAnchors) {
         expect(isPointInViewBox(a)).toBe(true);
       }
+      expect(typeof g.coastal).toBe('boolean');
     }
   });
 
@@ -59,10 +72,37 @@ describe('strategic map geometry', () => {
     expect(isPointInViewBox(mid, 2)).toBe(true);
   });
 
-  it('viewBox 상수가 양의 크기다', () => {
-    expect(STRATEGIC_MAP_VIEWBOX.width).toBe(400);
-    expect(STRATEGIC_MAP_VIEWBOX.height).toBe(320);
-    expect(STRATEGIC_MAP_VIEWBOX.attr).toBe('0 0 400 320');
+  it('viewBox 상수가 양의 크기다(세로 우선)', () => {
+    expect(STRATEGIC_MAP_VIEWBOX.width).toBe(360);
+    expect(STRATEGIC_MAP_VIEWBOX.height).toBe(480);
+    expect(STRATEGIC_MAP_VIEWBOX.attr).toBe('0 0 360 480');
+  });
+
+  it('섬 외곽·강·도로 레이어 path가 유효하다', () => {
+    expect(isValidSvgPath(ISLAND_OUTLINE_PATH)).toBe(true);
+    // 강·도로는 열린 path(Z 없음) — M/C 토큰만 확인
+    expect(RIVER_PATH).toMatch(/^[MLCZmlcz0-9.,\s-]+$/);
+    expect(RIVER_PATH).toMatch(/[Mm]/);
+    expect(ROAD_PATHS.length).toBeGreaterThanOrEqual(2);
+    for (const d of ROAD_PATHS) {
+      expect(d).toMatch(/^[MLCZmlcz0-9.,\s-]+$/);
+      expect(d).toMatch(/[Mm]/);
+    }
+  });
+
+  it('listSharedEdges가 정본 인접 수와 일치한다', () => {
+    const edges = listSharedEdges();
+    const adj = geometryAdjacencyMatchesCanon();
+    expect(adj.ok).toBe(true);
+    // undirected edge count from edgeMidpoints
+    expect(edges.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('해안·내륙 영토가 모두 존재한다', () => {
+    const coastal = STRATEGIC_REGION_GEOMETRY.filter((g) => g.coastal);
+    const inland = STRATEGIC_REGION_GEOMETRY.filter((g) => !g.coastal);
+    expect(coastal.length).toBeGreaterThanOrEqual(6);
+    expect(inland.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -76,22 +116,18 @@ describe('strategic map render contracts', () => {
       moveTargets: [],
     });
     expect(html).toContain('strategic-map-svg');
-    expect(html).toContain('viewBox="0 0 400 320"');
+    expect(html).toContain('viewBox="0 0 360 480"');
     expect(html).toContain('st-ocean');
-    // 카드 그리드 클래스/버튼 패턴 부재
     expect(html).not.toMatch(/grid-template-columns:\s*repeat\(4/);
     expect(html).not.toContain('strategic-links');
-    // 12 territory fill paths (class starts with strategic-region space or quote)
     const regionMatches = html.match(/class="strategic-region(?:\s|")/g) ?? [];
     expect(regionMatches.length).toBe(12);
-    // 6 armies
     const armyMatches = html.match(/class="strategic-army/g) ?? [];
     expect(armyMatches.length).toBe(6);
-    // no card meta dump always-visible pattern (income·defense always on card)
     expect(html).not.toMatch(/class="meta"/);
   });
 
-  it('소유 세력별 fill/stroke 클래스와 중립 클래스를 적용한다', () => {
+  it('소유 세력별 soft tint와 중립 클래스를 적용하고 강한 소유 패턴을 쓰지 않는다', () => {
     const state = createStrategicState(7, 'azure');
     const html = renderStrategicMapHtml(state, {
       selectedArmyId: null,
@@ -102,12 +138,50 @@ describe('strategic map render contracts', () => {
     expect(html).toContain('owner-crimson');
     expect(html).toContain('owner-violet');
     expect(html).toContain('owner-neutral');
-    expect(ownerFillUrl('azure')).toContain('st-pat-azure');
-    expect(ownerFillUrl(null)).toContain('st-pat-neutral');
+    // 강한 사선/격자 소유 패턴 id 부재
+    expect(html).not.toContain('st-pat-azure');
+    expect(html).not.toContain('st-pat-crimson');
+    expect(html).not.toContain('st-pat-violet');
+    expect(ownerTintFill('azure')).toMatch(/rgba|rgb|#/);
+    expect(ownerFillUrl(null)).toMatch(/rgba|rgb|#|url/);
     expect(ownerStroke('crimson')).toMatch(/#/);
   });
 
-  it('군단 선택·이동 대상·행동 완료·손상 상태를 표시한다', () => {
+  it('지형 베이스·장식·강·도로·해안 레이어가 존재한다', () => {
+    const state = createStrategicState(11, 'azure');
+    const html = renderStrategicMapHtml(state, {
+      selectedArmyId: null,
+      selectedRegionId: null,
+      moveTargets: [],
+    });
+    expect(html).toContain('strategic-region-base');
+    expect(html).toContain('st-terrain-decor');
+    expect(html).toContain('st-river');
+    expect(html).toContain('st-road');
+    expect(html).toContain('st-coast');
+    expect(html).toContain('st-island-base');
+    expect(html).toContain('st-plains');
+    expect(html).toContain('st-forest');
+    expect(html).toContain('st-mountain');
+  });
+
+  it('수도 3·도시·요새 랜드마크와 전선 레이어가 있다', () => {
+    const state = createStrategicState(3, 'azure');
+    const html = renderStrategicMapHtml(state, {
+      selectedArmyId: null,
+      selectedRegionId: null,
+      moveTargets: [],
+    });
+    expect(html).toContain('st-capital');
+    expect(html).toContain('st-town');
+    expect(html).toContain('st-fort');
+    expect((html.match(/st-capital/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(html).toContain('st-fronts');
+    // 초기 배치에서 적대 접경 존재
+    expect(html).toContain('st-front-line');
+  });
+
+  it('군단 토큰이 깃발·문양·병력·HP를 갖고 A/C/V 문자 마커가 아니다', () => {
     const state = createStrategicState(99, 'azure');
     const army = state.armies.find((a) => a.faction === 'azure')!;
     army.moved = true;
@@ -122,11 +196,39 @@ describe('strategic map render contracts', () => {
     expect(html).toContain(`data-army="${army.id}"`);
     expect(html).toContain('selected');
     expect(html).toContain('acted');
+    expect(html).toContain('st-army-banner');
+    expect(html).toContain('st-army-count');
     expect(html).toContain('st-hp-fg');
+    expect(html).toContain('st-acted-mark');
+    // 구형 원형 문자 마커 중심 텍스트 A/C/V 단독 패턴 지양 — factionLetter 미사용
+    expect(html).not.toMatch(/class="st-army-letter"/);
     for (const tid of targets) {
       expect(html).toContain(`data-region="${tid}"`);
-      expect(html).toMatch(new RegExp(`move-target[^"]*"[^>]*data-region="${tid}"|data-region="${tid}"[^>]*move-target`));
+      expect(html).toMatch(
+        new RegExp(`move-target[^"]*"[^>]*data-region="${tid}"|data-region="${tid}"[^>]*move-target`),
+      );
     }
+    const banner = armyBannerTokenSvg({
+      faction: 'azure',
+      unitCount: 4,
+      selected: false,
+      acted: false,
+      damaged: true,
+      hpRatio: 0.5,
+      enemy: false,
+    });
+    expect(banner).toContain('st-army-banner');
+    expect(banner).toContain('st-army-count');
+    expect(banner).toContain('>4<');
+  });
+
+  it('거점·지형 decor SVG가 비어 있지 않다', () => {
+    expect(settlementIconSvg('capital', 0, 0)).toContain('st-capital');
+    expect(settlementIconSvg('town', 0, 0)).toContain('st-town');
+    expect(settlementIconSvg('fort', 0, 0)).toContain('st-fort');
+    expect(terrainDecorSvg('forest', 0, 0)).toContain('st-forest');
+    expect(terrainDecorSvg('mountain', 0, 0)).toContain('st-mountain');
+    expect(terrainDecorSvg('plains', 0, 0)).toContain('st-plains');
   });
 
   it('지역 상세는 선택 패널에만 있고 비선택 시 힌트만 보인다', () => {
@@ -153,6 +255,7 @@ describe('strategic map render contracts', () => {
     expect(reg).toContain(strategicRegionName(region.id));
     expect(reg).toContain('st-panel-close');
     expect(reg).toMatch(/수입|Income|income/i);
+    expect(reg).toContain('panel-stat');
 
     const army = state.armies.find((a) => a.faction === 'azure')!;
     const ap = renderSelectionPanel({
@@ -164,6 +267,33 @@ describe('strategic map render contracts', () => {
     });
     expect(ap).toContain('st-hold');
     expect(ap).toContain('st-replenish');
+    expect(ap).toContain('HP');
+  });
+
+  it('compact HUD는 칩 박스 다수 없이 문양·턴·국고를 한 줄로 쓴다', () => {
+    setLocale('ko');
+    const state = createStrategicState(5, 'azure');
+    const hud = renderCompactHud(state, false);
+    expect(hud).toContain('strategic-hud');
+    expect(hud).toContain('hud-main');
+    expect(hud).toContain('hud-crest');
+    expect(hud).toContain('hud-kingdom');
+    expect(hud).not.toContain('class="chip"');
+    expect(hud).toContain('id="st-end"');
+    expect(hud).toContain('id="st-title"');
+    const full = buildStrategicScreenHtml({
+      state,
+      selectedArmyId: null,
+      selectedRegionId: null,
+      moveTargets: [],
+      busy: false,
+      log: [],
+    });
+    expect(full).toContain('strategic-body');
+    expect(full).toContain('strategic-map-svg');
+    expect(full).toContain('strategic-panel--hint');
+    expect(full).not.toContain('strategic-marquee');
+    expect(full).not.toContain('tip-cyan');
   });
 
   it('geometry 조회와 reduced-motion 헬퍼가 동작한다', () => {
