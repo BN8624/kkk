@@ -37,7 +37,12 @@ import type { AppContext } from '../app/app-shell';
 import type { AppController } from '../app/lifecycle';
 import type { StrategicFlow } from '../app/navigation';
 import {
+  animateArmyMove,
   ensureStrategicHost,
+  flashBattleClash,
+  flashRegionCapture,
+  getArmyTokenEl,
+  getStrategicMapSvg,
   hideStrategicScreen,
   renderStrategicScreen,
   showStrategicBattleSummary,
@@ -62,8 +67,10 @@ function seedFromUrlOrNow(): number {
 export class StrategicController implements AppController, StrategicFlow {
   private _state: StrategicGameState | null = null;
   private selectedArmyId: string | null = null;
+  private selectedRegionId: string | null = null;
   private moveTargets: string[] = [];
   private busy = false;
+  private animating = false;
   private log: string[] = [];
   private host: HTMLElement | null = null;
   constructor(private ctx: AppContext) {}
@@ -102,6 +109,7 @@ export class StrategicController implements AppController, StrategicFlow {
     clearStrategicStorage();
     this._state = null;
     this.selectedArmyId = null;
+    this.selectedRegionId = null;
     this.moveTargets = [];
     this.log = [];
     this.ctx.enterMode('strategic');
@@ -122,6 +130,7 @@ export class StrategicController implements AppController, StrategicFlow {
       return;
     }
     this.selectedArmyId = null;
+    this.selectedRegionId = null;
     this.moveTargets = [];
     this.log = [];
     this.persist();
@@ -260,13 +269,15 @@ export class StrategicController implements AppController, StrategicFlow {
     renderStrategicScreen({
       state: this._state,
       selectedArmyId: this.selectedArmyId,
+      selectedRegionId: this.selectedRegionId,
       moveTargets: this.moveTargets,
-      busy: this.busy,
+      busy: this.busy || this.animating,
       log: this.log.slice(-5),
       host: this.host,
       handlers: {
         onRegion: (id) => this.onRegionTap(id),
         onSelectArmy: (id) => this.selectArmy(id),
+        onClearSelection: () => this.clearSelection(),
         onHold: () => this.issueHold(),
         onReplenish: () => this.issueReplenish(),
         onEndTurn: () => void this.endHumanTurn(),
@@ -279,12 +290,21 @@ export class StrategicController implements AppController, StrategicFlow {
     });
   }
 
+  private clearSelection(): void {
+    if (this.animating) return;
+    this.selectedArmyId = null;
+    this.selectedRegionId = null;
+    this.moveTargets = [];
+    this.refresh();
+  }
+
   private selectArmy(armyId: string): void {
     const state = this._state;
-    if (!state || this.busy) return;
+    if (!state || this.busy || this.animating) return;
     const army = state.armies.find((a) => a.id === armyId);
     if (!army) return;
     this.selectedArmyId = armyId;
+    this.selectedRegionId = army.regionId;
     this.moveTargets = [];
     if (
       army.faction === state.humanFaction &&
@@ -308,7 +328,7 @@ export class StrategicController implements AppController, StrategicFlow {
 
   private onRegionTap(regionId: string): void {
     const state = this._state;
-    if (!state || this.busy) return;
+    if (!state || this.busy || this.animating) return;
 
     // 이동 대상이면 이동 확인
     if (
@@ -320,23 +340,19 @@ export class StrategicController implements AppController, StrategicFlow {
       return;
     }
 
-    // 해당 지역 아군 군단 선택
-    const mine = state.armies.find(
-      (a) => a.regionId === regionId && a.faction === state.humanFaction,
-    );
-    if (mine) {
-      this.selectArmy(mine.id);
-      return;
-    }
-    // 선택 해제
+    // 영토 선택(군단 토큰은 별도 핸들러). 상세는 하단 패널.
     this.selectedArmyId = null;
+    this.selectedRegionId = regionId;
     this.moveTargets = [];
     this.refresh();
   }
 
   private async tryMove(armyId: string, toRegionId: string): Promise<void> {
     const state = this._state;
-    if (!state) return;
+    if (!state || this.animating) return;
+    const army = state.armies.find((a) => a.id === armyId);
+    if (!army) return;
+    const fromRegionId = army.regionId;
     const regionName = strategicRegionName(toRegionId);
     const occupants = state.armies.filter((a) => a.regionId === toRegionId);
     const enemies = occupants.filter((a) => a.faction !== state.humanFaction);
@@ -346,25 +362,62 @@ export class StrategicController implements AppController, StrategicFlow {
         : t('strategic.moveConfirm', { region: regionName });
     if (!window.confirm(msg)) return;
 
+    // 이동 애니메이션 후 정본 명령 적용(규칙/상태는 애니메이션과 분리)
+    this.animating = true;
+    this.refresh();
+    const host = this.host;
+    if (host) {
+      const svg = getStrategicMapSvg(host);
+      const token = getArmyTokenEl(host, armyId);
+      if (svg) {
+        if (enemies.length > 0) {
+          flashBattleClash(
+            svg,
+            toRegionId,
+            [armyId, ...enemies.map((e) => e.id)],
+          );
+        }
+        await animateArmyMove({
+          svgRoot: svg,
+          armyEl: token,
+          fromRegionId,
+          toRegionId,
+        });
+      }
+    }
+
     const applied = applyStrategicOrder(
       state,
       { type: 'move-army', armyId, toRegionId },
       state.humanFaction,
     );
+    this.animating = false;
     if (!applied.ok) {
       this.ctx.hud.toast(t('strategic.error.order', { reason: applied.reason }));
+      this.refresh();
       return;
     }
+    const prevOwner = state.regions.find((r) => r.id === toRegionId)?.owner ?? null;
     this._state = applied.value;
     this.selectedArmyId = null;
+    this.selectedRegionId = null;
     this.moveTargets = [];
     this.persist();
+    this.refresh();
+    // 빈 영토·우호 점령 플래시
+    if (enemies.length === 0 && host) {
+      const svg = getStrategicMapSvg(host);
+      const nowOwner = this._state.regions.find((r) => r.id === toRegionId)?.owner ?? null;
+      if (svg && nowOwner !== prevOwner) {
+        flashRegionCapture(svg, toRegionId);
+      }
+    }
     await this.handlePendingOrContinue();
   }
 
   private issueHold(): void {
     const state = this._state;
-    if (!state || !this.selectedArmyId || this.busy) return;
+    if (!state || !this.selectedArmyId || this.busy || this.animating) return;
     const applied = applyStrategicOrder(
       state,
       { type: 'hold-army', armyId: this.selectedArmyId },
@@ -382,7 +435,7 @@ export class StrategicController implements AppController, StrategicFlow {
 
   private issueReplenish(): void {
     const state = this._state;
-    if (!state || !this.selectedArmyId || this.busy) return;
+    if (!state || !this.selectedArmyId || this.busy || this.animating) return;
     const applied = applyStrategicOrder(
       state,
       { type: 'replenish-army', armyId: this.selectedArmyId },
