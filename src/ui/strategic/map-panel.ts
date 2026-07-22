@@ -1,4 +1,4 @@
-// 한 줄 목적: 전략 지도 하단 선택 슬라이드 패널(지역·군단) HTML을 생성한다
+// 한 줄 목적: 전략 지도 하단 선택 시트(지역·군단) HTML을 생성한다
 import { UNIT_STATS } from '../../core/data';
 import type { StrategicArmy, StrategicGameState, StrategicRegion } from '../../strategic/types';
 import { factionName, t, unitName, type MessageKey } from '../../i18n';
@@ -45,8 +45,12 @@ export function regionPanelHtml(
         <button type="button" class="panel-close" id="st-panel-close" aria-label="${escapeHtml(t('strategic.panel.close'))}">×</button>
       </div>
       <div class="row">${escapeHtml(ownerText(region))}</div>
-      <div class="row">${escapeHtml(t('strategic.region.terrain', { terrain: terrainLabel(region.terrain) }))} · ${escapeHtml(settlementLabel(region))}</div>
-      <div class="row">${escapeHtml(t('strategic.region.income', { n: region.income }))} · ${escapeHtml(t('strategic.region.defense', { n: region.defense }))}</div>
+      <div class="panel-stat-row">
+        <span class="panel-stat">${escapeHtml(t('strategic.region.terrain', { terrain: terrainLabel(region.terrain) }))}</span>
+        <span class="panel-stat">${escapeHtml(settlementLabel(region))}</span>
+        <span class="panel-stat">${escapeHtml(t('strategic.region.income', { n: region.income }))}</span>
+        <span class="panel-stat">${escapeHtml(t('strategic.region.defense', { n: region.defense }))}</span>
+      </div>
       <div class="row">${escapeHtml(t('strategic.region.garrison', { n: armies.length }))}${garrison ? `: ${escapeHtml(garrison)}` : ''}</div>
     </div>`;
 }
@@ -58,9 +62,13 @@ export function armyPanelHtml(
   moveTargets: string[],
 ): string {
   const regionName = strategicRegionName(army.regionId);
+  let totalHp = 0;
+  let totalMax = 0;
   const units = army.units
     .map((u) => {
       const max = UNIT_STATS[u.type].hp;
+      totalHp += u.hp;
+      totalMax += max;
       const dmg = u.hp < max ? ` · HP ${u.hp}/${max}` : '';
       return `<div class="unit-line">${escapeHtml(unitName(u.type))}${escapeHtml(dmg)}</div>`;
     })
@@ -81,13 +89,15 @@ export function armyPanelHtml(
   return `
     <div class="strategic-panel" id="strategic-panel" role="region" aria-label="${escapeHtml(t('strategic.army.name'))}">
       <div class="panel-head">
-        <h3>${escapeHtml(t('strategic.army.name'))} · ${escapeHtml(army.id)}</h3>
+        <h3>${escapeHtml(t('strategic.army.name'))} · ${escapeHtml(factionName(army.faction))}</h3>
         <button type="button" class="panel-close" id="st-panel-close" aria-label="${escapeHtml(t('strategic.panel.close'))}">×</button>
       </div>
-      <div class="row">${escapeHtml(t('strategic.army.faction', { faction: factionName(army.faction) }))}</div>
       <div class="row">${escapeHtml(t('strategic.army.region', { region: regionName }))}</div>
-      <div class="row">${escapeHtml(army.moved ? t('strategic.army.moved') : t('strategic.army.ready'))}</div>
-      <div class="row">${escapeHtml(t('strategic.army.units', { n: army.units.length }))}</div>
+      <div class="panel-stat-row">
+        <span class="panel-stat">${escapeHtml(army.moved ? t('strategic.army.moved') : t('strategic.army.ready'))}</span>
+        <span class="panel-stat">${escapeHtml(t('strategic.army.units', { n: army.units.length }))}</span>
+        <span class="panel-stat">HP ${totalHp}/${totalMax}</span>
+      </div>
       ${units}
       ${isMine ? targets : ''}
       ${
