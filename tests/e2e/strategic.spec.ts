@@ -60,6 +60,46 @@ async function startAzure(page: Page, seed: number): Promise<void> {
   );
 }
 
+/** 실제 렌더된 섬 bounds·군단 hit·레이아웃 비율. */
+async function measureMapLayout(page: Page) {
+  return page.evaluate(() => {
+    const root = document.getElementById('strategic-root')!;
+    const map = document.getElementById('strategic-map')!;
+    const hud = document.querySelector('.strategic-hud') as HTMLElement;
+    const panel = document.getElementById('strategic-panel')!;
+    const svg = document.querySelector('.strategic-map-svg') as SVGSVGElement;
+    const island = svg.querySelector('.st-island-base') as SVGGraphicsElement;
+    const rh = root.clientHeight;
+    const rw = root.clientWidth;
+    const islandBox = island.getBoundingClientRect();
+    const armies = [...document.querySelectorAll('.strategic-army')].map((el) => {
+      const hit =
+        (el.querySelector('.st-army-hit-box') as SVGGraphicsElement | null) ??
+        (el.querySelector('.st-army-hit') as SVGGraphicsElement | null) ??
+        (el as unknown as SVGGraphicsElement);
+      const r = hit.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    });
+    const regionHits = [...document.querySelectorAll('path.strategic-region')].slice(0, 3).map((el) => {
+      const r = el.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    });
+    return {
+      mapWidthRatio: map.clientWidth / rw,
+      mapHeightRatio: map.clientHeight / rh,
+      hudHeightRatio: hud.clientHeight / rh,
+      panelHeightRatio: panel.clientHeight / rh,
+      noHScroll: root.scrollWidth <= root.clientWidth + 1,
+      islandHeightRatio: islandBox.height / rh,
+      islandWidthRatio: islandBox.width / rw,
+      islandH: islandBox.height,
+      islandW: islandBox.width,
+      armyHits: armies,
+      regionHits,
+    };
+  });
+}
+
 test('전략: 시작·SVG 섬·12영토·HUD·카드 부재', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 4242);
@@ -77,6 +117,8 @@ test('전략: 시작·SVG 섬·12영토·HUD·카드 부재', async ({ page }) =
   await expect(page.locator('.st-river')).toHaveCount(1);
   await expect(page.locator('.st-road').first()).toBeVisible();
   await expect(page.locator('.st-front-line').first()).toBeVisible();
+  // 전선이 실제 path(공유 경계)로 렌더
+  await expect(page.locator('.st-front-line path').first()).toBeVisible();
   await expect(page.locator('.st-army-banner').first()).toBeVisible();
   // compact HUD
   await expect(page.locator('.strategic-hud .hud-main')).toBeVisible();
@@ -84,25 +126,26 @@ test('전략: 시작·SVG 섬·12영토·HUD·카드 부재', async ({ page }) =
   await expect(page.getByRole('button', { name: '전략 턴 종료' })).toBeVisible();
   // 기본 하단은 힌트(사이안 마키 없음)
   await expect(page.locator('.strategic-panel--hint')).toBeVisible();
-  const layout = await page.evaluate(() => {
-    const root = document.getElementById('strategic-root')!;
-    const map = document.getElementById('strategic-map')!;
-    const hud = document.querySelector('.strategic-hud') as HTMLElement;
-    const panel = document.getElementById('strategic-panel')!;
-    const rw = root.clientWidth;
-    const rh = root.clientHeight;
-    return {
-      mapWidthRatio: map.clientWidth / rw,
-      mapHeightRatio: map.clientHeight / rh,
-      hudHeightRatio: hud.clientHeight / rh,
-      panelHeightRatio: panel.clientHeight / rh,
-      noHScroll: root.scrollWidth <= root.clientWidth + 1,
-    };
-  });
+
+  const layout = await measureMapLayout(page);
   expect(layout.mapWidthRatio).toBeGreaterThanOrEqual(0.92);
-  expect(layout.mapHeightRatio).toBeGreaterThanOrEqual(0.7);
+  expect(layout.mapHeightRatio).toBeGreaterThanOrEqual(0.75);
   expect(layout.hudHeightRatio).toBeLessThanOrEqual(0.15);
   expect(layout.noHScroll).toBe(true);
+  // 실제 섬 bounds가 화면 높이의 상당 부분 (레터박스 제외 검사)
+  expect(layout.islandHeightRatio).toBeGreaterThanOrEqual(0.7);
+  expect(layout.islandWidthRatio).toBeGreaterThanOrEqual(0.75);
+  // 군단 터치 영역 ≥48×48 CSS px
+  for (const hit of layout.armyHits) {
+    expect(hit.w).toBeGreaterThanOrEqual(48);
+    expect(hit.h).toBeGreaterThanOrEqual(48);
+  }
+  // 영토 path 터치 영역도 충분한 크기
+  for (const hit of layout.regionHits) {
+    expect(hit.w).toBeGreaterThanOrEqual(40);
+    expect(hit.h).toBeGreaterThanOrEqual(40);
+  }
+
   const snap = await page.evaluate(() => {
     const s = window.__tc!.strategicState!();
     return { n: s!.regions.length, a: s!.armies.length, t: s!.turn, h: s!.humanFaction };
@@ -122,7 +165,8 @@ test('전략: 군단 토큰 선택·이동 강조·저장 이어하기', async (
     const s = window.__tc!.strategicState!();
     return s!.armies.find((a) => a.faction === 'azure')!.id;
   });
-  await page.locator(`.strategic-army[data-army="${armyId}"]`).click({ force: true });
+  // 정상 클릭 (force 금지 — 실제 hit target 검증)
+  await page.locator(`.strategic-army[data-army="${armyId}"]`).click({ trial: false });
 
   await expect
     .poll(async () => page.evaluate(() => window.__tc?.strategicSelectedArmy?.() ?? null), {
@@ -149,12 +193,14 @@ test('전략: 군단 토큰 선택·이동 강조·저장 이어하기', async (
   expect(moveCount).toBeGreaterThan(0);
   expect(moveCount).toBeLessThan(12);
 
+  // 이동 강조는 selected와 다른 상태(move-target 클래스 존재)
+  await expect(page.locator('path.strategic-region.move-target').first()).toBeVisible();
   await page.screenshot({
     path: path.join(shotDir, 'move-highlight.png'),
     fullPage: false,
   });
 
-  await page.getByRole('button', { name: '대기' }).click({ force: true });
+  await page.getByRole('button', { name: '대기' }).click();
   await expect
     .poll(
       async () =>
@@ -185,6 +231,7 @@ test('전략: 군단 토큰 선택·이동 강조·저장 이어하기', async (
 });
 
 test('전략: 군단 이동 경로·도착', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 5555);
   const info = await page.evaluate(() => {
     const s = window.__tc!.strategicState!();
@@ -196,12 +243,24 @@ test('전략: 군단 이동 경로·도착', async ({ page }) => {
     return { armyId: army.id, from: army.regionId, to };
   });
 
-  await page.locator(`.strategic-army[data-army="${info.armyId}"]`).click({ force: true });
+  await page.locator(`.strategic-army[data-army="${info.armyId}"]`).click();
   await expect
     .poll(async () => page.evaluate(() => window.__tc?.strategicSelectedArmy?.() ?? null))
     .toBe(info.armyId);
 
-  await page.locator(`path.strategic-region[data-region="${info.to}"]`).click({ force: true });
+  // 이동 클릭 — 경로 표시 프레임을 별도 캡처
+  await page.locator(`path.strategic-region[data-region="${info.to}"]`).click();
+  const pathShown = await page
+    .waitForSelector('.st-move-path', { state: 'attached', timeout: 2_500 })
+    .then(() => true)
+    .catch(() => false);
+  if (pathShown) {
+    await expect(page.locator('.st-move-path').first()).toBeVisible();
+    await page.screenshot({
+      path: path.join(shotDir, 'move-path.png'),
+      fullPage: false,
+    });
+  }
 
   await page.waitForFunction(
     ({ armyId, to }) => {
@@ -228,20 +287,22 @@ test('전략: 군단 이동 경로·도착', async ({ page }) => {
 });
 
 test('전략: 영토 선택 패널·닫기', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 7777);
-  await page.locator('path.strategic-region[data-region="r02"]').click({ force: true });
+  await page.locator('path.strategic-region[data-region="r02"]').click();
   await expect(page.locator('#strategic-panel')).toBeVisible();
   await expect(page.locator('#strategic-panel h3')).toBeVisible();
-  await page.locator('#st-panel-close').click({ force: true });
+  await page.locator('#st-panel-close').click();
   await expect(page.locator('.strategic-panel--hint')).toBeVisible();
 });
 
 test('전략: 턴 종료 후 진행', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 2002);
   const beforeGold = await page.evaluate(
     () => window.__tc!.strategicState!()!.treasury.azure,
   );
-  await page.getByRole('button', { name: '전략 턴 종료' }).click({ force: true });
+  await page.getByRole('button', { name: '전략 턴 종료' }).click();
 
   await page.waitForFunction(
     () => {
@@ -279,22 +340,12 @@ test('전략: 턴 종료 후 진행', async ({ page }) => {
 test('전략: 모바일 세로 — 가로 스크롤 없음·패널 조작', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await startAzure(page, 3003);
-  const metrics = await page.evaluate(() => {
-    const root = document.getElementById('strategic-root')!;
-    const map = document.getElementById('strategic-map')!;
-    return {
-      rootScrollW: root.scrollWidth,
-      rootClientW: root.clientWidth,
-      mapW: map.clientWidth,
-      mapH: map.clientHeight,
-      bodyOverflowX: getComputedStyle(document.body).overflowX,
-    };
-  });
-  expect(metrics.rootScrollW).toBeLessThanOrEqual(metrics.rootClientW + 1);
-  expect(metrics.mapW).toBeGreaterThan(200);
-  expect(metrics.mapH).toBeGreaterThan(200);
+  const metrics = await measureMapLayout(page);
+  expect(metrics.noHScroll).toBe(true);
+  expect(metrics.islandH).toBeGreaterThan(400);
+  expect(metrics.mapHeightRatio).toBeGreaterThanOrEqual(0.75);
 
-  await page.locator('.strategic-army').first().click({ force: true });
+  await page.locator('.strategic-army').first().click();
   await expect(page.locator('#strategic-panel')).toBeVisible();
   await expect(page.getByRole('button', { name: '대기' })).toBeVisible();
 });
