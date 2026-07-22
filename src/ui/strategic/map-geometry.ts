@@ -46,10 +46,6 @@ function pt(x: number, y: number): Pt {
   return { x, y };
 }
 
-function mid(a: Pt, b: Pt): Pt {
-  return pt((a.x + b.x) / 2, (a.y + b.y) / 2);
-}
-
 function avg(points: Pt[]): Pt {
   const n = points.length || 1;
   let x = 0;
