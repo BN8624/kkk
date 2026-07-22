@@ -10,6 +10,8 @@ export function injectStrategicStyles(): void {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   background: linear-gradient(180deg, #1a2438 0%, #121a28 100%);
   color: #f2ead8; overflow: hidden; z-index: 5;
+  /* #hud 가 pointer-events:none 이므로 전략 루트에서 입력 허용 */
+  pointer-events: auto;
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
 }
 .strategic-root[hidden] { display: none !important; }
