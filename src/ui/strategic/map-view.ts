@@ -1,23 +1,29 @@
-// 한 줄 목적: SVG 섬 영토 전략 지도 DOM·군단 토큰·이동 강조를 렌더링한다
+// 한 줄 목적: 자연 섬 전략 지도 DOM·군단 깃발·전선·이동 강조를 렌더링한다
 import { UNIT_STATS } from '../../core/data';
+import type { FactionId } from '../../core/types';
 import { STRATEGIC_REGION_IDS } from '../../strategic/map';
 import type { StrategicArmy, StrategicGameState, StrategicRegion } from '../../strategic/types';
 import { factionName, t, type MessageKey } from '../../i18n';
 import { escapeHtml } from '../shared/dom';
 import {
   ISLAND_OUTLINE_PATH,
+  ISLAND_SHOAL_PATH,
+  RIVER_PATH,
+  ROAD_PATHS,
   STRATEGIC_MAP_VIEWBOX,
   STRATEGIC_REGION_GEOMETRY,
   getRegionGeometry,
+  listSharedEdges,
 } from './map-geometry';
 import {
+  armyBannerTokenSvg,
   factionEmblemSvg,
-  factionLetter,
-  ownerFillUrl,
   ownerStroke,
+  ownerTintFill,
   settlementIconSvg,
   strategicMapPatternDefs,
-  terrainIconSvg,
+  terrainBaseFill,
+  terrainDecorSvg,
   terrainOverlayUrl,
 } from './map-icons';
 
@@ -60,32 +66,27 @@ function armyTokenSvg(
   const { hp, max } = armyTotalHp(army);
   const damaged = hp < max;
   const n = army.units.length;
-  const letter = factionLetter(army.faction);
   const movedClass = army.moved ? ' acted' : '';
   const selClass = opts.selected ? ' selected' : '';
   const enemyClass = opts.isEnemy ? ' enemy' : '';
-  const aria = `${t('strategic.army.name')} ${letter} · ${factionName(army.faction)} · ${t('strategic.army.units', { n })}${
+  const aria = `${t('strategic.army.name')} · ${factionName(army.faction)} · ${t('strategic.army.units', { n })}${
     damaged ? ` · HP ${hp}/${max}` : ''
   }${army.moved ? ` · ${t('strategic.army.moved')}` : ''}`;
-  const hpBar =
-    damaged && max > 0
-      ? `<rect class="st-hp-bg" x="-12" y="12" width="24" height="3.5" rx="1" />
-         <rect class="st-hp-fg" x="-12" y="12" width="${(24 * hp) / max}" height="3.5" rx="1" />`
-      : '';
-  const actedMark = army.moved
-    ? `<path class="st-acted-mark" d="M8,-10 L10,-8 L14,-13" fill="none" stroke="#f4cf55" stroke-width="1.6"/>`
-    : '';
+  const body = armyBannerTokenSvg({
+    faction: army.faction,
+    unitCount: n,
+    selected: opts.selected,
+    acted: army.moved,
+    damaged,
+    hpRatio: max > 0 ? hp / max : 1,
+    enemy: opts.isEnemy,
+  });
   return `
     <g class="strategic-army${movedClass}${selClass}${enemyClass}" data-army="${escapeHtml(army.id)}"
        data-region="${escapeHtml(army.regionId)}" data-x="${x}" data-y="${y}"
        transform="translate(${x},${y})" role="button" tabindex="0"
-       aria-label="${escapeHtml(aria)}">
-      <circle class="st-army-hit" r="16" fill="transparent"/>
-      <circle class="st-army-disc" r="11" fill="rgba(20,18,14,.88)" stroke="${ownerStroke(army.faction)}" stroke-width="2"/>
-      <g transform="translate(0,-1)">${factionEmblemSvg(army.faction, 12)}</g>
-      <text class="st-army-count" y="4" text-anchor="middle" dominant-baseline="central">${n}</text>
-      ${hpBar}
-      ${actedMark}
+       aria-label="${escapeHtml(aria)}" filter="url(#st-banner-shadow)">
+      ${body}
     </g>`;
 }
 
@@ -119,6 +120,83 @@ export interface MapViewRenderOpts {
   pathPreview?: { from: string; to: string } | null;
 }
 
+/** 동맹 내륙 경계 vs 적대 전선 구분. */
+function frontLineSvg(state: StrategicGameState): string {
+  const byId = new Map(state.regions.map((r) => [r.id, r]));
+  const parts: string[] = [];
+  for (const edge of listSharedEdges()) {
+    const ra = byId.get(edge.a);
+    const rb = byId.get(edge.b);
+    if (!ra || !rb) continue;
+    const oa = ra.owner;
+    const ob = rb.owner;
+    // 같은 세력: 얇은 내륙 경계
+    if (oa && oa === ob) {
+      parts.push(
+        `<line class="st-border-ally" x1="${edge.aCenter.x}" y1="${edge.aCenter.y}" x2="${edge.bCenter.x}" y2="${edge.bCenter.y}"
+          stroke="${ownerStroke(oa)}" stroke-width="0.9" stroke-opacity="0.35" pointer-events="none"/>`,
+      );
+      continue;
+    }
+    // 서로 다른 소유(또는 한쪽 중립이 아닌 적대 접촉): 전선
+    const hostile =
+      (oa && ob && oa !== ob) ||
+      (oa && !ob) ||
+      (!oa && ob);
+    if (!hostile) continue;
+    if (!oa || !ob) {
+      // 중립 접경 — 약한 점선
+      parts.push(
+        `<line class="st-border-neutral" x1="${edge.mid.x - 6}" y1="${edge.mid.y - 4}" x2="${edge.mid.x + 6}" y2="${edge.mid.y + 4}"
+          stroke="#cfc8b8" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.5" pointer-events="none"/>`,
+      );
+      continue;
+    }
+    // 적대 전선: 중점에 이중 색 짧은 호
+    const dx = edge.bCenter.x - edge.aCenter.x;
+    const dy = edge.bCenter.y - edge.aCenter.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * 7;
+    const ny = (dx / len) * 7;
+    const mx = edge.mid.x;
+    const my = edge.mid.y;
+    parts.push(
+      `<g class="st-front-line" data-front="${escapeHtml(edge.a)}-${escapeHtml(edge.b)}" pointer-events="none">
+        <line x1="${mx - nx}" y1="${my - ny}" x2="${mx + nx}" y2="${my + ny}"
+          stroke="${ownerStroke(oa)}" stroke-width="2.4" stroke-opacity="0.85" stroke-linecap="round"/>
+        <line x1="${mx - nx * 0.55}" y1="${my - ny * 0.55}" x2="${mx + nx * 0.55}" y2="${my + ny * 0.55}"
+          stroke="${ownerStroke(ob)}" stroke-width="2.4" stroke-opacity="0.75" stroke-linecap="round"
+          transform="translate(${nx * 0.35},${ny * 0.35})"/>
+      </g>`,
+    );
+  }
+  return parts.join('');
+}
+
+/** 수도 위협(적 군단 인접) 경고 링. */
+function capitalThreatSvg(state: StrategicGameState): string {
+  const parts: string[] = [];
+  for (const region of state.regions) {
+    if (region.settlement !== 'capital' || !region.owner) continue;
+    const geo = getRegionGeometry(region.id);
+    if (!geo) continue;
+    const enemyNear = state.armies.some(
+      (a) =>
+        a.faction !== region.owner &&
+        (a.regionId === region.id || region.neighbors.includes(a.regionId)),
+    );
+    if (!enemyNear) continue;
+    const p = geo.structureAnchor;
+    parts.push(
+      `<g class="st-capital-threat" transform="translate(${p.x},${p.y})" pointer-events="none" aria-hidden="true">
+        <circle r="16" fill="none" stroke="#e05050" stroke-width="1.6" stroke-dasharray="3 2" opacity="0.85"/>
+        <circle r="12" fill="none" stroke="#e05050" stroke-width="0.8" opacity="0.5"/>
+      </g>`,
+    );
+  }
+  return parts.join('');
+}
+
 export function renderStrategicMapHtml(
   state: StrategicGameState,
   opts: MapViewRenderOpts,
@@ -145,41 +223,53 @@ export function renderStrategicMapHtml(
       opts.moveTargets.length > 0 && !opts.moveTargets.includes(geo.regionId)
         ? ' move-blocked'
         : '';
-    const fill = ownerFillUrl(region.owner);
+    const coastClass = geo.coastal ? ' coastal' : ' inland';
+    const base = terrainBaseFill(region.terrain);
+    const tint = ownerTintFill(region.owner);
     const stroke = ownerStroke(region.owner);
     const aria = regionAria(region, armies.length);
-    // 히트 확장을 위한 두꺼운 투명 스트로크 패스 + 본 패스
+    // 지형 베이스 → 소유 틴트 → 지형 텍스처 (강한 소유 패턴 없음)
     return `
-      <g class="strategic-region-group" data-region-group="${escapeHtml(geo.regionId)}">
+      <g class="strategic-region-group${coastClass}" data-region-group="${escapeHtml(geo.regionId)}">
         <path class="strategic-region-hit" data-region="${escapeHtml(geo.regionId)}"
           d="${geo.path}" fill="transparent" stroke="transparent" stroke-width="14"
           pointer-events="stroke"/>
-        <path class="strategic-region ${ownerClass}${moveClass}${selectedClass}${blockedClass}"
+        <path class="strategic-region-base" d="${geo.path}" fill="${base}" pointer-events="none"/>
+        <path class="strategic-region ${ownerClass}${moveClass}${selectedClass}${blockedClass}${coastClass}"
           data-region="${escapeHtml(geo.regionId)}"
-          d="${geo.path}" fill="${fill}" stroke="${stroke}" stroke-width="1.6"
+          d="${geo.path}" fill="${tint}" stroke="${stroke}" stroke-width="${geo.coastal ? 1.8 : 1.1}"
           role="button" tabindex="0" aria-label="${escapeHtml(aria)}"/>
         <path class="strategic-region-terrain" d="${geo.path}"
           fill="${terrainOverlayUrl(region.terrain)}" pointer-events="none"/>
       </g>`;
   }).join('');
 
-  const structures = STRATEGIC_REGION_GEOMETRY.map((geo) => {
+  const terrainDecor = STRATEGIC_REGION_GEOMETRY.map((geo) => {
     const region = state.regions.find((r) => r.id === geo.regionId)!;
-    const sa = geo.structureAnchor;
-    const settle = region.settlement
-      ? settlementIconSvg(region.settlement, sa.x, sa.y)
-      : '';
-    const terr = terrainIconSvg(region.terrain, sa.x + 14, sa.y + 10);
-    return settle + terr;
+    // 구조와 겹치지 않게 약간 오프셋
+    const dx = region.settlement ? 12 : 0;
+    const dy = region.settlement ? 10 : 0;
+    return terrainDecorSvg(region.terrain, geo.labelAnchor.x + dx, geo.labelAnchor.y + dy);
   }).join('');
 
-  // 세력 문양(라벨 앵커 근처, 소유 표시 보조)
+  const structures = STRATEGIC_REGION_GEOMETRY.map((geo) => {
+    const region = state.regions.find((r) => r.id === geo.regionId)!;
+    if (!region.settlement) return '';
+    return settlementIconSvg(region.settlement, geo.structureAnchor.x, geo.structureAnchor.y);
+  }).join('');
+
+  // 소유 문양은 거점 없을 때만 은은하게
   const emblems = STRATEGIC_REGION_GEOMETRY.map((geo) => {
     const region = state.regions.find((r) => r.id === geo.regionId)!;
-    if (!region.owner) return '';
+    if (!region.owner || region.settlement) return '';
     const p = geo.labelAnchor;
-    return `<g transform="translate(${p.x - 14},${p.y - 10})" opacity="0.9">${factionEmblemSvg(region.owner, 9)}</g>`;
+    return `<g class="st-owner-mark" transform="translate(${p.x - 16},${p.y - 12})" opacity="0.55">${factionEmblemSvg(region.owner as FactionId, 8)}</g>`;
   }).join('');
+
+  const roads = ROAD_PATHS.map(
+    (d) =>
+      `<path class="st-road" d="${d}" fill="none" stroke="rgba(180,150,90,.45)" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="4 3" pointer-events="none"/>`,
+  ).join('');
 
   const armySvg: string[] = [];
   for (const id of STRATEGIC_REGION_IDS) {
@@ -206,13 +296,26 @@ export function renderStrategicMapHtml(
         role="img" aria-label="${escapeHtml(t('strategic.map.label'))}"
         preserveAspectRatio="xMidYMid meet">
         ${strategicMapPatternDefs()}
-        <rect class="st-ocean" x="0" y="0" width="${STRATEGIC_MAP_VIEWBOX.width}" height="${STRATEGIC_MAP_VIEWBOX.height}" data-ocean="1"/>
-        <path class="st-island-shadow" d="${ISLAND_OUTLINE_PATH}" transform="translate(3,4)" fill="rgba(0,0,0,.28)"/>
-        <path class="st-island-base" d="${ISLAND_OUTLINE_PATH}" fill="#3a4a3a" stroke="#1a2830" stroke-width="2"/>
+        <rect class="st-ocean" x="0" y="0" width="${STRATEGIC_MAP_VIEWBOX.width}" height="${STRATEGIC_MAP_VIEWBOX.height}"
+          fill="url(#st-ocean-grad)" data-ocean="1"/>
+        <path class="st-shoal" d="${ISLAND_SHOAL_PATH}" fill="rgba(60,140,150,.22)" pointer-events="none"/>
+        <path class="st-island-shadow" d="${ISLAND_OUTLINE_PATH}" transform="translate(2.5,3.5)" fill="rgba(0,0,0,.32)" pointer-events="none"/>
+        <path class="st-island-base" d="${ISLAND_OUTLINE_PATH}" fill="url(#st-island-base-grad)" stroke="#1a2830" stroke-width="1.5" pointer-events="none"/>
         <g class="st-regions">${regionPaths}</g>
-        <path class="st-coast" d="${ISLAND_OUTLINE_PATH}" fill="none" stroke="rgba(160,200,220,.55)" stroke-width="2.2" pointer-events="none"/>
+        <path class="st-coast st-coast-outer" d="${ISLAND_OUTLINE_PATH}" fill="none"
+          stroke="rgba(170,210,220,.7)" stroke-width="2.6" pointer-events="none"/>
+        <path class="st-coast st-coast-foam" d="${ISLAND_OUTLINE_PATH}" fill="none"
+          stroke="rgba(220,240,245,.35)" stroke-width="1.1" stroke-dasharray="2 4" pointer-events="none"/>
+        <g class="st-roads" pointer-events="none">${roads}</g>
+        <path class="st-river" d="${RIVER_PATH}" fill="none" stroke="#4a8aaa" stroke-width="2.2"
+          stroke-linecap="round" opacity="0.75" pointer-events="none"/>
+        <path class="st-river-highlight" d="${RIVER_PATH}" fill="none" stroke="rgba(160,210,230,.45)" stroke-width="0.9"
+          stroke-linecap="round" pointer-events="none"/>
+        <g class="st-fronts">${frontLineSvg(state)}</g>
+        <g class="st-terrain-decor" pointer-events="none">${terrainDecor}</g>
         <g class="st-structures" pointer-events="none">${structures}</g>
         <g class="st-emblems" pointer-events="none">${emblems}</g>
+        <g class="st-threats">${capitalThreatSvg(state)}</g>
         <g id="st-path-layer"></g>
         <g class="st-armies">${armySvg.join('')}</g>
       </svg>
@@ -233,7 +336,6 @@ export function bindStrategicMap(root: HTMLElement, handlers: MapViewHandlers): 
   const svg = root.querySelector<SVGSVGElement>('.strategic-map-svg');
   if (!svg) return;
 
-  // 영토: hit path + 본 path 모두
   root.querySelectorAll<SVGElement>('[data-region]').forEach((el) => {
     const id = el.getAttribute('data-region');
     if (!id) return;
@@ -258,7 +360,6 @@ export function bindStrategicMap(root: HTMLElement, handlers: MapViewHandlers): 
     activateFromKeyboard(el, () => handlers.onArmy(id));
   });
 
-  // 바다 클릭 → 선택 해제
   svg.querySelector('.st-ocean')?.addEventListener('click', (ev) => {
     ev.stopPropagation();
     handlers.onOcean?.();
