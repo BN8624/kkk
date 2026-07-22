@@ -2,6 +2,13 @@
 import type { GameState } from '../core/types';
 import type { ReplayDocument } from '../core/replay';
 import type { ScenarioDocumentV1 } from '../core/scenario/types';
+import type { FactionId } from '../core/types';
+import type { StrategicGameState } from '../strategic/types';
+
+/** 전략 전술 전투 세션 식별. */
+export interface StrategicBattleLaunch {
+  battleId: string;
+}
 
 /** 일반 플레이 진입 옵션. */
 export interface LaunchOptions {
@@ -9,6 +16,8 @@ export interface LaunchOptions {
   testPlay?: boolean;
   /** AI 관전(인간 차례도 AI가 대신 진행). */
   spectate?: boolean;
+  /** 전략 레이어에서 진입한 전술 전투(일반 저장·기록 오염 금지). */
+  strategicBattle?: StrategicBattleLaunch;
 }
 
 /** 상위 화면 이동. 컨트롤러는 다른 컨트롤러를 직접 만들지 않고 이 인터페이스만 사용한다. */
@@ -19,12 +28,23 @@ export interface AppNavigation {
   toDaily(): void;
   toRecords(): void;
   toCampaign(): void;
+  toStrategic(): void;
   toCustomScenarios(): void;
   toEditorHome(): void;
   toReplayArchive(): void;
   toAnalysis(): void;
   launch(state: GameState, opts?: LaunchOptions): void;
   openPlayback(doc: ReplayDocument): void;
+}
+
+/** StrategicController 공개 계약. */
+export interface StrategicFlow {
+  show(): void;
+  startNew(faction: FactionId, seed: number): void;
+  continueSaved(): void;
+  handleTacticalGameEnd(state: GameState): void;
+  persistOnExit(): void;
+  readonly state: StrategicGameState | null;
 }
 
 /** PlayController가 다른 컨트롤러·셸에 공개하는 계약. */
