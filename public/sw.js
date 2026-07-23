@@ -1,5 +1,5 @@
 // 한 줄 목적: 앱 셸과 정적 자산을 캐시해 설치 후 오프라인 실행과 사용자 승인 업데이트를 제공한다
-const CACHE_NAME = 'three-crowns-shell-v2.2.2';
+const CACHE_NAME = 'three-crowns-shell-v2.2.3';
 const APP_SHELL = [
   './',
   './index.html',

@@ -1,4 +1,4 @@
-# 목적: 모든 ?�질·보안·결정론·시?�리?�·E2E 검증을 ?�과??빌드�?GitHub Pages??배포?�다.
+# 목적: 모든 품질·보안·결정론·시나리오·E2E 검증을 통과한 빌드만 GitHub Pages에 배포한다.
 name: Deploy to GitHub Pages
 
 on:
@@ -235,7 +235,7 @@ jobs:
       - run: npm run release:assets
       - uses: actions/upload-artifact@v7
         with:
-          name: three-crowns-island-2.2.2
+          name: three-crowns-island-2.2.3
           path: release
           if-no-files-found: error
 
