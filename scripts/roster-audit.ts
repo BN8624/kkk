@@ -118,7 +118,7 @@ if (matrix.filter((r) => r.faction !== null).length !== 3) notes.push('expected-
 const g = matrix.find((r) => r.id === 'guardian')!;
 const r = matrix.find((r) => r.id === 'raider')!;
 const c = matrix.find((r) => r.id === 'crossbow')!;
-if (g.braceBonus !== 2) notes.push('guardian-brace');
+if (g.braceBonus !== 1) notes.push('guardian-brace');
 if (r.forestCost !== 1 || r.mountainCost !== 2) notes.push('raider-mobility');
 if (r.plunderGold !== 5) notes.push('raider-plunder');
 if (c.pierce !== 2) notes.push('crossbow-pierce');

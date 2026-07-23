@@ -1,6 +1,6 @@
 # 병종 역할 매트릭스
 
-- 생성: 2026-07-20T00:45:21.112Z
+- 생성: 2026-07-23T19:51:44.682Z
 - 판정: PASS
 
 | 병종 | 세력 | HP | 공 | 방 | 이 | 사 | 비용 | 역할 | 특성 |
@@ -17,7 +17,7 @@
 - cavalry → archer: 피해 7
 - guardian → cavalry: 피해 3
 - raider → archer: 피해 6
-- crossbow → guardian: 피해 3 (수호 태세 방어 2)
+- crossbow → guardian: 피해 4 (수호 태세 방어 1)
 
 ## 시나리오 로스터
 

@@ -1,9 +1,18 @@
-// 한 줄 목적: 헤드리스 대규모 밸런스 시뮬레이션을 실행해 승률·안정성 허용 기준을 검증한다
+// 한 줄 목적: 헤드리스 대규모 밸런스 시뮬레이션을 실행해 승률·종료·6병종 편중 게이트를 검증한다
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runAiTurn } from '../src/core/ai';
 import { FACTION_IDS, FACTION_NAMES, UNIT_NAMES } from '../src/core/data';
+import {
+  BALANCE_UNIT_TYPES,
+  CONQUEST_SCENARIOS,
+  evaluateBalanceGates,
+  isUniqueUnitType,
+  type ScenarioOutcomeSummary,
+  type UnitProductionStats,
+  uniqueUnitFaction,
+} from '../src/core/eval/balance-gates';
 import { newGame } from '../src/core/game';
 import { SCENARIO_IDS, SCENARIOS } from '../src/core/scenarios';
 import type {
@@ -13,9 +22,9 @@ import type {
   BuiltinScenarioId,
   UnitTypeId,
 } from '../src/core/types';
+import { UNIT_TYPE_IDS } from '../src/core/units';
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard'];
-const UNIT_TYPES: UnitTypeId[] = ['infantry', 'archer', 'cavalry'];
 const SEEDS_PER_COMBO = Number(process.argv.find((a) => a.startsWith('--seeds='))?.slice(8) ?? 40);
 const SEED_BASE = 20260000;
 
@@ -32,6 +41,10 @@ interface GameOutcome {
   produced: Record<UnitTypeId, number>;
   spawned: Record<UnitTypeId, number>;
   alive: Record<UnitTypeId, number>;
+  /** 세력별 병종 생산 */
+  producedByFaction: Record<FactionId, Record<UnitTypeId, number>>;
+  /** 해당 게임에서 한 번 이상 생산된 병종 */
+  typesProduced: Set<UnitTypeId>;
   captured: number;
   idlePhases: number;
   eligiblePhases: number;
@@ -39,7 +52,17 @@ interface GameOutcome {
 }
 
 function zeroByType(): Record<UnitTypeId, number> {
-  return { infantry: 0, archer: 0, cavalry: 0, guardian: 0, raider: 0, crossbow: 0 };
+  const o = {} as Record<UnitTypeId, number>;
+  for (const t of UNIT_TYPE_IDS) o[t] = 0;
+  return o;
+}
+
+function zeroByFactionType(): Record<FactionId, Record<UnitTypeId, number>> {
+  return {
+    azure: zeroByType(),
+    crimson: zeroByType(),
+    violet: zeroByType(),
+  };
 }
 
 /** 상태 불변식 검사: 위반 사유 문자열을 수집한다. */
@@ -70,6 +93,8 @@ function runGame(
   const state = newGame(seed, { scenario, difficulty, humanFaction });
   const spawned = zeroByType();
   const produced = zeroByType();
+  const producedByFaction = zeroByFactionType();
+  const typesProduced = new Set<UnitTypeId>();
   for (const u of state.units) spawned[u.type]++;
   const illegal = new Set<string>();
   let idlePhases = 0;
@@ -82,7 +107,6 @@ function runGame(
     const f = state.current;
     const t0 = performance.now();
     // 인간 대체 AI: 선택 왕국은 항상 '보통' 실력으로 고정하고, 나머지는 설정 난이도를 따른다
-    // (runAiTurn이 END_PHASE 명령까지 발행해 페이즈를 넘긴다)
     const { commands } = runAiTurn(state, f, f === humanFaction ? 'normal' : undefined);
     maxPhaseMs = Math.max(maxPhaseMs, performance.now() - t0);
     phases++;
@@ -95,10 +119,11 @@ function runGame(
       if (c.type === 'produce-unit') {
         produced[c.unitType]++;
         spawned[c.unitType]++;
+        producedByFaction[f][c.unitType]++;
+        typesProduced.add(c.unitType);
       }
     }
     checkIllegal(state, illegal);
-    // AI가 페이즈를 넘기지 못하면(방어적 가드) 무한 루프를 피하기 위해 종료한다
     if (state.current === f && !state.over) break;
   }
 
@@ -126,6 +151,8 @@ function runGame(
     produced,
     spawned,
     alive,
+    producedByFaction,
+    typesProduced,
     captured,
     idlePhases,
     eligiblePhases,
@@ -142,7 +169,6 @@ for (const scenario of SCENARIO_IDS) {
   for (const humanFaction of FACTION_IDS) {
     for (const difficulty of DIFFICULTIES) {
       for (let i = 0; i < SEEDS_PER_COMBO; i++) {
-        // 시나리오 안에서 조합마다 서로 다른 시드를 사용해 시나리오별 시드 수를 확보한다
         const seed = SEED_BASE + combo * SEEDS_PER_COMBO + i;
         outcomes.push(runGame(scenario, humanFaction, difficulty, seed));
       }
@@ -167,25 +193,39 @@ for (const o of outcomes) {
   if (o.winner && o.winner !== 'draw') winsByFaction[o.winner]++;
 }
 
-const perScenario = SCENARIO_IDS.map((sid) => {
+const overallWinRates = Object.fromEntries(
+  FACTION_IDS.map((f) => [f, +(winsByFaction[f] / total).toFixed(4)]),
+) as Record<FactionId, number>;
+
+const perScenario: ScenarioOutcomeSummary[] = SCENARIO_IDS.map((sid) => {
   const games = outcomes.filter((o) => o.scenario === sid);
   const wins = Object.fromEntries(FACTION_IDS.map((f) => [f, 0])) as Record<FactionId, number>;
   for (const o of games) if (o.winner && o.winner !== 'draw') wins[o.winner]++;
   const reasons = { conquest: 0, 'crown-hold': 0, 'turn-limit': 0, unfinished: 0 };
   for (const o of games) reasons[o.endReason]++;
+  const n = games.length || 1;
   return {
     scenario: sid,
     games: games.length,
-    seeds: new Set(games.map((o) => o.seed)).size,
     winRates: Object.fromEntries(
-      FACTION_IDS.map((f) => [f, +(wins[f] / games.length).toFixed(3)]),
-    ),
-    avgEndTurn: +(games.reduce((s, o) => s + o.turns, 0) / games.length).toFixed(2),
+      FACTION_IDS.map((f) => [f, +(wins[f] / n).toFixed(4)]),
+    ) as Record<FactionId, number>,
     endReasons: reasons,
+    turnLimitRate: +(reasons['turn-limit'] / n).toFixed(4),
   };
 });
 
-// 난이도 검증: 대체 인간(보통 고정)의 승률이 상대 AI 난이도가 오를수록 낮아져야 한다
+// 시나리오 부가 진단(평균 턴·시드)
+const perScenarioDetail = SCENARIO_IDS.map((sid) => {
+  const games = outcomes.filter((o) => o.scenario === sid);
+  const base = perScenario.find((s) => s.scenario === sid)!;
+  return {
+    ...base,
+    seeds: new Set(games.map((o) => o.seed)).size,
+    avgEndTurn: +(games.reduce((s, o) => s + o.turns, 0) / (games.length || 1)).toFixed(2),
+  };
+});
+
 const proxyRateByDifficulty = Object.fromEntries(
   DIFFICULTIES.map((d) => {
     const games = outcomes.filter((o) => o.difficulty === d);
@@ -194,7 +234,6 @@ const proxyRateByDifficulty = Object.fromEntries(
   }),
 ) as Record<Difficulty, number>;
 
-// 난이도별 진단: 종료 사유와 턴 제한 승부에서의 대체 인간 승률
 const perDifficulty = DIFFICULTIES.map((d) => {
   const games = outcomes.filter((o) => o.difficulty === d);
   const reasons = { conquest: 0, 'crown-hold': 0, 'turn-limit': 0, unfinished: 0 };
@@ -221,23 +260,54 @@ const proxyRateByFaction = Object.fromEntries(
   }),
 ) as Record<FactionId, number>;
 
-const producedTotals = zeroByType();
-const spawnedTotals = zeroByType();
-const aliveTotals = zeroByType();
-for (const o of outcomes) {
-  for (const t of UNIT_TYPES) {
-    producedTotals[t] += o.produced[t];
-    spawnedTotals[t] += o.spawned[t];
-    aliveTotals[t] += o.alive[t];
+// 6병종 통계 — UNIT_TYPE_IDS 정본
+const unitStats = {} as Record<UnitTypeId, UnitProductionStats>;
+for (const t of UNIT_TYPE_IDS) {
+  const produced = outcomes.reduce((s, o) => s + o.produced[t], 0);
+  const spawned = outcomes.reduce((s, o) => s + o.spawned[t], 0);
+  const alive = outcomes.reduce((s, o) => s + o.alive[t], 0);
+  const byFaction = Object.fromEntries(FACTION_IDS.map((f) => [f, 0])) as Record<FactionId, number>;
+  const byScenario: Partial<Record<BuiltinScenarioId, number>> = {};
+  for (const o of outcomes) {
+    for (const f of FACTION_IDS) byFaction[f] += o.producedByFaction[f][t];
+    byScenario[o.scenario] = (byScenario[o.scenario] ?? 0) + o.produced[t];
   }
+  // 고유 병종 분모: 해당 세력이 참여한 게임만(내장 시뮬은 항상 3세력)
+  void uniqueUnitFaction(t);
+  const eligibleGames = isUniqueUnitType(t)
+    ? outcomes.filter((o) => !o.illegal.length).length // 모든 게임이 uniqueUnits 내장
+    : outcomes.length;
+  const gamesProduced = outcomes.filter((o) => o.typesProduced.has(t)).length;
+  unitStats[t] = {
+    produced,
+    spawned,
+    alive,
+    share: 0, // 아래에서 채움
+    survivalRate: spawned > 0 ? +(alive / spawned).toFixed(4) : 0,
+    gamesProduced,
+    eligibleGames,
+    produceRate: eligibleGames > 0 ? +(gamesProduced / eligibleGames).toFixed(4) : 0,
+    byFaction,
+    byScenario,
+  };
 }
-const producedSum = UNIT_TYPES.reduce((s, t) => s + producedTotals[t], 0);
-const productionShare = Object.fromEntries(
-  UNIT_TYPES.map((t) => [t, +(producedTotals[t] / producedSum).toFixed(3)]),
-) as Record<UnitTypeId, number>;
-const survivalRate = Object.fromEntries(
-  UNIT_TYPES.map((t) => [t, +(aliveTotals[t] / spawnedTotals[t]).toFixed(3)]),
-) as Record<UnitTypeId, number>;
+const producedSum = UNIT_TYPE_IDS.reduce((s, t) => s + unitStats[t].produced, 0);
+for (const t of UNIT_TYPE_IDS) {
+  unitStats[t].share = producedSum > 0 ? +(unitStats[t].produced / producedSum).toFixed(4) : 0;
+}
+
+const sharedProducedTotal = UNIT_TYPE_IDS.filter((t) => !isUniqueUnitType(t)).reduce(
+  (s, t) => s + unitStats[t].produced,
+  0,
+);
+
+// 세력별 병종 구성(생산 합)
+const rosterByFaction = Object.fromEntries(
+  FACTION_IDS.map((f) => [
+    f,
+    Object.fromEntries(UNIT_TYPE_IDS.map((t) => [t, unitStats[t].byFaction[f]])),
+  ]),
+) as Record<FactionId, Record<UnitTypeId, number>>;
 
 const idleSum = outcomes.reduce((s, o) => s + o.idlePhases, 0);
 const eligibleSum = outcomes.reduce((s, o) => s + o.eligiblePhases, 0);
@@ -246,30 +316,37 @@ const maxPhaseMs = +Math.max(...outcomes.map((o) => o.maxPhaseMs)).toFixed(1);
 
 // ---------------- 허용 기준 ----------------
 
-const failures: string[] = [];
-if (unfinished.length > 0) failures.push(`종료되지 않은 게임 ${unfinished.length}개`);
-if (illegalGames.length > 0)
-  failures.push(
+const structuralFailures: string[] = [];
+if (unfinished.length > 0) structuralFailures.push(`종료되지 않은 게임 ${unfinished.length}개`);
+if (illegalGames.length > 0) {
+  structuralFailures.push(
     `불법 상태 ${illegalGames.length}개: ${[...new Set(illegalGames.flatMap((o) => o.illegal))].join(', ')}`,
   );
-for (const f of FACTION_IDS) {
-  const rate = winsByFaction[f] / total;
-  if (rate > 0.65) failures.push(`${FACTION_NAMES[f]} 전체 승률 ${(rate * 100).toFixed(1)}% > 65%`);
-  if (rate < 0.2) failures.push(`${FACTION_NAMES[f]} 전체 승률 ${(rate * 100).toFixed(1)}% < 20%`);
-}
-for (const t of UNIT_TYPES) {
-  if (productionShare[t] > 0.7)
-    failures.push(`${UNIT_NAMES[t]} 생산 비중 ${(productionShare[t] * 100).toFixed(1)}% > 70%`);
 }
 const MARGIN = 0.04;
-if (proxyRateByDifficulty.easy < proxyRateByDifficulty.normal + MARGIN)
-  failures.push(
+if (proxyRateByDifficulty.easy < proxyRateByDifficulty.normal + MARGIN) {
+  structuralFailures.push(
     `보통 AI가 쉬움보다 명확히 강하지 않음 (대체 인간 승률 easy ${proxyRateByDifficulty.easy} vs normal ${proxyRateByDifficulty.normal})`,
   );
-if (proxyRateByDifficulty.normal < proxyRateByDifficulty.hard + MARGIN)
-  failures.push(
+}
+if (proxyRateByDifficulty.normal < proxyRateByDifficulty.hard + MARGIN) {
+  structuralFailures.push(
     `어려움 AI가 보통보다 명확히 강하지 않음 (대체 인간 승률 normal ${proxyRateByDifficulty.normal} vs hard ${proxyRateByDifficulty.hard})`,
   );
+}
+
+const gateResult = evaluateBalanceGates({
+  totalGames: total,
+  overallWinRates: overallWinRates as { azure: number; crimson: number; violet: number },
+  perScenario,
+  unitStats,
+  sharedProducedTotal,
+});
+
+const failures = [
+  ...structuralFailures,
+  ...gateResult.failures.map((f) => f.message),
+];
 
 // ---------------- 출력 ----------------
 
@@ -281,20 +358,28 @@ const summary = {
   unfinishedGames: unfinished.length,
   illegalGames: illegalGames.length,
   draws,
-  overallWinRates: Object.fromEntries(
-    FACTION_IDS.map((f) => [f, +(winsByFaction[f] / total).toFixed(3)]),
-  ),
+  overallWinRates,
   proxyWinRateByFaction: proxyRateByFaction,
   proxyWinRateByDifficulty: proxyRateByDifficulty,
   perDifficulty,
-  perScenario,
-  productionShare,
-  survivalRate,
-  idlePhaseRate: +(idleSum / eligibleSum).toFixed(3),
+  perScenario: perScenarioDetail,
+  unitStats,
+  productionShare: Object.fromEntries(UNIT_TYPE_IDS.map((t) => [t, unitStats[t].share])),
+  survivalRate: Object.fromEntries(UNIT_TYPE_IDS.map((t) => [t, unitStats[t].survivalRate])),
+  uniqueProduceRates: Object.fromEntries(
+    UNIT_TYPE_IDS.filter(isUniqueUnitType).map((t) => [t, unitStats[t].produceRate]),
+  ),
+  rosterByFaction,
+  sharedProducedTotal,
+  cavalrySharedShare:
+    sharedProducedTotal > 0 ? +(unitStats.cavalry.produced / sharedProducedTotal).toFixed(4) : 0,
+  idlePhaseRate: +(idleSum / (eligibleSum || 1)).toFixed(3),
   avgCapturesPerGame: avgCaptured,
   maxPhaseMs,
   pass: failures.length === 0,
   failures,
+  gateFailures: gateResult.failures,
+  conquestScenarios: CONQUEST_SCENARIOS,
 };
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -310,14 +395,46 @@ const md = [
   `- 종료 불능 게임: ${unfinished.length} · 불법 상태: ${illegalGames.length} · 무승부: ${draws}`,
   `- AI 무행동 페이즈 비율: ${pct(summary.idlePhaseRate)} · 게임당 평균 점령: ${avgCaptured} · 최장 페이즈: ${maxPhaseMs}ms`,
   '',
+  '> 자동 시뮬레이션은 종료 가능성, 불법 상태, 극단적 편중과 난이도 순서를 검증한다.',
+  '> 인간 플레이의 재미·가독성·조작감은 별도 실기 검증 대상이며 이 산출물로 증명되지 않는다.',
+  '',
   '## 전체 왕국 승률',
   '',
   '| 왕국 | 전체 승률 | 대체 인간 승률 |',
   '| --- | --- | --- |',
   ...FACTION_IDS.map(
     (f) =>
-      `| ${FACTION_NAMES[f]} | ${pct(winsByFaction[f] / total)} | ${pct(proxyRateByFaction[f])} |`,
+      `| ${FACTION_NAMES[f]} | ${pct(overallWinRates[f])} | ${pct(proxyRateByFaction[f])} |`,
   ),
+  '',
+  '## 시나리오별 왕국 승률·종료 방식',
+  '',
+  '| 시나리오 | 게임 | 청람 | 진홍 | 자원 | 평균 종료 턴 | 정복 | 왕관 | 턴 제한 | 턴제한비율 |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  ...perScenarioDetail.map(
+    (s) =>
+      `| ${SCENARIOS[s.scenario].name} | ${s.games} | ${pct(s.winRates.azure)} | ${pct(s.winRates.crimson)} | ${pct(s.winRates.violet)} | ${s.avgEndTurn} | ${s.endReasons.conquest} | ${s.endReasons['crown-hold']} | ${s.endReasons['turn-limit']} | ${pct(s.turnLimitRate)} |`,
+  ),
+  '',
+  '## 6병종 생산·생존 통계',
+  '',
+  '| 병종 | 생산 | 등장(시작포함) | 생존 | 생산비중 | 생존율 | 생산게임비율 | 적격게임 |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  ...UNIT_TYPE_IDS.map((t) => {
+    const u = unitStats[t];
+    return `| ${UNIT_NAMES[t]} | ${u.produced} | ${u.spawned} | ${u.alive} | ${pct(u.share)} | ${pct(u.survivalRate)} | ${pct(u.produceRate)} | ${u.eligibleGames} |`;
+  }),
+  '',
+  `- 공용 기병 비중(공용 대비): ${pct(summary.cavalrySharedShare)}`,
+  '',
+  '## 세력별 병종 구성(생산)',
+  '',
+  '| 세력 | 보병 | 궁병 | 기병 | 수호대 | 약탈대 | 쇠뇌대 |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...FACTION_IDS.map((f) => {
+    const r = rosterByFaction[f];
+    return `| ${FACTION_NAMES[f]} | ${r.infantry} | ${r.archer} | ${r.cavalry} | ${r.guardian} | ${r.raider} | ${r.crossbow} |`;
+  }),
   '',
   '## 난이도별 대체 인간(보통 고정) 승률',
   '',
@@ -325,23 +442,11 @@ const md = [
   '| --- | --- |',
   ...DIFFICULTIES.map((d) => `| ${d} | ${pct(proxyRateByDifficulty[d])} |`),
   '',
-  '## 시나리오별',
-  '',
-  '| 시나리오 | 게임 | 시드 | 청람 | 진홍 | 자원 | 평균 종료 턴 | 정복 | 왕관 | 턴 제한 |',
-  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
-  ...perScenario.map(
-    (s) =>
-      `| ${SCENARIOS[s.scenario].name} | ${s.games} | ${s.seeds} | ${pct(s.winRates.azure)} | ${pct(s.winRates.crimson)} | ${pct(s.winRates.violet)} | ${s.avgEndTurn} | ${s.endReasons.conquest} | ${s.endReasons['crown-hold']} | ${s.endReasons['turn-limit']} |`,
-  ),
-  '',
-  '## 병과',
-  '',
-  '| 병과 | 생산 비중 | 생존율 |',
-  '| --- | --- | --- |',
-  ...UNIT_TYPES.map((t) => `| ${UNIT_NAMES[t]} | ${pct(productionShare[t])} | ${pct(survivalRate[t])} |`),
-  '',
   `## 판정: ${failures.length === 0 ? 'PASS' : 'FAIL'}`,
-  ...(failures.length ? ['', ...failures.map((f) => `- ${f}`)] : []),
+  '',
+  ...(failures.length
+    ? ['### 실패한 게이트와 실제 수치', '', ...failures.map((f) => `- ${f}`)]
+    : ['실패한 게이트: 0건']),
   '',
 ].join('\n');
 writeFileSync(join(outDir, 'balance-summary.md'), md);
