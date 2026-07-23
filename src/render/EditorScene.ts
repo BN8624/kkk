@@ -4,7 +4,13 @@ import { UNIT_STATS } from '../core/data';
 import type { ScenarioDocumentV1 } from '../core/scenario/types';
 import type { Axial, Tile } from '../core/types';
 import { ensureGeneratedTextures, HEX_SIZE, queueExternalAssets, textureKey } from './assets';
-import { BoardView, fitCameraToTiles, pixelToHex, type ViewUnit } from './board-view';
+import {
+  BoardView,
+  disposeCameraFit,
+  fitCameraToTiles,
+  pixelToHex,
+  type ViewUnit,
+} from './board-view';
 
 export interface EditorSceneCallbacks {
   /** 탭(선택·유닛 배치 등 도구별 처리) */
@@ -48,6 +54,8 @@ export class EditorScene extends Phaser.Scene {
     this.view = new BoardView(this);
     this.buildAll();
     this.setupInput();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => disposeCameraFit(this));
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => disposeCameraFit(this));
     this.callbacks.onReady();
   }
 

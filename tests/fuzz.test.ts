@@ -121,4 +121,46 @@ describe('mutation fuzz (결정론 시드)', () => {
       expect(Date.now() - started, `입력 #${i}`).toBeLessThan(PER_INPUT_BUDGET_MS);
     }
   });
+
+  it('비정수 좌표 fixture를 예외 없이 거부한다', () => {
+    const base = cloneBuiltinDocument('three-crowns', 'fuzz-coords', 11, 'Coords');
+    const fixtures: unknown[] = [
+      (() => {
+        const d = structuredClone(base);
+        (d.board.tiles[0] as { q: unknown }).q = 1.25;
+        return d;
+      })(),
+      (() => {
+        const d = structuredClone(base);
+        (d.units[0] as { r: unknown }).r = '3';
+        return d;
+      })(),
+      (() => {
+        const d = structuredClone(base);
+        d.victoryConditions = [{ type: 'capture-building', at: { q: NaN, r: 0 } }];
+        return d;
+      })(),
+      (() => {
+        const d = structuredClone(base);
+        d.defeatConditions = [{ type: 'lose-building', at: { q: 0, r: -Infinity } }];
+        return d;
+      })(),
+      (() => {
+        const d = structuredClone(base);
+        d.victoryConditions = [
+          {
+            type: 'any-of',
+            conditions: [{ type: 'capture-building', at: { q: null as unknown as number, r: 1 } }],
+          },
+        ];
+        return d;
+      })(),
+    ];
+    for (const [i, fixture] of fixtures.entries()) {
+      const started = Date.now();
+      const r = decodeScenarioInput(fixture);
+      expect(r.ok, `fixture #${i}`).toBe(false);
+      expect(Date.now() - started, `fixture #${i}`).toBeLessThan(PER_INPUT_BUDGET_MS);
+    }
+  });
 });

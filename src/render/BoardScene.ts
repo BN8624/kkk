@@ -12,6 +12,7 @@ import {
 } from './assets';
 import {
   BoardView,
+  disposeCameraFit,
   fitCameraToTiles,
   pixelToHex,
   UNIT_Y_OFFSET,
@@ -56,6 +57,9 @@ export class BoardScene extends Phaser.Scene {
     this.buildBoard();
     fitCameraToTiles(this, this.state.tiles);
     this.setupInput();
+    // 씬 종료 시 자신이 등록한 resize 콜백만 정리
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => disposeCameraFit(this));
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => disposeCameraFit(this));
     this.callbacks.onReady();
   }
 
@@ -66,6 +70,7 @@ export class BoardScene extends Phaser.Scene {
     this.view.resetRefs();
     this.highlightPool = [];
     this.buildBoard();
+    // fitCameraToTiles가 이전 콜백을 교체하므로 누적되지 않는다
     fitCameraToTiles(this, this.state.tiles);
   }
 
