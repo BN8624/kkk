@@ -10,6 +10,7 @@ import {
   textureKey,
   type AssetId,
 } from './assets';
+import { attackAnimKind, isRangedAttackAnim, projectileStyle } from './attack-presentation';
 import {
   BoardView,
   disposeCameraFit,
@@ -216,9 +217,38 @@ export class BoardScene extends Phaser.Scene {
           resolve();
         });
       };
+      const anim = attackAnimKind(o.attackerType);
       const impact = () => {
-        this.floatText(target.x, target.y - 26, `-${o.damage}`, '#ffd9d9');
-        this.cameras.main.shake(o.attackerType === 'cavalry' ? 140 : 90, o.attackerType === 'cavalry' ? 0.006 : 0.004);
+        const dmgColor =
+          anim === 'bolt'
+            ? projectileStyle('bolt').damageTextColor
+            : anim === 'arrow'
+              ? projectileStyle('arrow').damageTextColor
+              : '#ffd9d9';
+        this.floatText(target.x, target.y - 26, `-${o.damage}`, dmgColor);
+        if (anim === 'bolt') {
+          // 관통 특성을 알아볼 수 있는 피격 플래시(규칙·피해량은 불변)
+          const style = projectileStyle('bolt');
+          const flash = this.add.circle(
+            target.x,
+            target.y + UNIT_Y_OFFSET,
+            style.impactFlashRadius,
+            style.impactFlashColor,
+            0.85,
+          );
+          flash.setDepth(10);
+          this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 1.6,
+            duration: 160,
+            onComplete: () => flash.destroy(),
+          });
+        }
+        this.cameras.main.shake(
+          anim === 'cavalry-charge' ? 140 : 90,
+          anim === 'cavalry-charge' ? 0.006 : 0.004,
+        );
         this.hitShake(o.defenderId);
         if (o.counterDamage && o.attackerPos) {
           const ap = this.pos(o.attackerPos);
@@ -232,33 +262,40 @@ export class BoardScene extends Phaser.Scene {
         }
       };
 
-      if (o.attackerType === 'archer') {
-        // 궁병: 돌진 대신 투사체 연출
-        const proj = this.add.circle(view.container.x, view.container.y - 10, 3.5, 0xf2ead8);
+      if (isRangedAttackAnim(o.attackerType)) {
+        // 궁병 화살 / 쇠뇌대 볼트: 돌진 대신 투사체 연출
+        const kind = anim === 'bolt' ? 'bolt' : 'arrow';
+        const style = projectileStyle(kind);
+        const proj = this.add.circle(
+          view.container.x,
+          view.container.y - 10,
+          style.radius,
+          style.color,
+        );
         proj.setDepth(9);
         this.tweens.add({
           targets: proj,
           x: target.x,
           y: target.y + UNIT_Y_OFFSET,
-          duration: 220,
-          ease: 'Sine.easeIn',
+          duration: style.durationMs,
+          ease: style.ease,
           onComplete: () => {
             proj.destroy();
             impact();
           },
         });
       } else {
-        // 보병·기병: 돌진(기병은 더 깊고 빠르게)
+        // 보병·수호·약탈·기병: 돌진(기병은 더 깊고 빠르게)
         const ox = view.container.x;
         const oy = view.container.y;
-        const depth = o.attackerType === 'cavalry' ? 0.5 : 0.3;
+        const depth = anim === 'cavalry-charge' ? 0.5 : 0.3;
         const dx = (target.x - ox) * depth;
         const dy = (target.y + UNIT_Y_OFFSET - oy) * depth;
         this.tweens.add({
           targets: view.container,
           x: ox + dx,
           y: oy + dy,
-          duration: o.attackerType === 'cavalry' ? 85 : 100,
+          duration: anim === 'cavalry-charge' ? 85 : 100,
           yoyo: true,
           ease: 'Sine.easeIn',
           onComplete: impact,
