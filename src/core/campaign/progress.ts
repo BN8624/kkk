@@ -55,11 +55,14 @@ export function loadCampaignProgress(): CampaignProgressV1 {
   }
 }
 
-export function saveCampaignProgress(progress: CampaignProgressV1): void {
+export function saveCampaignProgress(progress: CampaignProgressV1): boolean {
   try {
-    storage()?.setItem(CAMPAIGN_PROGRESS_KEY, JSON.stringify(progress));
+    const s = storage();
+    if (!s) return false;
+    s.setItem(CAMPAIGN_PROGRESS_KEY, JSON.stringify(progress));
+    return true;
   } catch {
-    /* 저장 공간 부족 등은 무시(진행은 다음 판에서 다시 기록된다) */
+    return false;
   }
 }
 

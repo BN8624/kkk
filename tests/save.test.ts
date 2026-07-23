@@ -1,8 +1,62 @@
 // 한 줄 목적: 저장 직렬화·복원·v1 마이그레이션과 손상 데이터 안전 처리를 검증한다
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { newGame } from '../src/core/game';
-import { deserialize, SAVE_VERSION, serialize } from '../src/core/save';
+import {
+  deserialize,
+  isStorageAvailable,
+  resetSaveFailureWarning,
+  SAVE_VERSION,
+  saveGame,
+  saveRaw,
+  saveSettings,
+  serialize,
+  shouldWarnSaveFailure,
+  DEFAULT_SETTINGS,
+} from '../src/core/save';
 import { SCENARIOS } from '../src/core/scenarios';
+
+/** 테스트용 메모리 localStorage. */
+function installMemoryStorage(opts?: {
+  throwOnSet?: Error | null;
+  denyAccess?: boolean;
+}): { map: Map<string, string> } {
+  const map = new Map<string, string>();
+  if (opts?.denyAccess) {
+    Object.defineProperty(globalThis, 'localStorage', {
+      get() {
+        throw new Error('access denied');
+      },
+      configurable: true,
+    });
+    return { map };
+  }
+  const store = {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      if (opts?.throwOnSet) throw opts.throwOnSet;
+      map.set(k, v);
+    },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
+  };
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: store,
+    configurable: true,
+    writable: true,
+  });
+  return { map };
+}
+
+afterEach(() => {
+  resetSaveFailureWarning();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (globalThis as any).localStorage;
+  } catch {
+    /* ignore */
+  }
+});
 
 describe('save', () => {
   it('직렬화 후 복원하면 동일한 상태가 된다', () => {
@@ -206,5 +260,62 @@ describe('save', () => {
     const badType = newGame(5);
     (badType.units[0] as { type: string }).type = 'dragon';
     expect(deserialize(serialize(badType))).toBeNull();
+  });
+});
+
+describe('저장 성공·실패 반환과 경고', () => {
+  it('정상 저장은 true를 반환한다', () => {
+    const { map } = installMemoryStorage();
+    const state = newGame(99);
+    expect(saveGame(state)).toBe(true);
+    expect(saveRaw('{"version":4}')).toBe(true);
+    expect(saveSettings(DEFAULT_SETTINGS)).toBe(true);
+    expect(map.size).toBeGreaterThan(0);
+    expect(isStorageAvailable()).toBe(true);
+  });
+
+  it('저장소 접근 예외는 false를 반환한다', () => {
+    installMemoryStorage({ denyAccess: true });
+    const state = newGame(1);
+    expect(saveGame(state)).toBe(false);
+    expect(saveRaw('x')).toBe(false);
+    expect(saveSettings(DEFAULT_SETTINGS)).toBe(false);
+    expect(isStorageAvailable()).toBe(false);
+  });
+
+  it('quota 예외는 false를 반환한다', () => {
+    installMemoryStorage({
+      throwOnSet: new Error('QuotaExceededError'),
+    });
+    expect(saveGame(newGame(2))).toBe(false);
+    expect(saveRaw('payload')).toBe(false);
+    expect(saveSettings(DEFAULT_SETTINGS)).toBe(false);
+    expect(isStorageAvailable()).toBe(false);
+  });
+
+  it('경고는 세션 최초 1회만 표시한다', () => {
+    expect(shouldWarnSaveFailure()).toBe(true);
+    expect(shouldWarnSaveFailure()).toBe(false);
+    expect(shouldWarnSaveFailure()).toBe(false);
+    resetSaveFailureWarning();
+    expect(shouldWarnSaveFailure()).toBe(true);
+  });
+
+  it('저장 실패해도 게임 상태 진행은 유지된다', () => {
+    installMemoryStorage({ throwOnSet: new Error('quota') });
+    const state = newGame(7);
+    const turn = state.turn;
+    const gold = state.factions.azure.gold;
+    expect(saveGame(state)).toBe(false);
+    expect(state.turn).toBe(turn);
+    expect(state.factions.azure.gold).toBe(gold);
+    expect(state.over).toBe(false);
+  });
+
+  it('데이터 관리 화면용 저장 가능 여부를 보고한다', () => {
+    installMemoryStorage();
+    expect(isStorageAvailable()).toBe(true);
+    installMemoryStorage({ denyAccess: true });
+    expect(isStorageAvailable()).toBe(false);
   });
 });

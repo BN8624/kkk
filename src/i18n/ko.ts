@@ -116,8 +116,12 @@ export const KO = {
   'pause.newGame': '새 게임 (저장 초기화)',
   'pause.toTitle': '타이틀로',
   'pause.dataManagement': '데이터 백업·복구',
+  'save.failed':
+    '이 기기에서는 진행 상황을 저장하지 못했습니다. 브라우저를 닫으면 현재 게임이 사라질 수 있습니다.',
   'backup.title': '데이터 백업·복구',
   'backup.hint': '이 브라우저의 선택한 데이터를 JSON 파일로 저장하거나 복구합니다.',
+  'backup.storageAvailable': '기기 저장소: 사용 가능',
+  'backup.storageUnavailable': '기기 저장소: 사용할 수 없음',
   'backup.category.preferences': '설정·언어·즐겨찾기',
   'backup.category.progress': '게임 저장·기록·캠페인 진행',
   'backup.category.scenarios': '시나리오 초안·설치 전장',

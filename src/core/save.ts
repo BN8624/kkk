@@ -301,21 +301,50 @@ function storage(): StorageLike | null {
   return null;
 }
 
-export function saveGame(state: GameState): void {
+/**
+ * 실제 쓰기 가능 여부. 프라이빗 모드를 단정하지 않고 probe 쓰기 성공만 본다.
+ * 실패해도 예외를 밖으로 던지지 않는다.
+ */
+export function isStorageAvailable(): boolean {
   try {
-    storage()?.setItem(SAVE_KEY, serialize(state));
+    const s = storage();
+    if (!s) return false;
+    const probe = `${SETTINGS_KEY}__probe`;
+    s.setItem(probe, '1');
+    s.removeItem(probe);
+    return true;
   } catch {
-    /* 저장 공간 부족 등 실패해도 게임은 계속 진행 */
+    return false;
+  }
+}
+
+/** localStorage에 키를 쓴다. 접근 불가·quota·직렬화 실패 시 false. */
+function writeItem(key: string, value: string): boolean {
+  try {
+    const s = storage();
+    if (!s) return false;
+    s.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 게임 상태 저장. 성공 여부만 반환하며 예외로 게임을 중단하지 않는다.
+ * 호출측에서 세션 최초 1회 경고를 띄울 수 있다.
+ */
+export function saveGame(state: GameState): boolean {
+  try {
+    return writeItem(SAVE_KEY, serialize(state));
+  } catch {
+    return false;
   }
 }
 
 /** 직렬화 문자열을 그대로 저장한다(AI 페이즈 체크포인트 복구용). */
-export function saveRaw(raw: string): void {
-  try {
-    storage()?.setItem(SAVE_KEY, raw);
-  } catch {
-    /* 실패해도 게임은 계속 진행 */
-  }
+export function saveRaw(raw: string): boolean {
+  return writeItem(SAVE_KEY, raw);
 }
 
 export function loadGame(): GameState | null {
@@ -354,10 +383,28 @@ export function loadSettings(): Settings {
   }
 }
 
-export function saveSettings(settings: Settings): void {
+export function saveSettings(settings: Settings): boolean {
   try {
-    storage()?.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    return writeItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch {
-    /* 실패해도 게임은 계속 진행 */
+    return false;
   }
+}
+
+/** 세션 동안 게임 저장 실패 경고를 한 번만 보여 주기 위한 플래그. */
+let saveFailureWarned = false;
+
+/** 테스트용: 세션 경고 플래그를 초기화한다. */
+export function resetSaveFailureWarning(): void {
+  saveFailureWarned = false;
+}
+
+/**
+ * 게임 저장 실패 시 세션 최초 1회만 true를 반환한다(토스트 표시 여부).
+ * 이후 실패는 false — 같은 경고를 반복하지 않는다.
+ */
+export function shouldWarnSaveFailure(): boolean {
+  if (saveFailureWarned) return false;
+  saveFailureWarned = true;
+  return true;
 }
