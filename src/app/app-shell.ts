@@ -19,11 +19,6 @@ import { EditorFlowController } from '../controllers/editor-flow-controller';
 import { LibraryController } from '../controllers/library-controller';
 import { PlayController } from '../controllers/play-controller';
 import { ReplayController } from '../controllers/replay-controller';
-import { StrategicController } from '../controllers/strategic-controller';
-import {
-  loadStrategicBattleFromStorage,
-} from '../strategic/battle-session-save';
-import { loadStrategicFromStorage } from '../strategic/save';
 import { activeCleanupCount, type ModeToken } from './lifecycle';
 import type { AppMode } from './mode';
 import type {
@@ -33,7 +28,6 @@ import type {
   LibraryFlow,
   PlaySession,
   ReplayArchiveFlow,
-  StrategicFlow,
 } from './navigation';
 
 /** 컨트롤러가 받는 공유 문맥. 컨트롤러 간 접근은 여기 노출된 인터페이스로만 한다. */
@@ -59,7 +53,6 @@ export interface AppContext {
   readonly editorFlow: EditorFlow;
   readonly replays: ReplayArchiveFlow;
   readonly library: LibraryFlow;
-  readonly strategic: StrategicFlow;
 }
 
 export class AppShell implements AppContext, AppNavigation {
@@ -83,7 +76,6 @@ export class AppShell implements AppContext, AppNavigation {
   private replayCtrl: ReplayController;
   private libraryCtrl: LibraryController;
   private analysisCtrl: AnalysisController;
-  private strategicCtrl: StrategicController;
 
   constructor() {
     this.settings = loadSettings();
@@ -118,12 +110,8 @@ export class AppShell implements AppContext, AppNavigation {
     this.replayCtrl = new ReplayController(this);
     this.libraryCtrl = new LibraryController(this);
     this.analysisCtrl = new AnalysisController(this);
-    this.strategicCtrl = new StrategicController(this);
 
-    window.addEventListener('pagehide', () => {
-      this.playCtrl.persistOnExit();
-      this.strategicCtrl.persistOnExit();
-    });
+    window.addEventListener('pagehide', () => this.playCtrl.persistOnExit());
   }
 
   /** 부팅: 타이틀 표시 후 공유 URL 진입을 처리한다. */
@@ -208,10 +196,6 @@ export class AppShell implements AppContext, AppNavigation {
     return this.libraryCtrl;
   }
 
-  get strategic(): StrategicFlow {
-    return this.strategicCtrl;
-  }
-
   // ---------------- 상위 화면 이동 ----------------
 
   toTitle(): void {
@@ -219,7 +203,6 @@ export class AppShell implements AppContext, AppNavigation {
     this.replayCtrl.stopPlaybackUi();
     this.playCtrl.clearTestPlayUi();
     this.editorCtrl.closeSession();
-    this.strategicCtrl.hideUi();
     const saved = loadGame();
     const summary = saved
       ? t('title.saveSummary', {
@@ -233,31 +216,14 @@ export class AppShell implements AppContext, AppNavigation {
           daily: saved.config.mode === 'daily' ? t('title.dailySuffix') : '',
         })
       : undefined;
-    const strategicSave = loadStrategicFromStorage();
-    const strategicBattle = loadStrategicBattleFromStorage();
     showTitleScreen(this.overlay, {
       hasSave: saved !== null,
       saveSummary: summary,
       updateAvailable: this.updateAvailable,
-      hasStrategicSave: strategicSave !== null,
-      hasStrategicBattleSave: strategicBattle !== null,
-      features: {
-        campaign: true,
-        scenarios: true,
-        editor: true,
-        replays: true,
-        analysis: true,
-        strategic: true,
-      },
+      features: { campaign: true, scenarios: true, editor: true, replays: true, analysis: true },
       handlers: {
         onContinue: () => this.continueGame(),
         onNewGame: () => this.toSetup(),
-        onStrategicStart: () => this.toStrategic(),
-        onStrategicContinue: () => this.strategicCtrl.continueSaved(),
-        onStrategicNew: () => {
-          if (!window.confirm(t('title.strategicNewConfirm'))) return;
-          this.strategicCtrl.beginNewCampaign();
-        },
         onDaily: () => this.toDaily(),
         onCampaign: () => this.toCampaign(),
         onScenarios: () => this.toCustomScenarios(),
@@ -327,10 +293,6 @@ export class AppShell implements AppContext, AppNavigation {
     this.campaignCtrl.show();
   }
 
-  toStrategic(): void {
-    this.strategicCtrl.show();
-  }
-
   toCustomScenarios(): void {
     void this.libraryCtrl.showCustomScenarios();
   }
@@ -347,10 +309,7 @@ export class AppShell implements AppContext, AppNavigation {
     void this.analysisCtrl.showLab();
   }
 
-  launch(
-    state: GameState,
-    opts?: { testPlay?: boolean; spectate?: boolean; strategicBattle?: { battleId: string } },
-  ): void {
+  launch(state: GameState, opts?: { testPlay?: boolean; spectate?: boolean }): void {
     this.playCtrl.launch(state, opts);
   }
 
@@ -399,12 +358,6 @@ export class AppShell implements AppContext, AppNavigation {
       openEditor: () => this.toEditorHome(),
       editorDoc: () => this.editorCtrl.currentDoc,
       editorTap: (q: number, r: number) => this.editorCtrl.editorTap(q, r),
-      strategicState: () => this.strategicCtrl.state,
-      strategicDigest: () => this.strategicCtrl.testDigest(),
-      strategicSelectedArmy: () => this.strategicCtrl.testSelectedArmy(),
-      strategicRegion: (id: string) =>
-        this.strategicCtrl.state?.regions.find((r) => r.id === id) ?? null,
-      strategicContinue: () => this.strategicCtrl.continueSaved(),
       // 누수 진단: 화면 전환 반복 후 수치가 증가하지 않아야 한다
       leaks: () => ({
         cleanups: activeCleanupCount(),

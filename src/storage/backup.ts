@@ -5,11 +5,6 @@ import { RECORDS_KEY } from '../core/records';
 import { decodeReplayDocument } from '../core/replay-decode';
 import { SAVE_KEY, SETTINGS_KEY } from '../core/save';
 import { parseScenarioDocument } from '../core/scenario/validate';
-import {
-  deserializeStrategicBattleSave,
-  STRATEGIC_BATTLE_SAVE_KEY,
-} from '../strategic/battle-session-save';
-import { deserializeStrategic, STRATEGIC_SAVE_KEY } from '../strategic/save';
 import { LOCALE_STORAGE_KEY } from '../i18n';
 import { DOC_STORE_NAMES, type DocStoreName, type DocumentStore } from './docstore';
 import { documentStore } from './idb';
@@ -31,13 +26,7 @@ export const BACKUP_CATEGORIES: BackupCategory[] = [
 const FAVORITES_KEY = 'three-crowns-replay-favs';
 const LOCAL_KEYS: Record<Exclude<BackupCategory, 'scenarios' | 'replays'>, string[]> = {
   preferences: [SETTINGS_KEY, LOCALE_STORAGE_KEY, FAVORITES_KEY],
-  progress: [
-    SAVE_KEY,
-    RECORDS_KEY,
-    CAMPAIGN_PROGRESS_KEY,
-    STRATEGIC_SAVE_KEY,
-    STRATEGIC_BATTLE_SAVE_KEY,
-  ],
+  progress: [SAVE_KEY, RECORDS_KEY, CAMPAIGN_PROGRESS_KEY],
 };
 const STORE_KEYS: Record<BackupCategory, DocStoreName[]> = {
   preferences: [],
@@ -169,17 +158,7 @@ export function parseBackup(text: string): BackupParseResult {
   }
   const localEntries = value.localStorage as Record<string, unknown>;
   const selectedLocalKeys = new Set(localKeysFor(categories as BackupCategory[]));
-  if (
-    Object.entries(localEntries).some(([key, entry]) => {
-      if (!ALLOWED_LOCAL_KEYS.has(key) || !selectedLocalKeys.has(key) || typeof entry !== 'string') {
-        return true;
-      }
-      // 전략 저장은 실제 deserializer로 검증(손상 주입 차단)
-      if (key === STRATEGIC_SAVE_KEY) return deserializeStrategic(entry) === null;
-      if (key === STRATEGIC_BATTLE_SAVE_KEY) return deserializeStrategicBattleSave(entry) === null;
-      return false;
-    })
-  ) {
+  if (Object.entries(localEntries).some(([key, entry]) => !ALLOWED_LOCAL_KEYS.has(key) || !selectedLocalKeys.has(key) || typeof entry !== 'string')) {
     return { ok: false, code: 'invalid' };
   }
   const documents = value.documents as Record<string, unknown>;

@@ -37,8 +37,6 @@ import {
   type BackupDocumentV1,
   type RestoreMode,
 } from '../storage/backup';
-import { saveStrategicBattleToStorage } from '../strategic/battle-session-save';
-import { loadStrategicFromStorage } from '../strategic/save';
 import { TestPlayBar } from '../ui/editor/testplay';
 import {
   showBackupPreviewScreen,
@@ -82,8 +80,6 @@ export class PlayController implements AppController, PlaySession {
   private pendingAttackId: number | null = null;
   private testPlay = false;
   private spectate = false;
-  /** 전략 전술 전투 battleId(있으면 일반 저장·기록 경로 비활성). */
-  private strategicBattleId: string | null = null;
   private testPlayBar: TestPlayBar | null = null;
   private observations = new ObservationTracker();
   private onVisibility = (): void => {
@@ -119,29 +115,13 @@ export class PlayController implements AppController, PlaySession {
     return humanFaction(this._state!);
   }
 
-  /** 일반 플레이 자동 저장. 테스트 플레이·전략 전투는 일반 저장을 오염시키지 않는다. */
+  /** 일반 플레이 자동 저장. 테스트 플레이는 실제 저장을 오염시키지 않는다. */
   private persist(state: GameState): void {
-    if (this.testPlay) return;
-    if (this.strategicBattleId) {
-      const strategic = this.ctx.strategic.state ?? loadStrategicFromStorage();
-      if (strategic) {
-        saveStrategicBattleToStorage(strategic, this.strategicBattleId, state);
-      }
-      return;
-    }
-    saveGame(state);
+    if (!this.testPlay) saveGame(state);
   }
 
   persistOnExit(): void {
-    if (!this._state || this._state.over || this.testPlay) return;
-    if (this.strategicBattleId) {
-      const strategic = this.ctx.strategic.state ?? loadStrategicFromStorage();
-      if (strategic) {
-        saveStrategicBattleToStorage(strategic, this.strategicBattleId, this._state);
-      }
-      return;
-    }
-    saveGame(this._state);
+    if (this._state && !this._state.over && !this.testPlay) saveGame(this._state);
   }
 
   /** 보드 씬 생성 직후 HUD를 현재 상태로 맞춘다. */
@@ -293,7 +273,6 @@ export class PlayController implements AppController, PlaySession {
     else this.ctx.editorFlow.closeSession();
     this.testPlay = !!opts.testPlay;
     this.spectate = !!opts.spectate;
-    this.strategicBattleId = opts.strategicBattle?.battleId ?? null;
     this.testPlayBar?.destroy();
     this.testPlayBar = null;
     this.ctx.enterMode('play');
@@ -338,7 +317,6 @@ export class PlayController implements AppController, PlaySession {
   clearTestPlayUi(): void {
     this.testPlay = false;
     this.spectate = false;
-    this.strategicBattleId = null;
     this.testPlayBar?.destroy();
     this.testPlayBar = null;
   }
@@ -347,7 +325,6 @@ export class PlayController implements AppController, PlaySession {
   abandonTestPlay(): void {
     this.testPlay = false;
     this.spectate = false;
-    this.strategicBattleId = null;
     this.testPlayBar?.destroy();
     this.testPlayBar = null;
     this._state = null;
@@ -752,22 +729,6 @@ export class PlayController implements AppController, PlaySession {
       window.setTimeout(() => {
         if (token.alive) this.ctx.editorFlow.handleTestPlayEnd(state);
       }, 500);
-      return;
-    }
-    // 전략 전술 전투: 일반 저장·기록·캠페인·리플레이 보관함 오염 금지
-    if (this.strategicBattleId) {
-      const battleId = this.strategicBattleId;
-      this.strategicBattleId = null;
-      this._busy = false;
-      window.setTimeout(() => {
-        if (!token.alive) return;
-        // battleId는 전략 컨트롤러가 pendingBattle과 대조
-        void battleId;
-        this.ctx.strategic.handleTacticalGameEnd(state);
-        this._state = null;
-        this.ctx.hud.setPlayControlsVisible(false);
-        this.ctx.sleepBoard();
-      }, 400);
       return;
     }
     clearSave();

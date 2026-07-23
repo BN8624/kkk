@@ -8,9 +8,6 @@ export interface TitleMenuHandlers {
   onNewGame: () => void;
   onDaily: () => void;
   onCampaign: () => void;
-  onStrategicStart: () => void;
-  onStrategicContinue: () => void;
-  onStrategicNew: () => void;
   onScenarios: () => void;
   onEditor: () => void;
   onReplays: () => void;
@@ -27,9 +24,6 @@ export function showTitleScreen(
     hasSave: boolean;
     saveSummary?: string;
     updateAvailable: boolean;
-    /** 전략 저장·전투 임시 저장 존재 여부(빠른 전투 이어하기와 분리). */
-    hasStrategicSave: boolean;
-    hasStrategicBattleSave: boolean;
     /** 아직 열리지 않은 메뉴는 렌더링하지 않는다(단계별 수직 완성 원칙) */
     features: {
       campaign: boolean;
@@ -37,28 +31,11 @@ export function showTitleScreen(
       editor: boolean;
       replays: boolean;
       analysis: boolean;
-      strategic: boolean;
     };
     handlers: TitleMenuHandlers;
   },
 ): void {
-  const {
-    hasSave,
-    saveSummary,
-    updateAvailable,
-    hasStrategicSave,
-    hasStrategicBattleSave,
-    features,
-    handlers,
-  } = opts;
-  const strategicBlock = features.strategic
-    ? hasStrategicSave || hasStrategicBattleSave
-      ? `<button class="sub-btn" id="btn-strategic-continue">${escapeHtml(
-          hasStrategicBattleSave ? t('title.strategicBattleContinue') : t('title.strategicContinue'),
-        )}</button>
-         <button class="sub-btn" id="btn-strategic-new">${escapeHtml(t('title.strategicNew'))}</button>`
-      : `<button class="sub-btn" id="btn-strategic-start">${escapeHtml(t('title.strategicStart'))}</button>`
-    : '';
+  const { hasSave, saveSummary, updateAvailable, features, handlers } = opts;
   overlay.show(`
       <div class="crown">${CROWN_SVG}</div>
       <h1>${escapeHtml(t('title.appName'))}</h1>
@@ -71,7 +48,6 @@ export function showTitleScreen(
           : ''
       }
       <button class="${hasSave ? 'sub-btn' : 'big-btn'}" id="btn-new">${escapeHtml(t('title.quickBattle'))}</button>
-      ${strategicBlock}
       ${features.campaign ? `<button class="sub-btn" id="btn-campaign">${escapeHtml(t('title.campaign'))}</button>` : ''}
       <button class="sub-btn" id="btn-daily">${escapeHtml(t('title.daily'))}</button>
       ${features.scenarios ? `<button class="sub-btn" id="btn-scenarios">${escapeHtml(t('title.customScenarios'))}</button>` : ''}
@@ -83,9 +59,6 @@ export function showTitleScreen(
   overlay.bind({
     'btn-continue': handlers.onContinue,
     'btn-new': handlers.onNewGame,
-    'btn-strategic-start': handlers.onStrategicStart,
-    'btn-strategic-continue': handlers.onStrategicContinue,
-    'btn-strategic-new': handlers.onStrategicNew,
     'btn-campaign': handlers.onCampaign,
     'btn-daily': handlers.onDaily,
     'btn-scenarios': handlers.onScenarios,
