@@ -235,7 +235,7 @@ jobs:
       - run: npm run release:assets
       - uses: actions/upload-artifact@v7
         with:
-          name: three-crowns-island-2.2.2
+          name: three-crowns-island-2.2.3
           path: release
           if-no-files-found: error
 
