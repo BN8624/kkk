@@ -255,9 +255,14 @@ function analyze(state: GameState, faction: FactionId, profile: AiProfile): Anal
   const turnsLeft = Math.max(0, state.maxTurns - state.turn + 1);
   const hasConquest = flattenVictory(state.objectives.victory).some((c) => c.type === 'conquest');
   // 정복 시나리오만 수도 우선·마을 억제(턴 제한 점수전 ≤70%). 수비·캠페인은 기존 가치 유지.
+  // 왕관+정복 병존 시 초반 수도 러시는 4턴 이하 전멸을 유발하므로 왕관 아래로 둔다.
   let capitalBase: number;
   if (crownDenyImminent) capitalBase = 90;
-  else if (hasConquest) {
+  else if (isCrownScenario && hasConquest) {
+    if (state.turn <= 4) capitalBase = 75;
+    else if (state.turn <= 7) capitalBase = 110;
+    else capitalBase = turnsLeft <= 5 ? 160 : 130;
+  } else if (hasConquest) {
     capitalBase = turnsLeft <= 4 ? 240 : turnsLeft <= 7 ? 200 : turnsLeft <= 9 ? 170 : 150;
   } else {
     capitalBase = 100;
@@ -384,12 +389,14 @@ function assignRoles(
     }
   }
 
-  if (profile.defend && an.myCapital && an.capitalThreats.length > 0) {
+  // 위협 탐지 전이라도 왕관 시나리오 초반에는 수도 최소 방어(기동 병과 원거리 러시 대비)
+  const earlyCrownCapGuard = an.crownScenario && state.turn <= 4 && !!an.myCapital;
+  if (profile.defend && an.myCapital && (an.capitalThreats.length > 0 || earlyCrownCapGuard)) {
     const cap = an.myCapital;
     // 초반 위협: 방어 인원을 넉넉히 두어 4턴 이하 전멸·수도 상실을 줄인다
     const need = Math.min(
       state.turn <= 4 ? 3 : 2,
-      Math.max(1, an.capitalThreats.length),
+      Math.max(1, an.capitalThreats.length > 0 ? an.capitalThreats.length : 1),
     );
     // 수호대를 수도 방어에 우선 배정
     const defenders = units
@@ -682,9 +689,9 @@ function tryAttack(
       if (profile.avoidBadTrades && fc.attackerDies && !fc.defenderDies) continue;
 
       let score = fc.damage.total;
-      // 어려움 초반(1~3): 처치 가산 완화 — 4턴 이하 전멸 즉시와 중후반 차이를 계단화
+      // 어려움 초반(1~4): 처치 가산 완화 — 4턴 이하 전멸과 중후반 차이를 계단화
       const earlyHardSoft =
-        profile.production === 'adaptive' && state.turn <= 3 ? 0.5 : 1;
+        profile.production === 'adaptive' && state.turn <= 4 ? 0.5 : 1;
       if (fc.defenderDies) {
         score +=
           (profile.killBonusBase + unitValue(enemy) * profile.killValueScale) * earlyHardSoft;
