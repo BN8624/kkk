@@ -110,14 +110,14 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     production: 'balanced',
     crownDenyBonus: 0,
     // 보통: 처치·부상 집결과 완벽한 반격 최적화를 완화해 교환비를 낮춘다
-    killBonusBase: 8,
-    killValueScale: 0.8,
-    woundedWeight: 0.05,
-    counterWeight: 0.3,
-    suicidePenaltyScale: 2,
-    multiHitDampening: 28,
-    softCandidateBand: 10,
-    chaseWoundedWeight: 0.3,
+    killBonusBase: 5,
+    killValueScale: 0.55,
+    woundedWeight: 0.03,
+    counterWeight: 0.2,
+    suicidePenaltyScale: 2.2,
+    multiHitDampening: 36,
+    softCandidateBand: 14,
+    chaseWoundedWeight: 0.2,
   },
   hard: {
     moveAttack: true,
@@ -127,15 +127,15 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     focusFire: true,
     seekTerrain: true,
     production: 'adaptive',
-    crownDenyBonus: 250,
-    killBonusBase: 45,
-    killValueScale: 2.8,
-    woundedWeight: 1.0,
-    counterWeight: 0.95,
-    suicidePenaltyScale: 3.5,
+    crownDenyBonus: 300,
+    killBonusBase: 60,
+    killValueScale: 3.4,
+    woundedWeight: 1.2,
+    counterWeight: 1.0,
+    suicidePenaltyScale: 3.8,
     multiHitDampening: 0,
     softCandidateBand: 0,
-    chaseWoundedWeight: 3.2,
+    chaseWoundedWeight: 4.0,
   },
 };
 
@@ -155,6 +155,8 @@ interface Analysis {
   crownTile: Tile | null;
   /** hold-building 승리 조건이 있는 시나리오(왕관의 심장 등) */
   crownScenario: boolean;
+  /** conquest 승리 조건이 있는 정복형 시나리오 */
+  conquestScenario: boolean;
   crownOwner: FactionId | null;
   crownActive: boolean;
   crownHeldTurns: number;
@@ -331,6 +333,7 @@ function analyze(state: GameState, faction: FactionId, profile: AiProfile): Anal
     capitalThreats,
     crownTile,
     crownScenario: isCrownScenario,
+    conquestScenario: hasConquest,
     crownOwner,
     crownActive,
     crownHeldTurns,
@@ -383,6 +386,11 @@ function assignRoles(
 
   if (profile.defend && an.myCapital && an.capitalThreats.length > 0) {
     const cap = an.myCapital;
+    // 초반 위협: 수비 인원을 넉넉히 잡아 4턴 이하 전멸 러시를 줄인다
+    const need = Math.min(
+      state.turn <= 4 ? 3 : 2,
+      Math.max(1, an.capitalThreats.length),
+    );
     // 수호대를 수도 방어에 우선 배정
     const defenders = units
       .filter((u) => !roles.has(u.id))
@@ -390,7 +398,7 @@ function assignRoles(
         const typeBias = (u: Unit) => (u.type === 'guardian' ? -2 : 0);
         return typeBias(a) - typeBias(b) || hexDistance(a, cap) - hexDistance(b, cap);
       })
-      .slice(0, Math.min(2, an.capitalThreats.length));
+      .slice(0, need);
     for (const d of defenders) roles.set(d.id, 'defend');
   }
 
@@ -674,11 +682,15 @@ function tryAttack(
       if (profile.avoidBadTrades && fc.attackerDies && !fc.defenderDies) continue;
 
       let score = fc.damage.total;
+      // 어려움 초반(1~3턴) 처치 가산 완화: 4턴 이하 전멸 러시를 줄이되 중후반 난이도 계단은 유지
+      const earlyHardSoft =
+        profile.production === 'adaptive' && state.turn <= 3 ? 0.5 : 1;
       if (fc.defenderDies) {
-        score += profile.killBonusBase + unitValue(enemy) * profile.killValueScale;
+        score +=
+          (profile.killBonusBase + unitValue(enemy) * profile.killValueScale) * earlyHardSoft;
       }
       const missingHp = UNIT_STATS[enemy.type].hp - enemy.hp;
-      score += missingHp * profile.woundedWeight;
+      score += missingHp * profile.woundedWeight * earlyHardSoft;
       if (profile.counterAware && fc.counter) {
         score -= fc.counter.total * profile.counterWeight;
         if (fc.attackerDies) {
@@ -996,16 +1008,18 @@ function scoreProductionType(
     // 기병 목표 비율은 올리되, 연·중방어 원거리 우선 상황에서 궁병을 압도하지 않게 한다
     const cavTarget = Math.max(1, Math.ceil((count + 1) * 0.14));
     score += ofType < cavTarget ? 22 : ofType === cavTarget ? 8 : -2 - ofType * 2;
-    // 정복형 후반: 기동으로 수도 압박
-    if (!an.crownScenario && an.turnsLeft <= 5) score += 12;
+    // 정복형 후반: 기동으로 수도 압박 (생존·방어·캠페인 비정복에는 적용하지 않음)
+    if (an.conquestScenario && an.turnsLeft <= 5) score += 12;
     // 왕관 경합: 기동 병종으로 선점
-    if (an.crownScenario) score += 10;
+    if (an.crownScenario) score += 14;
   }
 
   // 고유 병종: 최소 1기 유도 + 기계적 과생산 억제(적격 40~95%). 약탈대는 쉽게 95%를 넘지 않게 한다.
   if (isUniqueUnit(type)) {
     if (ofType === 0) {
-      score += type === 'crossbow' ? 30 : type === 'raider' ? 10 : 20;
+      // 쇠뇌대는 자원 궁병 가산에 밀려 0생산 붕괴가 나지 않도록 1기 유도 가산을 충분히 둔다
+      // 약탈대 1기 유도는 기계적 95% 상한을 넘지 않게 소폭만 둔다
+      score += type === 'crossbow' ? 42 : type === 'raider' ? 12 : 20;
     } else if (ofType === 1) {
       score += type === 'raider' ? -8 : 2;
     } else {
@@ -1016,7 +1030,7 @@ function scoreProductionType(
   // 수호대: 방어·거점 우선. 왕관 시나리오에서는 과생산을 강하게 억제한다.
   if (type === 'guardian') {
     if (an.capitalThreats.length > 0) score += 22;
-    if (an.crownScenario) score -= 18;
+    if (an.crownScenario) score -= 22;
     if (an.holdTiles.length > 0) score += 15;
     const enemyRaiders = an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length;
     if (an.enemies.length > 0 && enemyRaiders / an.enemies.length >= 0.3) score += 18;
@@ -1030,7 +1044,7 @@ function scoreProductionType(
       (t) => t.building && t.owner !== faction && !unitAt(state, t.q, t.r),
     ).length;
     score += Math.min(18, emptyBuildings * 3);
-    if (an.crownScenario) score += 10;
+    if (an.crownScenario) score += 12;
     const enemyRanged = an.enemies.filter((e) => e.type === 'archer' || e.type === 'crossbow').length;
     if (an.enemies.length > 0 && enemyRanged / an.enemies.length >= 0.3) score += 12;
     // 남은 턴이 매우 적으면 저렴한 보병 선호
@@ -1144,6 +1158,21 @@ function pickProductionType(
 
   // 남은 턴이 1 이하면 저렴한 유닛으로 점수를 극대화한다
   if (an.turnsLeft <= 1) return 'infantry';
+
+  // 자원(violet)만: 공용 3기 이상·고유 미보유 시 쇠뇌대 1회 강제
+  // (전 세력 강제는 난이도 승률 계단을 무너뜨림. 연·중/고방어 1턴 프로브는 공용 2기로 역할 분기 유지)
+  if (faction === 'violet') {
+    const unique = roster.find((t) => isUniqueUnit(t));
+    const sharedCount = mine.filter((u) => !isUniqueUnit(u.type)).length;
+    if (
+      unique &&
+      sharedCount >= 3 &&
+      !mine.some((u) => isUniqueUnit(u.type)) &&
+      fs.gold >= unitCost(faction, unique, state.config.modifier)
+    ) {
+      return unique;
+    }
+  }
 
   let best: UnitTypeId = 'infantry';
   let bestScore = -Infinity;

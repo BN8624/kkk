@@ -20,8 +20,8 @@ export const TERRAIN_RULES: Record<TerrainId, TerrainRule> = {
 };
 
 export const BUILDING_DEF_BONUS: Record<BuildingId, number> = {
-  // 수도·왕관 방어 보너스 완화: 정복 종료·왕관 경합이 수비 과잉에 막히지 않도록
-  capital: 1,
+  // 수도 방어 +2: 4턴 이하 전멸 러시를 줄이되, 마을·왕관은 +1로 정복·경합 과수비를 막는다
+  capital: 2,
   village: 1,
   crown: 1,
 };

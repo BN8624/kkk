@@ -231,7 +231,7 @@ describe('고유 병종 저장·리플레이', () => {
     }
   });
 
-  it('2.2.1 이후 현행 리플레이 호환 등급은 exact다', () => {
+  it('2.2.3+ 현행 리플레이 호환 등급은 exact다', () => {
     const state = newGame(9);
     let guard = 0;
     while (!state.over && guard < 200) {
@@ -242,15 +242,37 @@ describe('고유 병종 저장·리플레이', () => {
       replayId: 'compat-22',
       createdAt: '2026-07-20T00:00:00.000Z',
     })!;
-    // 현행 GAME_VERSION(2.2.1+) 문서는 exact. 2.2.0 라벨을 붙여 exact를 가장하지 않는다.
+    // 현행 GAME_VERSION(2.2.3+) 문서는 exact. 2.2.0–2.2.2 라벨을 붙여 exact를 가장하지 않는다.
     expect(doc.gameVersion).toBe(GAME_VERSION);
-    expect(GAME_VERSION).not.toBe('2.2.0');
+    expect(GAME_VERSION).toBe('2.2.3');
     const d = checkReplayCompatibility(doc);
     expect(d.compatibility).toBe('exact');
     expect(d.reasonCode).toBe('exact');
   });
 
-  it('2.2.0 라벨 문서는 brace 규칙 변경으로 playable-unverified다', () => {
+  it.each(['2.2.0', '2.2.1', '2.2.2'] as const)(
+    '%s 라벨 문서는 brace 규칙 변경으로 playable-unverified다',
+    (ver) => {
+      const state = newGame(9);
+      let guard = 0;
+      while (!state.over && guard < 200) {
+        guard++;
+        runAiTurn(state, state.current);
+      }
+      const doc = buildReplayDocument(state, {
+        replayId: `compat-${ver}-dishonest`,
+        createdAt: '2026-07-20T00:00:00.000Z',
+      })!;
+      const labeled = { ...doc, gameVersion: ver };
+      const d = checkReplayCompatibility(labeled);
+      // 2.2.3에서 수호 태세 수치가 바뀌어 2.2.0–2.2.2는 exact 검증 없이 재생만 허용한다
+      expect(d.compatibility).toBe('playable-unverified');
+      expect(d.reasonCode).toBe('unverified');
+      expect(d.compatibility).not.toBe('exact');
+    },
+  );
+
+  it('2.2.3 라벨은 exact 경계값이다', () => {
     const state = newGame(9);
     let guard = 0;
     while (!state.over && guard < 200) {
@@ -258,14 +280,13 @@ describe('고유 병종 저장·리플레이', () => {
       runAiTurn(state, state.current);
     }
     const doc = buildReplayDocument(state, {
-      replayId: 'compat-220-dishonest',
+      replayId: 'compat-223-boundary',
       createdAt: '2026-07-20T00:00:00.000Z',
     })!;
-    const as220 = { ...doc, gameVersion: '2.2.0' };
-    const d = checkReplayCompatibility(as220);
-    // 2.2.3에서 수호 태세 수치가 바뀌어 2.2.0은 exact 검증 없이 재생만 허용한다
-    expect(d.compatibility).toBe('playable-unverified');
-    expect(d.compatibility).not.toBe('exact');
+    const as223 = { ...doc, gameVersion: '2.2.3' };
+    const d = checkReplayCompatibility(as223);
+    expect(d.compatibility).toBe('exact');
+    expect(d.reasonCode).toBe('exact');
   });
 });
 

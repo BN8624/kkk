@@ -498,14 +498,17 @@ export function evaluateVictory(state: GameState): void {
     state.winner = 'draw';
     return;
   }
-  if (alive.length === 1) {
+  // 왕관의 심장: 왕관 활성화(3)·보유(4) 타이밍 전 전멸 러시로 4턴 이하 종료를 확정하지 않는다
+  const crownEarlyGrace =
+    state.config.scenario === 'crown-heart' && state.turn <= 4;
+  if (alive.length === 1 && !crownEarlyGrace) {
     state.over = true;
     state.winner = alive[0];
     return;
   }
   const me = humanFaction(state);
   // 인간 세력이 탈락하면 게임 종료: 남은 세력 중 최고 점수가 승자
-  if (state.factions[me].eliminated) {
+  if (state.factions[me].eliminated && !crownEarlyGrace) {
     state.over = true;
     const winner = scoreWinner(state, alive);
     state.winner = winner === 'draw' ? alive[0] : winner;

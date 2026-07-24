@@ -249,7 +249,7 @@ function gate(b: SimBucket): { ok: boolean; notes: string[] } {
   const notes: string[] = [];
   if (b.unfinished > 0) notes.push(`unfinished=${b.unfinished}`);
   if (b.illegal > 0) notes.push(`illegal=${b.illegal}`);
-  // 빠른 전투만 세 세력 고유 생산 의무 + 자원 역할 분리
+  // 빠른 전투: 세 세력 고유 생산 의무 + 자원 역할 분리
   if (b.label === 'quick-battle') {
     for (const f of FACTION_IDS) {
       const u = b.byFaction[f];
@@ -287,6 +287,16 @@ function gate(b: SimBucket): { ok: boolean; notes: string[] } {
       }
     } else {
       notes.push('violet-no-ranged-production');
+    }
+  }
+
+  // 공식 전장: 고유 병종 허용 맵에서 세력별 고유 0생산은 역할 붕괴로 실패
+  if (b.label === 'official') {
+    for (const f of FACTION_IDS) {
+      const u = b.byFaction[f];
+      const uniqueType =
+        f === 'azure' ? 'guardian' : f === 'crimson' ? 'raider' : 'crossbow';
+      if (u.produced[uniqueType] === 0) notes.push(`${f}-no-${uniqueType}`);
     }
   }
   return { ok: notes.length === 0, notes };
