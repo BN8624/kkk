@@ -200,6 +200,62 @@ describe('점령', () => {
     expect(state.over).toBe(true);
     expect(state.winner).not.toBe('crimson');
   });
+
+  it('crown-heart 4턴 이하에서는 정복 승리가 즉시 확정되지 않는다', () => {
+    const state = makeState({ scenario: 'crown-heart' });
+    state.turn = 3;
+    // 모든 수도를 crimson이 점령한 상태(유닛은 각 세력 생존)
+    for (const [q, r] of [
+      [0, 0],
+      [2, 2],
+      [4, 4],
+    ] as const) {
+      const t = tileAt(state, q, r)!;
+      t.building = 'capital';
+      t.owner = 'crimson';
+    }
+    addUnit(state, { faction: 'azure', q: 1, r: 0 });
+    addUnit(state, { faction: 'crimson', q: 2, r: 1 });
+    addUnit(state, { faction: 'violet', q: 3, r: 3 });
+    evaluateVictory(state);
+    expect(state.over).toBe(false);
+    expect(state.winner).toBeUndefined();
+  });
+
+  it('crown-heart 5턴부터는 정복 승리가 즉시 확정된다', () => {
+    const state = makeState({ scenario: 'crown-heart' });
+    state.turn = 5;
+    for (const [q, r] of [
+      [0, 0],
+      [2, 2],
+      [4, 4],
+    ] as const) {
+      const t = tileAt(state, q, r)!;
+      t.building = 'capital';
+      t.owner = 'crimson';
+    }
+    addUnit(state, { faction: 'azure', q: 1, r: 0 });
+    addUnit(state, { faction: 'crimson', q: 2, r: 1 });
+    addUnit(state, { faction: 'violet', q: 3, r: 3 });
+    evaluateVictory(state);
+    expect(state.over).toBe(true);
+    expect(state.winner).toBe('crimson');
+  });
+
+  it('crown-heart 4턴 이하에서도 인간 탈락은 즉시 종료한다', () => {
+    const state = makeState({ scenario: 'crown-heart' });
+    state.turn = 2;
+    // 인간(azure) 수도·유닛 없음 → 탈락 확정, 유예 없이 종료
+    const cap = tileAt(state, 0, 0)!;
+    cap.building = 'capital';
+    cap.owner = 'crimson';
+    addUnit(state, { faction: 'crimson', q: 1, r: 0 });
+    addUnit(state, { faction: 'violet', q: 3, r: 3 });
+    evaluateVictory(state);
+    expect(state.factions.azure.eliminated).toBe(true);
+    expect(state.over).toBe(true);
+    expect(state.winner).not.toBe('azure');
+  });
 });
 
 describe('생산과 자원', () => {
