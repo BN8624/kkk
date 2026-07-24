@@ -26,4 +26,7 @@ export const EXTERNAL_ASSETS: Record<string, string> = {
   'building.crown.azure': './art/phase1/buildings/crown-azure.png',
   'building.crown.crimson': './art/phase1/buildings/crown-crimson.png',
   'building.crown.violet': './art/phase1/buildings/crown-violet.png',
+  'unit.infantry.azure': './art/phase2a/units/infantry-azure.png',
+  'unit.infantry.crimson': './art/phase2a/units/infantry-crimson.png',
+  'unit.infantry.violet': './art/phase2a/units/infantry-violet.png',
 };

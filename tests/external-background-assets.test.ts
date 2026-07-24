@@ -51,10 +51,11 @@ function exactCaseExists(path: string): boolean {
 }
 
 describe('Phase 1 외부 배경 에셋', () => {
-  it('필수 AssetId 15개만 정확한 경로로 등록한다', () => {
-    expect(EXTERNAL_ASSETS).toEqual(REQUIRED_ASSETS);
-    expect(Object.keys(EXTERNAL_ASSETS)).toHaveLength(15);
-    expect(Object.keys(EXTERNAL_ASSETS).some((id) => id.startsWith('unit.'))).toBe(false);
+  it('필수 배경 AssetId 15개가 정확한 경로로 유지된다', () => {
+    expect(Object.keys(REQUIRED_ASSETS)).toHaveLength(15);
+    for (const [id, url] of Object.entries(REQUIRED_ASSETS)) {
+      expect(EXTERNAL_ASSETS[id]).toBe(url);
+    }
     expect(Object.keys(EXTERNAL_ASSETS).some((id) => id.startsWith('ui.'))).toBe(false);
   });
 
