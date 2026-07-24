@@ -231,7 +231,7 @@ describe('고유 병종 저장·리플레이', () => {
     }
   });
 
-  it('2.2.1 이후 현행 리플레이 호환 등급은 exact다', () => {
+  it('2.2.3 이후 현행 리플레이 호환 등급은 exact다', () => {
     const state = newGame(9);
     let guard = 0;
     while (!state.over && guard < 200) {
@@ -242,7 +242,7 @@ describe('고유 병종 저장·리플레이', () => {
       replayId: 'compat-22',
       createdAt: '2026-07-20T00:00:00.000Z',
     })!;
-    // 현행 GAME_VERSION(2.2.1+) 문서는 exact. 2.2.0 라벨을 붙여 exact를 가장하지 않는다.
+    // 현행 GAME_VERSION(2.2.3+) 문서는 exact. 2.2.0–2.2.2 라벨을 붙여 exact를 가장하지 않는다.
     expect(doc.gameVersion).toBe(GAME_VERSION);
     expect(GAME_VERSION).not.toBe('2.2.0');
     const d = checkReplayCompatibility(doc);
@@ -250,8 +250,7 @@ describe('고유 병종 저장·리플레이', () => {
     expect(d.reasonCode).toBe('exact');
   });
 
-  it('2.2.0 라벨 문서(현행 digest)는 migratable이며 migration 실패 시 unsupported다', () => {
-    // 현행 digest로 만든 문서에 2.2.0 라벨만 붙이면 legacy 검증이 실패해야 정직하다
+  it('2.2.0–2.2.2 라벨 문서는 playable-unverified다(2.2.3 밸런스 재조정)', () => {
     const state = newGame(9);
     let guard = 0;
     while (!state.over && guard < 200) {
@@ -262,12 +261,12 @@ describe('고유 병종 저장·리플레이', () => {
       replayId: 'compat-220-dishonest',
       createdAt: '2026-07-20T00:00:00.000Z',
     })!;
-    const as220 = { ...doc, gameVersion: '2.2.0' };
-    const d = checkReplayCompatibility(as220);
-    // guardian 유무와 무관하게 정책은 migratable 항목을 탄다. 현행 digest는 legacy와 다를 수 있어
-    // migration 실패(unsupported) 또는 성공(migratable) 모두 가능하나 exact는 아니다.
-    expect(d.compatibility).not.toBe('exact');
-    expect(['migratable', 'unsupported']).toContain(d.compatibility);
+    for (const ver of ['2.2.0', '2.2.1', '2.2.2'] as const) {
+      const labeled = { ...doc, gameVersion: ver };
+      const d = checkReplayCompatibility(labeled);
+      expect(d.compatibility).toBe('playable-unverified');
+      expect(d.reasonCode).toBe('unverified');
+    }
   });
 });
 

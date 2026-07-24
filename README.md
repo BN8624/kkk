@@ -121,13 +121,15 @@ npm run audit:rosters  # 병종 역할 매트릭스
 
 밸런스 수치는 [src/core/doctrines.ts](src/core/doctrines.ts)·[src/core/data.ts](src/core/data.ts)·[src/core/units.ts](src/core/units.ts)에 모여 있고, 시뮬레이션 허용 기준은 [scripts/simulate.ts](scripts/simulate.ts)와 [scripts/unit-sim.ts](scripts/unit-sim.ts)가 검증한다.
 
+자동 시뮬레이션은 **종료 가능성, 불법 상태, 극단적 편중, 난이도 순서**를 검증한다. 인간 플레이의 재미·가독성·조작감은 별도 실기 검증 대상이며, 자동 PASS만으로 증명되지 않는다.
+
 ## itch.io 배포
 
 `npm run package:itch`로 생성한 `three-crowns-island.zip`을 HTML 게임으로 업로드한다.
 
 - 게임 설명 초안: *하나의 섬, 세 왕국, 최종 6병종. 빠른 전투·9개 미션 캠페인·모바일 전장 제작실·결정론적 리플레이·플레이 분석·일일 도전을 브라우저에서 바로 플레이. 청람 수호대·진홍 약탈대·자원 쇠뇌대. 한국어·영어, 오프라인 PWA.*
 - 권장 설정: 화면 방향 자유(세로·가로 모두 지원), 모바일 지원 체크, 대표 이미지는 `public/og-image.png`
-- 버전: 2.2.2
+- 버전: 2.2.3
 
 ## 저장소 이름 변경
 
@@ -141,10 +143,10 @@ Three Crowns Island is a mobile-first, deterministic hex strategy game and scena
 - Choose **Settings** to switch languages immediately.
 - All saves, replays, scenarios, and analysis data stay on this device; no analytics server is used.
 - Use **Data management** to export a full backup before clearing browser data or moving devices.
-- Existing 1.5 saves remain supported. Replay compatibility: 1.5.x and 2.0.x non-crown are exact; 2.0.x crown-heart is playable-unverified (rules changed); 2.1.x and 2.2.1+ are exact; 2.2.0 is migratable (legacy guardian digest verified then upgraded).
+- Existing 1.5 saves remain supported. Replay compatibility: 1.5.x and 2.0.x non-crown are exact; 2.0.x crown-heart is playable-unverified (rules changed); 2.1.x is exact; 2.2.0–2.2.2 are playable-unverified after the 2.2.3 balance retune; 2.2.3+ is exact.
 - For contributors: run `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run simulate:units`, `npm run audit:rosters`, and `npm run test:e2e:dist` before submitting changes.
 
-See [the 2.2.2 release notes](docs/RELEASE_NOTES_2.2.2.md), [the 2.2.1 release notes](docs/RELEASE_NOTES_2.2.1.md), [the 2.2.0 release notes](docs/RELEASE_NOTES_2.2.0.md), and [the physical iPhone checklist](docs/IPHONE_CHECKLIST.md) for release details.
+See [the 2.2.3 release notes](docs/RELEASE_NOTES_2.2.3.md), [the 2.2.2 release notes](docs/RELEASE_NOTES_2.2.2.md), [the 2.2.1 release notes](docs/RELEASE_NOTES_2.2.1.md), [the 2.2.0 release notes](docs/RELEASE_NOTES_2.2.0.md), and [the physical iPhone checklist](docs/IPHONE_CHECKLIST.md) for release details.
 
 ## 그래픽 에셋 교체
 
