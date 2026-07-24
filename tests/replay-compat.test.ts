@@ -76,14 +76,19 @@ describe('호환 판정', () => {
     );
   });
 
-  it('2.1.0·2.2.1·현재 게임 버전은 exact', () => {
+  it('2.1.0·2.2.3(현재)·현재 게임 버전은 exact, 2.2.0–2.2.2는 playable-unverified', () => {
     expect(checkReplayCompatibility(docWithVersion('2.1.0')).compatibility).toBe('exact');
     expect(checkReplayCompatibility(docWithVersion('2.1.0', 'crown-heart')).compatibility).toBe(
       'exact',
     );
-    expect(checkReplayCompatibility(docWithVersion('2.2.1')).compatibility).toBe('exact');
-    expect(checkReplayCompatibility(docWithVersion('2.2.1', 'crown-heart')).compatibility).toBe(
-      'exact',
+    expect(checkReplayCompatibility(docWithVersion('2.2.0')).compatibility).toBe(
+      'playable-unverified',
+    );
+    expect(checkReplayCompatibility(docWithVersion('2.2.1')).compatibility).toBe(
+      'playable-unverified',
+    );
+    expect(checkReplayCompatibility(docWithVersion('2.2.2')).compatibility).toBe(
+      'playable-unverified',
     );
     expect(checkReplayCompatibility(docWithVersion(GAME_VERSION)).compatibility).toBe('exact');
     expect(checkReplayCompatibility(docWithVersion(GAME_VERSION, 'crown-heart')).compatibility).toBe(
@@ -91,12 +96,10 @@ describe('호환 판정', () => {
     );
   });
 
-  it('2.2.0은 migratable(검증 없이 exact로 표시하지 않는다)', () => {
+  it('2.2.0은 exact로 표시하지 않는다(brace 규칙 변경)', () => {
     const d = checkReplayCompatibility(docWithVersion('2.2.0'));
-    // stub 문서는 migrate 실패 → unsupported 또는 실제 fixture에서 migratable.
-    // 정책 항목 자체는 2.2.0을 exact로 두지 않는다.
-    expect(d.compatibility).not.toBe('exact');
-    expect(['migratable', 'unsupported']).toContain(d.compatibility);
+    expect(d.compatibility).toBe('playable-unverified');
+    expect(d.reasonCode).toBe('unverified');
   });
 
   /**
@@ -197,7 +200,7 @@ describe('2.2.0 guardian fixture(5a7bbac 동결) 호환', () => {
     return decoded.value;
   }
 
-  it('동결 fixture는 gameVersion 2.2.0·guardian 포함·legacy digest와 일치한다', () => {
+  it('동결 fixture는 gameVersion 2.2.0·guardian 포함·초기 legacy digest가 맞다', () => {
     const doc = loadFixture();
     expect(doc.gameVersion).toBe('2.2.0');
     expect(doc.scenario.id).toBe('campaign-azure-2');
@@ -205,18 +208,18 @@ describe('2.2.0 guardian fixture(5a7bbac 동결) 호환', () => {
     expect(doc.finalStateDigest).toBe('3b0401e8da1eb195');
     // 시작 배치에 guardian이 있다
     expect(doc.scenario.units?.some((u) => u.type === 'guardian')).toBe(true);
-    // legacy(5a7bbac) digest로 초기·최종이 검증된다
+    // 초기 상태 legacy digest는 전투 전이라 brace 수치와 무관하게 유지된다
     const initial = replayInitialState(doc);
     expect(stateDigestV220(initial)).toBe(doc.initialStateDigest);
     // 현행 digest와는 다르다(guardian movedThisTurn 포함)
     expect(stateDigest(initial)).not.toBe(doc.initialStateDigest);
+    // 2.2.3 brace+1 전투로 최종 상태는 동결 digest와 어긋날 수 있다(재생만 허용)
     const state = replayInitialState(doc);
     for (const command of doc.commands) {
       const r = executeCommand(state, command);
       expect(r.ok).toBe(true);
     }
-    expect(stateDigestV220(state)).toBe(doc.finalStateDigest);
-    expect(stateDigest(state)).not.toBe(doc.finalStateDigest);
+    expect(stateDigestV220(state)).not.toBe(doc.finalStateDigest);
     expect(state.units.some((u) => u.type === 'guardian')).toBe(true);
   });
 
@@ -227,24 +230,19 @@ describe('2.2.0 guardian fixture(5a7bbac 동결) 호환', () => {
     expect(v.reason).toBe('initial-mismatch');
   });
 
-  it('checkReplayCompatibility는 migratable이고 migration 후 exact 검증이 통과한다', () => {
+  it('checkReplayCompatibility는 playable-unverified(brace 규칙 변경)이다', () => {
     const doc = loadFixture();
     const d = checkReplayCompatibility(doc);
-    expect(d.compatibility).toBe('migratable');
-    expect(d.reasonCode).toBe('migrated');
-    expect(d.migrated).toBeDefined();
-    const migrated = d.migrated!;
-    expect(migrated.gameVersion).toBe(GAME_VERSION);
-    expect(verifyReplay(migrated).ok).toBe(true);
-    // 마이그레이션 직후 문서는 현행 exact 계열
-    expect(checkReplayCompatibility(migrated).compatibility).toBe('exact');
+    expect(d.compatibility).toBe('playable-unverified');
+    expect(d.reasonCode).toBe('unverified');
+    expect(d.migrated).toBeUndefined();
   });
 
-  it('migrateReplayDocumentV220는 손상 digest를 거부한다', () => {
+  it('migrateReplayDocumentV220는 brace 변경 후 최종 digest 불일치로 실패한다', () => {
     const doc = loadFixture();
+    expect(migrateReplayDocumentV220(doc)).toBeNull();
     const bad = { ...doc, finalStateDigest: '0000000000000000' };
     expect(migrateReplayDocumentV220(bad)).toBeNull();
-    expect(checkReplayCompatibility(bad).compatibility).toBe('unsupported');
   });
 
   it('1.5·2.0·2.1 호환 등급은 회귀 없이 보존된다', () => {
@@ -256,6 +254,9 @@ describe('2.2.0 guardian fixture(5a7bbac 동결) 호환', () => {
       'playable-unverified',
     );
     expect(checkReplayCompatibility(docWithVersion('2.1.0')).compatibility).toBe('exact');
-    expect(checkReplayCompatibility(docWithVersion('2.2.1')).compatibility).toBe('exact');
+    expect(checkReplayCompatibility(docWithVersion('2.2.1')).compatibility).toBe(
+      'playable-unverified',
+    );
+    expect(checkReplayCompatibility(docWithVersion('2.2.3')).compatibility).toBe('exact');
   });
 });

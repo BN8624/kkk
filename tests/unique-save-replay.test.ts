@@ -250,8 +250,7 @@ describe('고유 병종 저장·리플레이', () => {
     expect(d.reasonCode).toBe('exact');
   });
 
-  it('2.2.0 라벨 문서(현행 digest)는 migratable이며 migration 실패 시 unsupported다', () => {
-    // 현행 digest로 만든 문서에 2.2.0 라벨만 붙이면 legacy 검증이 실패해야 정직하다
+  it('2.2.0 라벨 문서는 brace 규칙 변경으로 playable-unverified다', () => {
     const state = newGame(9);
     let guard = 0;
     while (!state.over && guard < 200) {
@@ -264,10 +263,9 @@ describe('고유 병종 저장·리플레이', () => {
     })!;
     const as220 = { ...doc, gameVersion: '2.2.0' };
     const d = checkReplayCompatibility(as220);
-    // guardian 유무와 무관하게 정책은 migratable 항목을 탄다. 현행 digest는 legacy와 다를 수 있어
-    // migration 실패(unsupported) 또는 성공(migratable) 모두 가능하나 exact는 아니다.
+    // 2.2.3에서 수호 태세 수치가 바뀌어 2.2.0은 exact 검증 없이 재생만 허용한다
+    expect(d.compatibility).toBe('playable-unverified');
     expect(d.compatibility).not.toBe('exact');
-    expect(['migratable', 'unsupported']).toContain(d.compatibility);
   });
 });
 

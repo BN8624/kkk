@@ -72,7 +72,7 @@
 
 게임의 이동·공격·생산·턴 종료를 정본 명령으로 기록한다. 보관함에서 재생·일시정지·명령 앞뒤 이동·턴 이동·1×/2×/4× 배속·가져오기·내보내기를 사용할 수 있으며, 재생 결과는 정본 상태 다이제스트로 검증된다.
 
-**호환 정책:** 1.5.x·2.0.x 비-crown 리플레이는 exact 재생. 2.0.x crown-heart 는 왕관 규칙 변경으로 재생 전용(playable-unverified). 2.1.x·2.2.x 는 exact.
+**호환 정책:** 1.5.x·2.0.x 비-crown 리플레이는 exact 재생. 2.0.x crown-heart 는 왕관 규칙 변경으로 재생 전용(playable-unverified). 2.1.x exact. 2.2.0–2.2.2 는 수호 태세 수치 변경으로 재생 전용. 2.2.3+ exact.
 
 ## 게임 모드
 
@@ -143,7 +143,7 @@ Three Crowns Island is a mobile-first, deterministic hex strategy game and scena
 - Choose **Settings** to switch languages immediately.
 - All saves, replays, scenarios, and analysis data stay on this device; no analytics server is used.
 - Use **Data management** to export a full backup before clearing browser data or moving devices.
-- Existing 1.5 saves remain supported. Replay compatibility: 1.5.x and 2.0.x non-crown are exact; 2.0.x crown-heart is playable-unverified (rules changed); 2.1.x and 2.2.1+ are exact; 2.2.0 is migratable (legacy guardian digest verified then upgraded).
+- Existing 1.5 saves remain supported. Replay compatibility: 1.5.x and 2.0.x non-crown are exact; 2.0.x crown-heart is playable-unverified (rules changed); 2.1.x is exact; 2.2.0–2.2.2 are playable-unverified (guardian brace combat changed in 2.2.3); 2.2.3+ are exact.
 - For contributors: run `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run simulate:units`, `npm run audit:rosters`, and `npm run test:e2e:dist` before submitting changes.
 
 See [the 2.2.3 release notes](docs/RELEASE_NOTES_2.2.3.md), [the 2.2.2 release notes](docs/RELEASE_NOTES_2.2.2.md), [the 2.2.1 release notes](docs/RELEASE_NOTES_2.2.1.md), [the 2.2.0 release notes](docs/RELEASE_NOTES_2.2.0.md), and [the physical iPhone checklist](docs/IPHONE_CHECKLIST.md) for release details. The physical iPhone checklist is not claimed complete until every item is verified on a real device.
