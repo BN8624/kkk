@@ -190,7 +190,12 @@ describe('전술 전용 제품 경계 (전략 레이어 철회)', () => {
   it('테스트 플레이는 저장을 오염시키지 않는 분기가 유지된다', () => {
     const play = read('src/controllers/play-controller.ts');
     expect(play).toMatch(/testPlay/);
-    expect(play).toMatch(/if \(!this\.testPlay\) saveGame/);
+    // 계약: 테스트 플레이는 실제 저장 직전에 차단된다. 특정 한 줄 표현이 아니라
+    // 가드 자체(조기 반환 또는 !testPlay 부정 가드가 saveGame을 막는 것)를 확인해
+    // 동작이 같은 정당한 리팩터링에는 깨지지 않게 한다.
+    expect(play).toMatch(
+      /if \(this\.testPlay\) return|!this\.testPlay[\s\S]{0,120}saveGame\(/,
+    );
     expect(play).toMatch(/abandonTestPlay/);
   });
 
