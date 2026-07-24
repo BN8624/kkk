@@ -31,6 +31,7 @@ export class BoardScene extends Phaser.Scene {
   private state!: GameState;
   private callbacks!: BoardCallbacks;
   private view!: BoardView;
+  private ready = false;
   private highlightPool: Phaser.GameObjects.Image[] = [];
   private selectRing!: Phaser.GameObjects.Image;
   private ringTween?: Phaser.Tweens.Tween;
@@ -61,13 +62,20 @@ export class BoardScene extends Phaser.Scene {
     // 씬 종료 시 resize 콜백 정리. SHUTDOWN 후 재시작 시 DESTROY once가 남지 않도록
     // 공유 핸들러에서 양쪽 리스너를 모두 해제한 뒤 dispose한다.
     const onSceneCleanup = (): void => {
+      this.ready = false;
       this.events.off(Phaser.Scenes.Events.SHUTDOWN, onSceneCleanup);
       this.events.off(Phaser.Scenes.Events.DESTROY, onSceneCleanup);
       disposeCameraFit(this);
     };
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, onSceneCleanup);
     this.events.on(Phaser.Scenes.Events.DESTROY, onSceneCleanup);
+    this.ready = true;
     this.callbacks.onReady();
+  }
+
+  /** 외부 이미지 로딩과 최초 보드 구성이 끝났는지 반환한다. */
+  isReady(): boolean {
+    return this.ready;
   }
 
   /** 새 게임 상태로 보드를 다시 그린다. */

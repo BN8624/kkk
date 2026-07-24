@@ -16,6 +16,7 @@ declare global {
     __tc?: {
       state: () => TcState | null;
       busy: () => boolean;
+      boardReady: () => boolean;
       screenPos: (q: number, r: number) => { x: number; y: number } | undefined;
       dests: () => { q: number; r: number }[];
       targets: (id: number) => { id: number; q: number; r: number }[];
@@ -54,7 +55,9 @@ async function startNewGame(page: Page, seed: number): Promise<void> {
   await page.goto(`/?seed=${seed}`);
   await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
-  await page.waitForFunction(() => window.__tc?.state() !== null);
+  await page.waitForFunction(
+    () => window.__tc !== undefined && window.__tc.state() !== null && window.__tc.boardReady(),
+  );
 }
 
 test('시작→유닛 선택→이동→턴 종료→저장→이어하기', async ({ page }) => {
@@ -190,7 +193,9 @@ test('생산 시트: 청람은 수호대 포함·진홍은 수호대 없음(공�
   await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.locator('.fac-card[data-f="crimson"]').click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
-  await page.waitForFunction(() => window.__tc?.state() !== null);
+  await page.waitForFunction(
+    () => window.__tc !== undefined && window.__tc.state() !== null && window.__tc.boardReady(),
+  );
   await page.waitForFunction(
     () => {
       const s = window.__tc?.state();

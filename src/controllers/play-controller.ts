@@ -81,6 +81,7 @@ export class PlayController implements AppController, PlaySession {
   private attackIds = new Set<number>();
   private productionTile: Tile | null = null;
   private _busy = false;
+  private pendingAiStart = false;
   private tutorialStep = 0; // 0 = 비활성
   private lastTapPos: { q: number; r: number } | null = null;
   private lastSetup: GameSetup | null = null;
@@ -143,7 +144,13 @@ export class PlayController implements AppController, PlaySession {
 
   /** 보드 씬 생성 직후 HUD를 현재 상태로 맞춘다. */
   refreshHudIfPlaying(): void {
-    if (this.ctx.mode === 'play' && this._state) this.ctx.hud.updateTop(this._state);
+    if (this.ctx.mode !== 'play' || !this._state) return;
+    this.ctx.hud.updateTop(this._state);
+    if (!this.pendingAiStart) return;
+    this.pendingAiStart = false;
+    if (!this._state.over && (this.spectate || !isHumanTurn(this._state))) {
+      void this.runAiPhases();
+    }
   }
 
   // ---------------- 화면 ----------------
@@ -297,6 +304,7 @@ export class PlayController implements AppController, PlaySession {
     this._state = state;
     this.selectedUnitId = null;
     this._busy = false;
+    this.pendingAiStart = false;
     const hud = this.ctx.hud;
     this.ctx.overlay.hide();
     hud.setPlayControlsVisible(true);
@@ -325,7 +333,8 @@ export class PlayController implements AppController, PlaySession {
     }
     // 저장 시점이 AI 차례였다면(또는 관전이면) 남은 AI 턴을 이어서 진행한다
     if (this.spectate || !isHumanTurn(state)) {
-      void this.runAiPhases();
+      if (scene.isReady()) void this.runAiPhases();
+      else this.pendingAiStart = true;
     } else {
       this.observations.markPhaseStart();
     }

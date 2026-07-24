@@ -344,6 +344,7 @@ export class AppShell implements AppContext, AppNavigation {
     (window as unknown as { __tc?: unknown }).__tc = {
       state: () => this.playCtrl.state,
       busy: () => this.playCtrl.busy,
+      boardReady: () => this.scene?.isReady() ?? false,
       mode: () => this._mode,
       digest: () => (this.playCtrl.state ? stateDigest(this.playCtrl.state) : null),
       screenPos: (q: number, r: number) => this.scene?.screenPos({ q, r }),
