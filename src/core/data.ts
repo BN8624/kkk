@@ -20,9 +20,10 @@ export const TERRAIN_RULES: Record<TerrainId, TerrainRule> = {
 };
 
 export const BUILDING_DEF_BONUS: Record<BuildingId, number> = {
-  capital: 2,
+  // 수도·왕관 방어 보너스 완화: 정복 종료·왕관 경합이 수비 과잉에 막히지 않도록
+  capital: 1,
   village: 1,
-  crown: 2,
+  crown: 1,
 };
 
 export const BUILDING_INCOME: Record<BuildingId, number> = {

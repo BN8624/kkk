@@ -53,7 +53,8 @@ export const UNIT_DEFS: Record<UnitTypeId, UnitDefinition> = {
     range: 1,
     cost: 48,
     faction: 'azure',
-    traits: [{ type: 'brace', defenseBonus: 2 }],
+    // 왕관·거점 수비 과우위 완화: 수호 태세 방어 +1
+    traits: [{ type: 'brace', defenseBonus: 1 }],
   },
   raider: {
     id: 'raider',

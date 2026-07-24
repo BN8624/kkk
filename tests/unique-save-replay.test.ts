@@ -53,7 +53,7 @@ describe('수호 태세 정본 digest', () => {
   });
 
   it('수호 태세 활성·비활성 피해와 digest가 모두 다르다', () => {
-    // 기병 atk7 vs 수호대 def4 → brace 시 피해1, 이동 후 피해3
+    // 기병 atk7 vs 수호대 def4 → brace(+1) 시 피해 더 낮고, 이동 후 더 높다
     const idle = makeState({ humanFaction: 'azure' });
     const guardIdle = addUnit(idle, {
       faction: 'azure',
@@ -73,11 +73,11 @@ describe('수호 태세 정본 digest', () => {
     });
     const atkMoved = addUnit(moved, { faction: 'crimson', type: 'cavalry', q: 2, r: 1 });
 
-    expect(braceDefBonus(guardIdle)).toBe(2);
+    expect(braceDefBonus(guardIdle)).toBe(1);
     expect(braceDefBonus(guardMoved)).toBe(0);
     const bdIdle = damageBreakdown(idle, atkIdle, guardIdle);
     const bdMoved = damageBreakdown(moved, atkMoved, guardMoved);
-    expect(bdIdle.braceDef).toBe(2);
+    expect(bdIdle.braceDef).toBe(1);
     expect(bdMoved.braceDef).toBe(0);
     expect(bdIdle.total).toBeLessThan(bdMoved.total);
     expect(stateDigest(idle)).not.toBe(stateDigest(moved));

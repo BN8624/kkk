@@ -15,12 +15,23 @@ export interface GeneratedMap {
   crown?: Axial;
 }
 
-/** 세력 고유 본거지: 청람 남쪽, 진홍 북서, 자원 북동. 세 수도가 서로 등거리(8)가 되도록 배치한다 */
-function capitalSpots(): Record<FactionId, Axial> {
+/**
+ * 세력 고유 본거지: 청람 남쪽, 진홍 북서, 자원 북동.
+ * 정복 시나리오는 수도 간 거리를 소폭 줄여 12턴 안 결정적 종료를 돕는다.
+ * 왕관의 심장은 등거리(8) 배치로 왕관 도착 공정성을 유지한다.
+ */
+function capitalSpots(scenario: BuiltinScenarioId): Record<FactionId, Axial> {
+  if (scenario === 'crown-heart') {
+    return {
+      azure: offsetToAxial(4, 10),
+      crimson: offsetToAxial(0, 2),
+      violet: offsetToAxial(8, 2),
+    };
+  }
   return {
-    azure: offsetToAxial(4, 10),
-    crimson: offsetToAxial(0, 2),
-    violet: offsetToAxial(8, 2),
+    azure: offsetToAxial(4, 9),
+    crimson: offsetToAxial(1, 3),
+    violet: offsetToAxial(7, 3),
   };
 }
 
@@ -53,8 +64,11 @@ function baseIsland(rng: Rng): Map<string, Tile> {
   return tiles;
 }
 
-function placeCapitals(tiles: Map<string, Tile>): Record<FactionId, Axial> {
-  const spots = capitalSpots();
+function placeCapitals(
+  tiles: Map<string, Tile>,
+  scenario: BuiltinScenarioId,
+): Record<FactionId, Axial> {
+  const spots = capitalSpots(scenario);
   const center = offsetToAxial(4, 6);
   for (const fid of FACTION_IDS) {
     const pos = spots[fid];
@@ -146,8 +160,9 @@ const HEX_DIRS: Axial[] = [
 function genThreeCrowns(seed: number): GeneratedMap {
   const rng = mulberry32(seed);
   const tiles = baseIsland(rng);
-  const capitals = placeCapitals(tiles);
-  const villages = placeVillages(tiles, rng, capitals, 6);
+  const capitals = placeCapitals(tiles, 'three-crowns');
+  // 마을 6→5: 마을 집착으로 인한 턴 제한 점수전을 줄이고 수도 진격을 유도
+  const villages = placeVillages(tiles, rng, capitals, 5);
   finishConnectivity(tiles, capitals, villages);
   return { tiles: [...tiles.values()], capitals };
 }
@@ -175,7 +190,7 @@ function genBrokenStrait(seed: number): GeneratedMap {
       if (t) t.terrain = 'plains';
     }
   }
-  const capitals = placeCapitals(tiles);
+  const capitals = placeCapitals(tiles, 'broken-strait');
   // 육교 입구는 가치 있는 거점: 각 육교 남단에 마을 배치
   const bridgeVillages: Axial[] = [];
   for (const col of [westCol, eastCol]) {
@@ -216,7 +231,7 @@ function cloneTileMap(tiles: Map<string, Tile>): Map<string, Tile> {
 function genCrownHeart(seed: number): GeneratedMap {
   const rng = mulberry32(seed);
   const tiles = baseIsland(rng);
-  const capitals = placeCapitals(tiles);
+  const capitals = placeCapitals(tiles, 'crown-heart');
   const center = offsetToAxial(4, 6);
 
   type CrownCandidate = {
@@ -367,7 +382,7 @@ function staticFallbackMap(scenario: BuiltinScenarioId): GeneratedMap {
       tiles.set(hexKey(q, r), { q, r, terrain: 'plains' });
     }
   }
-  const capitals = placeCapitals(tiles);
+  const capitals = placeCapitals(tiles, scenario);
   for (const [col, row] of [
     [4, 8],
     [2, 3],

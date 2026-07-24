@@ -292,7 +292,7 @@ function azureMission2(): ScenarioDocumentV1 {
     id: 'campaign-azure-2',
     title: '포위망 돌파',
     description:
-      '포위를 뚫고 남쪽 보급 마을을 확보하라. 수호대는 이동하지 않으면 방어 +2(수호 태세)를 얻는다.',
+      '포위를 뚫고 남쪽 보급 마을을 확보하라. 수호대는 이동하지 않으면 방어 +1(수호 태세)를 얻는다.',
     board: { cols: 9, rows: 12, tiles: b.tiles, source: { kind: 'fixed' } },
     factions: factions('azure', ['crimson', 'violet'], { crimson: 15, violet: 15 }),
     units,

@@ -1,7 +1,8 @@
 // 한 줄 목적: 이동·전투·점령·생산·턴 진행·승패 판정 규칙을 검증한다
 import { describe, expect, it } from 'vitest';
 import { tileAt, unitAt, unitsOf } from '../src/core/board';
-import { BUILDING_INCOME, SCORE_WEIGHTS, START_GOLD, UNIT_STATS } from '../src/core/data';
+import { BUILDING_INCOME, SCORE_WEIGHTS, UNIT_STATS } from '../src/core/data';
+import { DOCTRINES } from '../src/core/doctrines';
 import {
   advancePhase,
   attack,
@@ -307,7 +308,7 @@ describe('실제 새 게임', () => {
     expect(unitsOf(state, 'azure').length).toBe(2);
     expect(unitsOf(state, 'crimson').length).toBe(2);
     expect(unitsOf(state, 'violet').length).toBe(2);
-    expect(state.factions.azure.gold).toBe(START_GOLD);
+    expect(state.factions.azure.gold).toBe(DOCTRINES.azure.startGold);
     expect(state.over).toBe(false);
     // 모든 유닛이 지상 위에 있다
     for (const u of state.units) {

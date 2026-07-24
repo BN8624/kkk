@@ -69,7 +69,7 @@ describe('UNIT_DEFS 레지스트리', () => {
       range: 1,
       cost: 48,
       faction: 'azure',
-      traits: [{ type: 'brace', defenseBonus: 2 }],
+      traits: [{ type: 'brace', defenseBonus: 1 }],
     });
     expect(unitDefinition('raider')).toMatchObject({
       hp: 11,
@@ -108,7 +108,7 @@ describe('UNIT_DEFS 레지스트리', () => {
 
   it('특성·고유 병종·세력 사용 가능 여부가 맞다', () => {
     expect(unitTraits('infantry')).toEqual([]);
-    expect(unitTrait('guardian', 'brace')).toEqual({ type: 'brace', defenseBonus: 2 });
+    expect(unitTrait('guardian', 'brace')).toEqual({ type: 'brace', defenseBonus: 1 });
     expect(unitTrait('raider', 'plunder')).toEqual({ type: 'plunder', bonusGold: 5 });
     expect(unitTrait('crossbow', 'armor-piercing')).toEqual({ type: 'armor-piercing', amount: 2 });
     expect(unitTrait('infantry', 'brace')).toBeUndefined();

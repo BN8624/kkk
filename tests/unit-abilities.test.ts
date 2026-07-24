@@ -108,13 +108,13 @@ describe('약탈대 점령 보상 (plunder)', () => {
 });
 
 describe('수호대 수호 태세 (brace)', () => {
-  it('이동하지 않으면 braceDef=2, 이동하면 0', () => {
+  it('이동하지 않으면 braceDef=1, 이동하면 0', () => {
     const state = makeState();
     const guard = addUnit(state, { faction: 'azure', q: 1, r: 0, type: 'guardian' });
     const atk = addUnit(state, { faction: 'crimson', q: 0, r: 0 });
 
-    expect(braceDefBonus(guard)).toBe(2);
-    expect(damageBreakdown(state, atk, guard).braceDef).toBe(2);
+    expect(braceDefBonus(guard)).toBe(1);
+    expect(damageBreakdown(state, atk, guard).braceDef).toBe(1);
 
     // 이동 후 brace 해제
     moveUnit(state, guard.id, { q: 2, r: 0 });
@@ -128,12 +128,12 @@ describe('수호대 수호 태세 (brace)', () => {
     const guard = addUnit(state, { faction: 'azure', q: 0, r: 0, type: 'guardian' });
     const enemy = addUnit(state, { faction: 'crimson', q: 1, r: 0 });
 
-    expect(braceDefBonus(guard)).toBe(2);
+    expect(braceDefBonus(guard)).toBe(1);
     const r = attack(state, guard.id, enemy.id);
     expect(r.ok).toBe(true);
     expect(guard.moved).toBe(true); // 공격 후 moved 플래그는 true
     expect(guard.movedThisTurn).toBeFalsy(); // 이동 명령이 아니므로 brace 유지
-    expect(braceDefBonus(guard)).toBe(2);
+    expect(braceDefBonus(guard)).toBe(1);
 
     // 반격 피해 계산 시에도 수호 태세 반영(방어자=원 공격자)
     // 적이 살아 있으면 반격 시 원 공격자의 brace가 적용됨
@@ -160,7 +160,7 @@ describe('수호대 수호 태세 (brace)', () => {
     advancePhase(state); // violet
     advancePhase(state); // 라운드 종료 → 리셋
     expect(g.movedThisTurn).toBe(false);
-    expect(braceDefBonus(g)).toBe(2);
+    expect(braceDefBonus(g)).toBe(1);
   });
 });
 
@@ -198,13 +198,13 @@ describe('쇠뇌대 방어 관통 (armor-piercing)', () => {
 
     // brace 방어는 관통 안 됨
     const guard = addUnit(state, { faction: 'azure', q: 1, r: 1, type: 'guardian' });
-    // guardian def=4, pierce min(2,4)=2, braceDef=2
-    // 7 - (4-2) - 0 - 0 - 2 = 3
+    // guardian def=4, pierce min(2,4)=2, braceDef=1
+    // 7 - (4-2) - 0 - 0 - 1 = 4
     const vsGuard = damageBreakdown(state, xbow, guard);
     expect(vsGuard.defense).toBe(4);
     expect(vsGuard.pierced).toBe(2);
-    expect(vsGuard.braceDef).toBe(2);
-    expect(vsGuard.total).toBe(3);
+    expect(vsGuard.braceDef).toBe(1);
+    expect(vsGuard.total).toBe(4);
   });
 
   it('관통량이 기본 방어보다 크면 기본 방어까지만 관통한다', () => {
@@ -239,11 +239,11 @@ describe('forecast와 실제 attack 피해 일치', () => {
     const state = makeState();
     const xbow = addUnit(state, { faction: 'violet', q: 0, r: 0, type: 'crossbow' });
     const guard = addUnit(state, { faction: 'azure', q: 2, r: 0, type: 'guardian' });
-    // plains, brace on, pierce 2 vs def 4 → total 3
+    // plains, brace on, pierce 2 vs def 4 → total 4 (brace +1)
     const fc = forecastAttack(state, xbow, guard);
-    expect(fc.damage.braceDef).toBe(2);
+    expect(fc.damage.braceDef).toBe(1);
     expect(fc.damage.pierced).toBe(2);
-    expect(fc.damage.total).toBe(3);
+    expect(fc.damage.total).toBe(4);
 
     const hpBefore = guard.hp;
     const r = attack(state, xbow.id, guard.id);
