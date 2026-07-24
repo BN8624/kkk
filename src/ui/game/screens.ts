@@ -54,14 +54,20 @@ export function showPauseScreen(
 export function showDataManagementScreen(
   overlay: OverlayHost,
   opts: {
+    /** 실제 probe 쓰기 결과. 프라이빗 모드 여부를 단정하지 않는다. */
+    storageAvailable: boolean;
     onExport: (categories: BackupCategory[]) => void;
     onImport: (file: File) => void;
     onBack: () => void;
   },
 ): void {
+  const storageLabel = opts.storageAvailable
+    ? t('backup.storageAvailable')
+    : t('backup.storageUnavailable');
   const root = overlay.show(`
       <h1 style="font-size:24px;">${escapeHtml(t('backup.title'))}</h1>
       <p class="subtitle">${escapeHtml(t('backup.hint'))}</p>
+      <p class="subtitle" id="backup-storage-status">${escapeHtml(storageLabel)}</p>
       <div class="backup-categories">
         ${BACKUP_CATEGORIES.map((category) => `<label><input type="checkbox" data-backup-category="${category}" checked> ${escapeHtml(t(`backup.category.${category}`))}</label>`).join('')}
       </div>

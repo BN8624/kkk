@@ -119,7 +119,11 @@ export const EN: Record<keyof typeof KO, string> = {
   'pause.toTitle': 'To title',
   'pause.dataManagement': 'Data backup and restore',
   'backup.title': 'Data Backup and Restore',
+  'save.failed':
+    'Progress could not be saved on this device. Closing the browser may lose the current game.',
   'backup.hint': 'Save selected data from this browser to JSON, or restore a backup.',
+  'backup.storageAvailable': 'Device storage: available',
+  'backup.storageUnavailable': 'Device storage: unavailable',
   'backup.category.preferences': 'Settings, language, and favorites',
   'backup.category.progress': 'Saved game, records, and campaign progress',
   'backup.category.scenarios': 'Scenario drafts and installed battlefields',

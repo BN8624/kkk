@@ -12,6 +12,7 @@ import type { CampaignDocument, CampaignMission } from '../core/campaign/types';
 import { factionScore, newGameFromScenario } from '../core/game';
 import { normalizeScenario } from '../core/scenario/normalize';
 import { starsEarned } from '../core/scenario/objectives';
+import { shouldWarnSaveFailure } from '../core/save';
 import type { GameState } from '../core/types';
 import { missionText, t } from '../i18n';
 import { showCampaignScreen, showMissionIntroScreen, type CampaignView } from '../ui/campaign';
@@ -71,7 +72,7 @@ export class CampaignController implements AppController, CampaignFlow {
     const me = state.config.humanFaction;
     const won = state.winner === me;
     const stars = starsEarned(state).filter(Boolean).length;
-    saveCampaignProgress(
+    const saved = saveCampaignProgress(
       recordMissionResult(loadCampaignProgress(), found.mission.id, {
         won,
         stars,
@@ -81,6 +82,7 @@ export class CampaignController implements AppController, CampaignFlow {
         playedAt: new Date().toISOString(),
       }),
     );
+    if (!saved && shouldWarnSaveFailure()) this.ctx.hud.toast(t('save.failed'));
     const token = this.ctx.currentToken();
     window.setTimeout(() => {
       if (token.alive) this.showResult(state, found.campaign, found.mission, won ? stars : 0);

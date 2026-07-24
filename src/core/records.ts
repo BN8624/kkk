@@ -141,10 +141,13 @@ export function loadRecords(): Records {
   }
 }
 
-export function saveRecords(records: Records): void {
+export function saveRecords(records: Records): boolean {
   try {
-    storage()?.setItem(RECORDS_KEY, JSON.stringify(records));
+    const s = storage();
+    if (!s) return false;
+    s.setItem(RECORDS_KEY, JSON.stringify(records));
+    return true;
   } catch {
-    /* 저장 실패해도 게임은 계속 */
+    return false;
   }
 }
