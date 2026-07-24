@@ -24,6 +24,62 @@ function issue(
   return { code, severity, message, ...extra };
 }
 
+/** 유한 정수 좌표인지 검사한다(NaN·Infinity·소수·문자열·null 거부). */
+export function isFiniteIntegerCoord(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && Number.isFinite(v);
+}
+
+/** 좌표 필드 오류를 path와 함께 기록한다. 유효하면 true. */
+function requireIntegerCoord(
+  v: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): v is number {
+  if (isFiniteIntegerCoord(v)) return true;
+  issues.push(
+    issue('bad-coordinate', 'error', t('validation.badCoordinate'), { path }),
+  );
+  return false;
+}
+
+/**
+ * 조건 트리 안의 모든 at 좌표를 경로 포함 검증한다.
+ * all-of/any-of 중첩 경로: victoryConditions[0].conditions[1].at.q
+ */
+function validateConditionCoords(
+  conds: unknown[],
+  basePath: string,
+  issues: ValidationIssue[],
+  depth = 0,
+): void {
+  if (depth > 4 || !Array.isArray(conds)) return;
+  conds.forEach((raw, i) => {
+    const path = `${basePath}[${i}]`;
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return;
+    const c = raw as Record<string, unknown>;
+    if ('at' in c) {
+      const at = c.at;
+      if (typeof at !== 'object' || at === null || Array.isArray(at)) {
+        issues.push(
+          issue('bad-coordinate', 'error', t('validation.badCoordinate'), {
+            path: `${path}.at`,
+          }),
+        );
+      } else {
+        const ax = at as Record<string, unknown>;
+        requireIntegerCoord(ax.q, `${path}.at.q`, issues);
+        requireIntegerCoord(ax.r, `${path}.at.r`, issues);
+      }
+    }
+    if (
+      (c.type === 'all-of' || c.type === 'any-of') &&
+      Array.isArray(c.conditions)
+    ) {
+      validateConditionCoords(c.conditions as unknown[], `${path}.conditions`, issues, depth + 1);
+    }
+  });
+}
+
 /** 축 좌표가 보드 범위(odd-r 오프셋 기준) 안인지 검사한다. */
 function inBounds(t: Axial, cols: number, rows: number): boolean {
   if (t.r < 0 || t.r >= rows) return false;
@@ -108,6 +164,9 @@ export function validateScenario(doc: ScenarioDocumentV1): ValidationIssue[] {
   const tileMap = new Map<string, ScenarioTile>();
   doc.board.tiles.forEach((tile, i) => {
     const path = `board.tiles[${i}]`;
+    const qOk = requireIntegerCoord((tile as { q?: unknown }).q, `${path}.q`, issues);
+    const rOk = requireIntegerCoord((tile as { r?: unknown }).r, `${path}.r`, issues);
+    if (!qOk || !rOk) return;
     if (!(tile.terrain in TERRAIN_RULES)) {
       issues.push(issue('bad-terrain', 'error', t('validation.badTerrain', { value: String(tile.terrain) }), { path, at: tile }));
       return;
@@ -167,6 +226,8 @@ export function validateScenario(doc: ScenarioDocumentV1): ValidationIssue[] {
   const tags = new Set<string>();
   doc.units.forEach((u, i) => {
     const path = `units[${i}]`;
+    const qOk = requireIntegerCoord((u as { q?: unknown }).q, `${path}.q`, issues);
+    const rOk = requireIntegerCoord((u as { r?: unknown }).r, `${path}.r`, issues);
     if (!FACTION_IDS.includes(u.faction)) {
       issues.push(issue('bad-unit-faction', 'error', t('validation.badUnitFaction', { value: String(u.faction) }), { path, unitIndex: i }));
       return;
@@ -200,6 +261,7 @@ export function validateScenario(doc: ScenarioDocumentV1): ValidationIssue[] {
     }
     if (u.hp !== undefined && (!Number.isInteger(u.hp) || u.hp < 1 || u.hp > UNIT_STATS[u.type].hp))
       issues.push(issue('bad-unit-hp', 'error', t('validation.badUnitHp', { max: UNIT_STATS[u.type].hp }), { path, unitIndex: i }));
+    if (!qOk || !rOk) return;
     const key = hexKey(u.q, u.r);
     const tile = tileMap.get(key);
     if (!tile) issues.push(issue('unit-off-map', 'error', t('validation.unitOffMap'), { path, unitIndex: i, at: u, repair: t('validation.repairUnitOffMap') }));
@@ -238,8 +300,14 @@ export function validateScenario(doc: ScenarioDocumentV1): ValidationIssue[] {
   if (victory.length > L.maxConditions || defeat.length > L.maxConditions || stars.length > L.maxConditions)
     issues.push(issue('too-many-conditions', 'error', t('validation.tooManyConditions', { max: L.maxConditions })));
 
+  // 좌표 필드 선검증: 소수·문자열·무한대 등을 path와 함께 거부
+  validateConditionCoords(victory as unknown[], 'victoryConditions', issues);
+  validateConditionCoords(defeat as unknown[], 'defeatConditions', issues);
+  validateConditionCoords(stars as unknown[], 'starConditions', issues);
+
   const flatV = flattenVictory(victory);
   const checkTarget = (at: Axial, code: string, path: string) => {
+    if (!isFiniteIntegerCoord(at?.q) || !isFiniteIntegerCoord(at?.r)) return undefined;
     const tile = tileMap.get(hexKey(at.q, at.r));
     if (!tile) issues.push(issue(code, 'error', t('validation.targetTileMissing', { q: at.q, r: at.r }), { path, at }));
     else if (!tile.building)
