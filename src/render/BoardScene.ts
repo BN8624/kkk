@@ -58,9 +58,15 @@ export class BoardScene extends Phaser.Scene {
     this.buildBoard();
     fitCameraToTiles(this, this.state.tiles);
     this.setupInput();
-    // 씬 종료 시 자신이 등록한 resize 콜백만 정리
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => disposeCameraFit(this));
-    this.events.once(Phaser.Scenes.Events.DESTROY, () => disposeCameraFit(this));
+    // 씬 종료 시 resize 콜백 정리. SHUTDOWN 후 재시작 시 DESTROY once가 남지 않도록
+    // 공유 핸들러에서 양쪽 리스너를 모두 해제한 뒤 dispose한다.
+    const onSceneCleanup = (): void => {
+      this.events.off(Phaser.Scenes.Events.SHUTDOWN, onSceneCleanup);
+      this.events.off(Phaser.Scenes.Events.DESTROY, onSceneCleanup);
+      disposeCameraFit(this);
+    };
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, onSceneCleanup);
+    this.events.on(Phaser.Scenes.Events.DESTROY, onSceneCleanup);
     this.callbacks.onReady();
   }
 
