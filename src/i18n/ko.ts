@@ -95,8 +95,8 @@ export const KO = {
   'doctrine.violet.style': '원거리 화력과 풍부한 수입으로 후반을 지배한다',
   'doctrine.violet.abilityName': '장궁',
   'doctrine.violet.abilityDesc': '궁병의 사거리 +1',
-  'doctrine.violet.bonusDesc': '마을 수입 +8, 궁병 생산 비용 -3',
-  'doctrine.violet.startDesc': '궁병 2기로 시작 (금 60)',
+  'doctrine.violet.bonusDesc': '마을 수입 +12, 궁병 생산 비용 -3',
+  'doctrine.violet.startDesc': '궁병·기병으로 시작 (금 65)',
   'doctrine.violet.recommended': '신중한 플레이어에게 추천',
 
   // 일시정지

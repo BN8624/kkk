@@ -40,7 +40,8 @@ export const UNIT_DEFS: Record<UnitTypeId, UnitDefinition> = {
     def: 1,
     move: 5,
     range: 1,
-    cost: 50,
+    // 공용 기병 비중·정복 기동 확보: 비용 소폭 인하(시작 금 너프 없이 생산 유도)
+    cost: 45,
     faction: null,
     traits: [],
   },

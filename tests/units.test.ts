@@ -57,7 +57,7 @@ describe('UNIT_DEFS 레지스트리', () => {
       def: 1,
       move: 5,
       range: 1,
-      cost: 50,
+      cost: 45,
       faction: null,
       traits: [],
     });

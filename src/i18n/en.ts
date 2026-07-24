@@ -97,8 +97,8 @@ export const EN: Record<keyof typeof KO, string> = {
   'doctrine.violet.style': 'Dominate the late game with ranged firepower and a strong economy.',
   'doctrine.violet.abilityName': 'Longbow',
   'doctrine.violet.abilityDesc': 'Archers gain +1 range.',
-  'doctrine.violet.bonusDesc': 'Villages produce 8 more gold. Archers cost 3 less gold.',
-  'doctrine.violet.startDesc': 'Start with 2 Archers (60 gold).',
+  'doctrine.violet.bonusDesc': 'Villages produce 12 more gold. Archers cost 3 less gold.',
+  'doctrine.violet.startDesc': 'Start with Archer and Cavalry (65 gold).',
   'doctrine.violet.recommended': 'Recommended for methodical players.',
 
   // 일시정지
