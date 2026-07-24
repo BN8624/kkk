@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T00:45:21.112Z",
+  "generatedAt": "2026-07-24T05:28:45.943Z",
   "pass": true,
   "notes": [],
   "matrix": [
@@ -69,7 +69,7 @@
       "role": "hold-defense",
       "forestCost": 2,
       "mountainCost": 3,
-      "braceBonus": 2,
+      "braceBonus": 1,
       "plunderGold": 0,
       "pierce": 0
     },
@@ -132,8 +132,8 @@
     {
       "attacker": "crossbow",
       "defender": "guardian",
-      "damage": 3,
-      "braced": 2
+      "damage": 4,
+      "braced": 1
     }
   ],
   "scenarioAudit": {
