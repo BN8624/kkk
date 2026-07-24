@@ -196,6 +196,75 @@ describe('리플레이 정밀 디코더', () => {
   });
 });
 
+describe('시나리오 좌표 정수 검증', () => {
+  it('소수 타일 좌표를 거부하고 경로를 반환한다', () => {
+    const doc = cloneBuiltinDocument('three-crowns', 'frac-tile', 1, 'Frac');
+    (doc.board.tiles[3] as { q: number }).q = 1.5;
+    const r = decodeScenarioInput(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      const hit = r.issues.find((i) => i.code === 'bad-coordinate');
+      expect(hit?.path).toBe('board.tiles[3].q');
+    }
+  });
+
+  it('문자열 유닛 좌표를 거부하고 경로를 반환한다', () => {
+    const doc = cloneBuiltinDocument('three-crowns', 'str-unit', 2, 'Str');
+    (doc.units[1] as { r: unknown }).r = '2';
+    const r = decodeScenarioInput(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      const hit = r.issues.find((i) => i.code === 'bad-coordinate');
+      expect(hit?.path).toBe('units[1].r');
+    }
+  });
+
+  it('무한대 목표 좌표를 거부하고 경로를 반환한다', () => {
+    const doc = cloneBuiltinDocument('three-crowns', 'inf-at', 3, 'Inf');
+    doc.victoryConditions = [
+      { type: 'capture-building', at: { q: Infinity, r: 0 } },
+    ];
+    const r = decodeScenarioInput(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      // scanStructure가 비유한 숫자를 먼저 잡을 수 있다
+      expect(r.issues.some((i) => i.code === 'non-finite-number' || i.code === 'bad-coordinate')).toBe(
+        true,
+      );
+    }
+  });
+
+  it('중첩 조건 내부 비정수 좌표를 거부하고 경로를 반환한다', () => {
+    const doc = cloneBuiltinDocument('three-crowns', 'nested-coord', 4, 'Nest');
+    doc.victoryConditions = [
+      {
+        type: 'all-of',
+        conditions: [
+          { type: 'conquest' },
+          { type: 'capture-building', at: { q: 1, r: 2.5 } },
+        ],
+      },
+    ];
+    const r = decodeScenarioInput(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      const hit = r.issues.find((i) => i.code === 'bad-coordinate');
+      expect(hit?.path).toBe('victoryConditions[0].conditions[1].at.r');
+    }
+  });
+
+  it('좌표 누락 필드도 bad-coordinate로 경로와 함께 거부한다', () => {
+    const doc = cloneBuiltinDocument('three-crowns', 'missing-q', 5, 'Miss');
+    delete (doc.units[0] as { q?: number }).q;
+    const r = decodeScenarioInput(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      const hit = r.issues.find((i) => i.code === 'bad-coordinate' && i.path === 'units[0].q');
+      expect(hit).toBeDefined();
+    }
+  });
+});
+
 describe('시나리오 디코더·공유 코드', () => {
   it('HTML·스크립트가 포함된 제목은 데이터로만 다뤄 디코드된다', () => {
     const doc = cloneBuiltinDocument('three-crowns', 'custom-xss-test', 7, '<script>alert(1)</script>');

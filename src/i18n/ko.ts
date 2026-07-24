@@ -899,6 +899,7 @@ export const KO = {
   'validation.objectiveUnreachable': '목표({target})까지 지상 경로가 없습니다',
   'validation.repairObjectiveUnreachable': '물·산으로 막힌 경로를 개통하세요',
   'validation.notObject': '시나리오 문서 형식이 아닙니다',
+  'validation.badCoordinate': '좌표는 유한한 정수여야 합니다',
   'validation.badShapeArrays': 'board.tiles / factions / units 배열이 필요합니다',
   'validation.badShapeRules': 'rules가 필요합니다',
   'validation.badShapeConditions': '승리·패배 조건 배열이 필요합니다',

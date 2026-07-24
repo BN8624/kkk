@@ -901,6 +901,7 @@ export const EN: Record<keyof typeof KO, string> = {
   'validation.objectiveUnreachable': 'No land route reaches objective {target}.',
   'validation.repairObjectiveUnreachable': 'Open a route blocked by water or mountains.',
   'validation.notObject': 'This is not a scenario document.',
+  'validation.badCoordinate': 'Coordinates must be finite integers.',
   'validation.badShapeArrays': 'board.tiles, factions, and units arrays are required.',
   'validation.badShapeRules': 'rules is required.',
   'validation.badShapeConditions': 'Victory and defeat condition arrays are required.',

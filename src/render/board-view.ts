@@ -3,6 +3,9 @@ import Phaser from 'phaser';
 import { axialToPixel, hexKey } from '../core/hex';
 import type { Axial, FactionId, Tile, UnitTypeId } from '../core/types';
 import { HEX_SIZE, textureKey, type AssetId } from './assets';
+import { clearCameraFit, registerCameraFit } from './camera-fit-lifecycle';
+
+export { clearCameraFit, getCameraFitHandler, registerCameraFit } from './camera-fit-lifecycle';
 
 export const UNIT_Y_OFFSET = -8;
 
@@ -42,6 +45,7 @@ export function pixelToHex(x: number, y: number, size = HEX_SIZE): Axial {
 
 /** 타일 전체가 화면에 들어오도록 카메라 경계·줌을 맞춘다. 리사이즈에도 다시 맞춘다. */
 export function fitCameraToTiles(scene: Phaser.Scene, tiles: { q: number; r: number }[]): void {
+  if (tiles.length === 0) return;
   const pts = tiles.map((t) => axialToPixel(t, HEX_SIZE));
   const pad = HEX_SIZE * 3;
   const minX = Math.min(...pts.map((p) => p.x)) - pad;
@@ -60,8 +64,12 @@ export function fitCameraToTiles(scene: Phaser.Scene, tiles: { q: number; r: num
   };
   fit();
   // 화면 회전·Safari 주소창 변화 시 지도가 다시 화면에 맞도록 재조정
-  scene.scale.off('resize');
-  scene.scale.on('resize', fit);
+  registerCameraFit(scene.scale, fit, scene);
+}
+
+/** 씬 종료 시 호출해 resize 수명주기를 정리한다. */
+export function disposeCameraFit(scene: Phaser.Scene): void {
+  clearCameraFit(scene.scale, scene);
 }
 
 /**
