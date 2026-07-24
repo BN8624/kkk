@@ -15,6 +15,33 @@ const BUILDING_DISPLAY = {
   crown: { size: 76, yOffset: -9 },
 } as const;
 
+export interface UnitDisplay {
+  width: number;
+  height: number;
+  hpBarY: number;
+  yOffset: number;
+}
+
+export const DEFAULT_UNIT_DISPLAY: UnitDisplay = {
+  width: 46,
+  height: 51,
+  hpBarY: 27,
+  yOffset: UNIT_Y_OFFSET,
+};
+
+export const UNIT_DISPLAY: Partial<Record<UnitTypeId, UnitDisplay>> = {
+  infantry: {
+    width: 56,
+    height: 66,
+    hpBarY: 33,
+    yOffset: -12,
+  },
+};
+
+export function unitDisplay(type: UnitTypeId): UnitDisplay {
+  return UNIT_DISPLAY[type] ?? DEFAULT_UNIT_DISPLAY;
+}
+
 /** 렌더 계층이 그리는 유닛 표현(게임 유닛·에디터 배치 유닛 공용). */
 export interface ViewUnit {
   key: number;
@@ -174,33 +201,37 @@ export class BoardView {
     for (const unit of units) {
       let view = this.unitViews.get(unit.key);
       const assetId = `unit.${unit.type}.${unit.faction}` as AssetId;
+      const display = unitDisplay(unit.type);
       if (!view) {
         const token = this.scene.add.image(0, 0, textureKey(assetId));
-        token.setDisplaySize(46, 51);
         const hpBar = this.scene.add.graphics();
         const container = this.scene.add.container(0, 0, [token, hpBar]);
         view = { container, token, hpBar };
         this.unitViews.set(unit.key, view);
       } else if (view.token.texture.key !== textureKey(assetId)) {
         view.token.setTexture(textureKey(assetId));
-        view.token.setDisplaySize(46, 51);
       }
+      view.token.setDisplaySize(display.width, display.height);
       const { x, y } = this.pos(unit);
-      view.container.setPosition(x, y + UNIT_Y_OFFSET);
+      view.container.setPosition(x, y + display.yOffset);
       view.container.setDepth(3 + y / 10000);
-      this.drawHpBar(view.hpBar, unit.hpRatio);
+      this.drawHpBar(view.hpBar, unit.hpRatio, display.hpBarY);
       view.container.setAlpha(unit.dim ? 0.55 : 1);
     }
   }
 
-  private drawHpBar(g: Phaser.GameObjects.Graphics, ratio: number | null): void {
+  private drawHpBar(
+    g: Phaser.GameObjects.Graphics,
+    ratio: number | null,
+    hpBarY: number,
+  ): void {
     g.clear();
     if (ratio === null) return;
     const clamped = Phaser.Math.Clamp(ratio, 0, 1);
     const w = 34;
     const h = 5;
     const x = -w / 2;
-    const y = 27;
+    const y = hpBarY;
     g.fillStyle(0x1d1a14, 0.85);
     g.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
     const color = clamped > 0.55 ? 0x64a05a : clamped > 0.28 ? 0xc9a227 : 0xa33636;

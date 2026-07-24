@@ -16,7 +16,7 @@ import {
   disposeCameraFit,
   fitCameraToTiles,
   pixelToHex,
-  UNIT_Y_OFFSET,
+  unitDisplay,
   type ViewUnit,
 } from './board-view';
 
@@ -179,6 +179,7 @@ export class BoardScene extends Phaser.Scene {
       }
       // 병과별 이동 속도: 기병은 빠르고 궁병은 느리다
       const unit = this.state.units.find((u) => u.id === unitId);
+      const yOffset = unitDisplay(unit?.type ?? 'infantry').yOffset;
       const stepMs = unit?.type === 'cavalry' ? 80 : unit?.type === 'archer' ? 125 : 105;
       const points = path.map((p) => this.pos(p));
       let i = 1;
@@ -193,7 +194,7 @@ export class BoardScene extends Phaser.Scene {
         this.tweens.add({
           targets: view.container,
           x: target.x,
-          y: target.y + UNIT_Y_OFFSET,
+          y: target.y + yOffset,
           duration: stepMs,
           ease: 'Sine.easeInOut',
           onComplete: step,
@@ -235,6 +236,9 @@ export class BoardScene extends Phaser.Scene {
         });
       };
       const anim = attackAnimKind(o.attackerType);
+      const attackerYOffset = unitDisplay(o.attackerType).yOffset;
+      const defenderType = this.state.units.find((unit) => unit.id === o.defenderId)?.type;
+      const defenderYOffset = unitDisplay(defenderType ?? 'infantry').yOffset;
       const impact = () => {
         const dmgColor =
           anim === 'bolt'
@@ -248,7 +252,7 @@ export class BoardScene extends Phaser.Scene {
           const style = projectileStyle('bolt');
           const flash = this.add.circle(
             target.x,
-            target.y + UNIT_Y_OFFSET,
+            target.y + defenderYOffset,
             style.impactFlashRadius,
             style.impactFlashColor,
             0.85,
@@ -293,7 +297,7 @@ export class BoardScene extends Phaser.Scene {
         this.tweens.add({
           targets: proj,
           x: target.x,
-          y: target.y + UNIT_Y_OFFSET,
+          y: target.y + defenderYOffset,
           duration: style.durationMs,
           ease: style.ease,
           onComplete: () => {
@@ -307,7 +311,7 @@ export class BoardScene extends Phaser.Scene {
         const oy = view.container.y;
         const depth = anim === 'cavalry-charge' ? 0.5 : 0.3;
         const dx = (target.x - ox) * depth;
-        const dy = (target.y + UNIT_Y_OFFSET - oy) * depth;
+        const dy = (target.y + attackerYOffset - oy) * depth;
         this.tweens.add({
           targets: view.container,
           x: ox + dx,
