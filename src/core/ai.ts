@@ -110,14 +110,14 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     production: 'balanced',
     crownDenyBonus: 0,
     // 보통: 처치·부상 집결과 완벽한 반격 최적화를 완화해 교환비를 낮춘다
-    killBonusBase: 12,
-    killValueScale: 1,
-    woundedWeight: 0.1,
-    counterWeight: 0.4,
+    killBonusBase: 8,
+    killValueScale: 0.8,
+    woundedWeight: 0.05,
+    counterWeight: 0.3,
     suicidePenaltyScale: 2,
-    multiHitDampening: 14,
-    softCandidateBand: 6,
-    chaseWoundedWeight: 0.5,
+    multiHitDampening: 28,
+    softCandidateBand: 10,
+    chaseWoundedWeight: 0.3,
   },
   hard: {
     moveAttack: true,
@@ -127,15 +127,15 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     focusFire: true,
     seekTerrain: true,
     production: 'adaptive',
-    crownDenyBonus: 200,
-    killBonusBase: 25,
-    killValueScale: 2,
-    woundedWeight: 0.6,
-    counterWeight: 0.8,
-    suicidePenaltyScale: 3,
+    crownDenyBonus: 250,
+    killBonusBase: 45,
+    killValueScale: 2.8,
+    woundedWeight: 1.0,
+    counterWeight: 0.95,
+    suicidePenaltyScale: 3.5,
     multiHitDampening: 0,
     softCandidateBand: 0,
-    chaseWoundedWeight: 2,
+    chaseWoundedWeight: 3.2,
   },
 };
 
@@ -998,19 +998,25 @@ function scoreProductionType(
     score += ofType < cavTarget ? 22 : ofType === cavTarget ? 8 : -2 - ofType * 2;
     // 정복형 후반: 기동으로 수도 압박
     if (!an.crownScenario && an.turnsLeft <= 5) score += 12;
+    // 왕관 경합: 기동 병종으로 선점
+    if (an.crownScenario) score += 10;
   }
 
-  // 고유 병종: 최소 1기는 강하게 유도, 과다 생산 억제(적격 게임 40~95%)
+  // 고유 병종: 최소 1기 유도 + 기계적 과생산 억제(적격 40~95%). 약탈대는 쉽게 95%를 넘지 않게 한다.
   if (isUniqueUnit(type)) {
-    if (ofType === 0) score += 30;
-    else if (ofType === 1) score += 4;
-    else score -= 14 * ofType; // 과사용 금지
+    if (ofType === 0) {
+      score += type === 'crossbow' ? 30 : type === 'raider' ? 10 : 20;
+    } else if (ofType === 1) {
+      score += type === 'raider' ? -8 : 2;
+    } else {
+      score -= 18 * ofType;
+    }
   }
 
   // 수호대: 방어·거점 우선. 왕관 시나리오에서는 과생산을 강하게 억제한다.
   if (type === 'guardian') {
     if (an.capitalThreats.length > 0) score += 22;
-    if (an.crownScenario) score -= 2;
+    if (an.crownScenario) score -= 18;
     if (an.holdTiles.length > 0) score += 15;
     const enemyRaiders = an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length;
     if (an.enemies.length > 0 && enemyRaiders / an.enemies.length >= 0.3) score += 18;
@@ -1024,7 +1030,7 @@ function scoreProductionType(
       (t) => t.building && t.owner !== faction && !unitAt(state, t.q, t.r),
     ).length;
     score += Math.min(18, emptyBuildings * 3);
-    if (an.crownScenario) score += 14;
+    if (an.crownScenario) score += 10;
     const enemyRanged = an.enemies.filter((e) => e.type === 'archer' || e.type === 'crossbow').length;
     if (an.enemies.length > 0 && enemyRanged / an.enemies.length >= 0.3) score += 12;
     // 남은 턴이 매우 적으면 저렴한 보병 선호

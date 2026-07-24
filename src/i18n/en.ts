@@ -84,7 +84,7 @@ export const EN: Record<keyof typeof KO, string> = {
   'doctrine.azure.abilityName': 'Bulwark',
   'doctrine.azure.abilityDesc': 'Infantry gain +1 defense in forests, mountains, and buildings.',
   'doctrine.azure.bonusDesc': 'Infantry cost 1 less gold.',
-  'doctrine.azure.startDesc': 'Start with Infantry and Archer (36 gold).',
+  'doctrine.azure.startDesc': 'Start with Infantry and Archer (34 gold).',
   'doctrine.azure.recommended': 'Recommended for first-time players.',
   'doctrine.crimson.title': 'Mobility and Assault',
   'doctrine.crimson.style': 'Seize buildings with swift cavalry advances and build momentum.',

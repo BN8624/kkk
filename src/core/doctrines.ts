@@ -37,10 +37,10 @@ export const DOCTRINES: Record<FactionId, Doctrine> = {
     abilityName: '보루',
     abilityDesc: `보병이 숲·산·거점에서 방어 +${AZURE_BULWARK_DEF}`,
     bonusDesc: '보병 생산 비용 -1',
-    startDesc: '보병·궁병으로 시작 (금 36)',
+    startDesc: '보병·궁병으로 시작 (금 34)',
     recommended: '처음 플레이에 추천',
     // 수비·왕관 과우위 완화: 시작 금·보병 할인 소폭 하향
-    startGold: 36,
+    startGold: 34,
     startUnits: ['infantry', 'archer'],
     unitCostDelta: { infantry: -1 },
     villageIncomeBonus: 0,

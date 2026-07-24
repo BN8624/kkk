@@ -82,7 +82,7 @@ export const KO = {
   'doctrine.azure.abilityName': '보루',
   'doctrine.azure.abilityDesc': '보병이 숲·산·거점에서 방어 +1',
   'doctrine.azure.bonusDesc': '보병 생산 비용 -1',
-  'doctrine.azure.startDesc': '보병·궁병으로 시작 (금 36)',
+  'doctrine.azure.startDesc': '보병·궁병으로 시작 (금 34)',
   'doctrine.azure.recommended': '처음 플레이에 추천',
   'doctrine.crimson.title': '기동과 공격',
   'doctrine.crimson.style': '빠른 기병 진격으로 거점을 빼앗아 몸집을 불린다',
