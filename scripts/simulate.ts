@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { runAiTurn } from '../src/core/ai';
 import { FACTION_IDS, FACTION_NAMES, UNIT_NAMES } from '../src/core/data';
 import {
+  aggregateOverallWinRates,
+  aggregateScenarioOutcomeSummaries,
+  aggregateUnitProductionStats,
   CONQUEST_SCENARIOS,
   evaluateBalanceGates,
   formatGateFailure,
   isUniqueUnitType,
-  type ScenarioOutcomeSummary,
-  type UnitProductionStats,
-  uniqueUnitFaction,
 } from '../src/core/eval/balance-gates';
 import { newGame } from '../src/core/game';
 import { SCENARIO_IDS, SCENARIOS } from '../src/core/scenarios';
@@ -23,6 +23,11 @@ import type {
   UnitTypeId,
 } from '../src/core/types';
 import { UNIT_TYPE_IDS } from '../src/core/units';
+
+/** JSON·Markdown 표시용 반올림(게이트 판정에는 쓰지 않음). */
+function round4(x: number): number {
+  return +x.toFixed(4);
+}
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard'];
 const SEEDS_PER_COMBO = Number(process.argv.find((a) => a.startsWith('--seeds='))?.slice(8) ?? 40);
@@ -185,42 +190,24 @@ const unfinished = outcomes.filter((o) => !o.finished);
 const illegalGames = outcomes.filter((o) => o.illegal.length > 0);
 const draws = outcomes.filter((o) => o.winner === 'draw').length;
 
-const winsByFaction = Object.fromEntries(FACTION_IDS.map((f) => [f, 0])) as Record<
-  FactionId,
-  number
->;
-for (const o of outcomes) {
-  if (o.winner && o.winner !== 'draw') winsByFaction[o.winner]++;
-}
+// 게이트 입력은 반올림하지 않은 원시 비율
+const overallWinRates = aggregateOverallWinRates(outcomes);
+const perScenario = aggregateScenarioOutcomeSummaries(outcomes, SCENARIO_IDS);
 
-const overallWinRates = Object.fromEntries(
-  FACTION_IDS.map((f) => [f, +(winsByFaction[f] / total).toFixed(4)]),
-) as Record<FactionId, number>;
-
-const perScenario: ScenarioOutcomeSummary[] = SCENARIO_IDS.map((sid) => {
-  const games = outcomes.filter((o) => o.scenario === sid);
-  const wins = Object.fromEntries(FACTION_IDS.map((f) => [f, 0])) as Record<FactionId, number>;
-  for (const o of games) if (o.winner && o.winner !== 'draw') wins[o.winner]++;
-  const reasons = { conquest: 0, 'crown-hold': 0, 'turn-limit': 0, unfinished: 0 };
-  for (const o of games) reasons[o.endReason]++;
-  const n = games.length || 1;
-  return {
-    scenario: sid,
-    games: games.length,
-    winRates: Object.fromEntries(
-      FACTION_IDS.map((f) => [f, +(wins[f] / n).toFixed(4)]),
-    ) as Record<FactionId, number>,
-    endReasons: reasons,
-    turnLimitRate: +(reasons['turn-limit'] / n).toFixed(4),
-  };
-});
-
-// 시나리오 부가 진단(평균 턴·시드)
+// 시나리오 부가 진단(평균 턴·시드) — 표시용 반올림만 적용
 const perScenarioDetail = SCENARIO_IDS.map((sid) => {
   const games = outcomes.filter((o) => o.scenario === sid);
   const base = perScenario.find((s) => s.scenario === sid)!;
   return {
-    ...base,
+    scenario: base.scenario,
+    games: base.games,
+    winRates: {
+      azure: round4(base.winRates.azure),
+      crimson: round4(base.winRates.crimson),
+      violet: round4(base.winRates.violet),
+    },
+    endReasons: base.endReasons,
+    turnLimitRate: round4(base.turnLimitRate),
     seeds: new Set(games.map((o) => o.seed)).size,
     avgEndTurn: +(games.reduce((s, o) => s + o.turns, 0) / (games.length || 1)).toFixed(2),
   };
@@ -260,46 +247,8 @@ const proxyRateByFaction = Object.fromEntries(
   }),
 ) as Record<FactionId, number>;
 
-// 6병종 통계 — UNIT_TYPE_IDS 정본
-const unitStats = {} as Record<UnitTypeId, UnitProductionStats>;
-const legalOutcomes = outcomes.filter((o) => o.illegal.length === 0);
-for (const t of UNIT_TYPE_IDS) {
-  const produced = outcomes.reduce((s, o) => s + o.produced[t], 0);
-  const spawned = outcomes.reduce((s, o) => s + o.spawned[t], 0);
-  const alive = outcomes.reduce((s, o) => s + o.alive[t], 0);
-  const byFaction = Object.fromEntries(FACTION_IDS.map((f) => [f, 0])) as Record<FactionId, number>;
-  const byScenario: Partial<Record<BuiltinScenarioId, number>> = {};
-  for (const o of outcomes) {
-    for (const f of FACTION_IDS) byFaction[f] += o.producedByFaction[f][t];
-    byScenario[o.scenario] = (byScenario[o.scenario] ?? 0) + o.produced[t];
-  }
-  // 고유 병종 분모: 소유 세력이 참여한 합법 게임(내장 시뮬은 항상 3세력)
-  const owner = uniqueUnitFaction(t);
-  const eligibleGames =
-    owner != null ? legalOutcomes.length : outcomes.length;
-  const gamesProduced = outcomes.filter((o) => o.typesProduced.has(t)).length;
-  unitStats[t] = {
-    produced,
-    spawned,
-    alive,
-    share: 0, // 아래에서 채움
-    survivalRate: spawned > 0 ? +(alive / spawned).toFixed(4) : 0,
-    gamesProduced,
-    eligibleGames,
-    produceRate: eligibleGames > 0 ? +(gamesProduced / eligibleGames).toFixed(4) : 0,
-    byFaction,
-    byScenario,
-  };
-}
-const producedSum = UNIT_TYPE_IDS.reduce((s, t) => s + unitStats[t].produced, 0);
-for (const t of UNIT_TYPE_IDS) {
-  unitStats[t].share = producedSum > 0 ? +(unitStats[t].produced / producedSum).toFixed(4) : 0;
-}
-
-const sharedProducedTotal = UNIT_TYPE_IDS.filter((t) => !isUniqueUnitType(t)).reduce(
-  (s, t) => s + unitStats[t].produced,
-  0,
-);
+// 6병종 통계 — 적격 집합 동일 분모/분자, 게이트용 원시 비율
+const { unitStats, sharedProducedTotal } = aggregateUnitProductionStats(outcomes);
 
 // 세력별 병종 구성(생산 합)
 const rosterByFaction = Object.fromEntries(
@@ -335,9 +284,10 @@ if (proxyRateByDifficulty.normal < proxyRateByDifficulty.hard + MARGIN) {
   );
 }
 
+// 게이트 평가는 반올림하지 않은 원시 비율로 수행
 const gateResult = evaluateBalanceGates({
   totalGames: total,
-  overallWinRates: overallWinRates as { azure: number; crimson: number; violet: number },
+  overallWinRates,
   perScenario,
   unitStats,
   sharedProducedTotal,
@@ -346,7 +296,22 @@ const gateResult = evaluateBalanceGates({
 const gateFailureLines = gateResult.failures.map(formatGateFailure);
 const failures = [...structuralFailures, ...gateFailureLines];
 
-// ---------------- 출력 ----------------
+// ---------------- 출력(표시용 반올림) ----------------
+
+const unitStatsDisplay = Object.fromEntries(
+  UNIT_TYPE_IDS.map((t) => {
+    const u = unitStats[t];
+    return [
+      t,
+      {
+        ...u,
+        share: round4(u.share),
+        survivalRate: round4(u.survivalRate),
+        produceRate: round4(u.produceRate),
+      },
+    ];
+  }),
+);
 
 const summary = {
   generatedAt: new Date().toISOString(),
@@ -356,21 +321,29 @@ const summary = {
   unfinishedGames: unfinished.length,
   illegalGames: illegalGames.length,
   draws,
-  overallWinRates,
+  overallWinRates: {
+    azure: round4(overallWinRates.azure),
+    crimson: round4(overallWinRates.crimson),
+    violet: round4(overallWinRates.violet),
+  },
   proxyWinRateByFaction: proxyRateByFaction,
   proxyWinRateByDifficulty: proxyRateByDifficulty,
   perDifficulty,
   perScenario: perScenarioDetail,
-  unitStats,
-  productionShare: Object.fromEntries(UNIT_TYPE_IDS.map((t) => [t, unitStats[t].share])),
-  survivalRate: Object.fromEntries(UNIT_TYPE_IDS.map((t) => [t, unitStats[t].survivalRate])),
+  unitStats: unitStatsDisplay,
+  productionShare: Object.fromEntries(
+    UNIT_TYPE_IDS.map((t) => [t, round4(unitStats[t].share)]),
+  ),
+  survivalRate: Object.fromEntries(
+    UNIT_TYPE_IDS.map((t) => [t, round4(unitStats[t].survivalRate)]),
+  ),
   uniqueProduceRates: Object.fromEntries(
-    UNIT_TYPE_IDS.filter(isUniqueUnitType).map((t) => [t, unitStats[t].produceRate]),
+    UNIT_TYPE_IDS.filter(isUniqueUnitType).map((t) => [t, round4(unitStats[t].produceRate)]),
   ),
   rosterByFaction,
   sharedProducedTotal,
   cavalrySharedShare:
-    sharedProducedTotal > 0 ? +(unitStats.cavalry.produced / sharedProducedTotal).toFixed(4) : 0,
+    sharedProducedTotal > 0 ? round4(unitStats.cavalry.produced / sharedProducedTotal) : 0,
   idlePhaseRate: +(idleSum / (eligibleSum || 1)).toFixed(3),
   avgCapturesPerGame: avgCaptured,
   maxPhaseMs,

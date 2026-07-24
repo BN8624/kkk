@@ -72,9 +72,126 @@ export interface BalanceGateFailure {
   limit: number;
 }
 
+/** 병종 생산 집계에 필요한 게임 슬라이스. */
+export interface UnitAggGame {
+  scenario: BuiltinScenarioId;
+  illegal: readonly string[];
+  produced: Readonly<Record<UnitTypeId, number>>;
+  spawned: Readonly<Record<UnitTypeId, number>>;
+  alive: Readonly<Record<UnitTypeId, number>>;
+  producedByFaction: Readonly<Record<FactionId, Readonly<Record<UnitTypeId, number>>>>;
+  typesProduced: ReadonlySet<UnitTypeId>;
+}
+
+export interface WinAggGame {
+  scenario: BuiltinScenarioId;
+  winner: FactionId | 'draw' | null;
+  endReason: 'conquest' | 'crown-hold' | 'turn-limit' | 'unfinished';
+}
+
+const FACTIONS: FactionId[] = ['azure', 'crimson', 'violet'];
+
 /** 실패 게이트를 코드·실제값·한도와 함께 한 줄로 포맷한다. */
 export function formatGateFailure(f: BalanceGateFailure): string {
   return `[${f.code}] ${f.message} (actual=${f.actual}, limit=${f.limit})`;
+}
+
+/**
+ * 6병종 생산 통계를 집계한다.
+ * 병종별 적격 게임 집합을 먼저 정한 뒤 gamesProduced·eligibleGames·produceRate를 동일 집합에서 계산한다.
+ * 비율 필드(share·survivalRate·produceRate)는 반올림하지 않은 원시 값이다.
+ */
+export function aggregateUnitProductionStats(
+  outcomes: readonly UnitAggGame[],
+): { unitStats: Record<UnitTypeId, UnitProductionStats>; sharedProducedTotal: number } {
+  const legalOutcomes = outcomes.filter((o) => o.illegal.length === 0);
+  const unitStats = {} as Record<UnitTypeId, UnitProductionStats>;
+
+  for (const t of BALANCE_UNIT_TYPES) {
+    const produced = outcomes.reduce((s, o) => s + (o.produced[t] ?? 0), 0);
+    const spawned = outcomes.reduce((s, o) => s + (o.spawned[t] ?? 0), 0);
+    const alive = outcomes.reduce((s, o) => s + (o.alive[t] ?? 0), 0);
+    const byFaction = Object.fromEntries(FACTIONS.map((f) => [f, 0])) as Record<FactionId, number>;
+    const byScenario: Partial<Record<BuiltinScenarioId, number>> = {};
+    for (const o of outcomes) {
+      for (const f of FACTIONS) byFaction[f] += o.producedByFaction[f]?.[t] ?? 0;
+      byScenario[o.scenario] = (byScenario[o.scenario] ?? 0) + (o.produced[t] ?? 0);
+    }
+
+    // 고유 병종: 합법 게임만 적격. 공용 병종: 전체 게임. 분자·분모 동일 집합.
+    const owner = uniqueUnitFaction(t);
+    const eligible = owner != null ? legalOutcomes : outcomes;
+    const eligibleGames = eligible.length;
+    const gamesProduced = eligible.filter((o) => o.typesProduced.has(t)).length;
+    const produceRate = eligibleGames > 0 ? gamesProduced / eligibleGames : 0;
+
+    unitStats[t] = {
+      produced,
+      spawned,
+      alive,
+      share: 0,
+      survivalRate: spawned > 0 ? alive / spawned : 0,
+      gamesProduced,
+      eligibleGames,
+      produceRate,
+      byFaction,
+      byScenario,
+    };
+  }
+
+  const producedSum = BALANCE_UNIT_TYPES.reduce((s, t) => s + unitStats[t].produced, 0);
+  for (const t of BALANCE_UNIT_TYPES) {
+    unitStats[t].share = producedSum > 0 ? unitStats[t].produced / producedSum : 0;
+  }
+
+  const sharedProducedTotal = BALANCE_UNIT_TYPES.filter((t) => !isUniqueUnitType(t)).reduce(
+    (s, t) => s + unitStats[t].produced,
+    0,
+  );
+
+  return { unitStats, sharedProducedTotal };
+}
+
+/** 전체 왕국 승률(원시 비율, 반올림 없음). */
+export function aggregateOverallWinRates(
+  outcomes: readonly { winner: FactionId | 'draw' | null }[],
+): FactionWinRates {
+  const total = outcomes.length || 1;
+  const wins = Object.fromEntries(FACTIONS.map((f) => [f, 0])) as Record<FactionId, number>;
+  for (const o of outcomes) {
+    if (o.winner && o.winner !== 'draw') wins[o.winner]++;
+  }
+  return {
+    azure: wins.azure / total,
+    crimson: wins.crimson / total,
+    violet: wins.violet / total,
+  };
+}
+
+/** 시나리오별 승률·턴제한 종료율(원시 비율, 반올림 없음). */
+export function aggregateScenarioOutcomeSummaries(
+  outcomes: readonly WinAggGame[],
+  scenarioIds: readonly BuiltinScenarioId[],
+): ScenarioOutcomeSummary[] {
+  return scenarioIds.map((sid) => {
+    const games = outcomes.filter((o) => o.scenario === sid);
+    const wins = Object.fromEntries(FACTIONS.map((f) => [f, 0])) as Record<FactionId, number>;
+    for (const o of games) if (o.winner && o.winner !== 'draw') wins[o.winner]++;
+    const reasons = { conquest: 0, 'crown-hold': 0, 'turn-limit': 0, unfinished: 0 };
+    for (const o of games) reasons[o.endReason]++;
+    const n = games.length || 1;
+    return {
+      scenario: sid,
+      games: games.length,
+      winRates: {
+        azure: wins.azure / n,
+        crimson: wins.crimson / n,
+        violet: wins.violet / n,
+      },
+      endReasons: reasons,
+      turnLimitRate: reasons['turn-limit'] / n,
+    };
+  });
 }
 
 export function checkOverallWinRateGates(rates: FactionWinRates): BalanceGateFailure[] {
