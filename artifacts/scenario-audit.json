@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T17:28:32.872Z",
-  "elapsedSec": 13.4,
+  "generatedAt": "2026-07-24T07:11:37.121Z",
+  "elapsedSec": 15.3,
   "seedsPerCombo": 16,
   "totalGames": 432,
   "unfinishedGames": 0,
@@ -11,89 +11,89 @@
       "humanFaction": "azure",
       "difficulty": "easy",
       "games": 16,
-      "humanWinRate": 0.875,
-      "avgEndTurn": 11.94,
+      "humanWinRate": 0.313,
+      "avgEndTurn": 11.63,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
     {
       "scenario": "three-crowns",
       "humanFaction": "azure",
+      "difficulty": "normal",
+      "games": 16,
+      "humanWinRate": 0.125,
+      "avgEndTurn": 10.88,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "three-crowns",
+      "humanFaction": "azure",
+      "difficulty": "hard",
+      "games": 16,
+      "humanWinRate": 0.313,
+      "avgEndTurn": 9.75,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "three-crowns",
+      "humanFaction": "crimson",
+      "difficulty": "easy",
+      "games": 16,
+      "humanWinRate": 0.375,
+      "avgEndTurn": 10.88,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "three-crowns",
+      "humanFaction": "crimson",
       "difficulty": "normal",
       "games": 16,
       "humanWinRate": 0.5,
-      "avgEndTurn": 12,
+      "avgEndTurn": 9.75,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
     {
       "scenario": "three-crowns",
-      "humanFaction": "azure",
+      "humanFaction": "crimson",
       "difficulty": "hard",
       "games": 16,
-      "humanWinRate": 0.375,
-      "avgEndTurn": 11.94,
-      "earlyEnds": 0,
+      "humanWinRate": 0.25,
+      "avgEndTurn": 9.81,
+      "earlyEnds": 1,
       "endedBeforeHumanAction": 0
     },
     {
       "scenario": "three-crowns",
-      "humanFaction": "crimson",
+      "humanFaction": "violet",
       "difficulty": "easy",
       "games": 16,
-      "humanWinRate": 0.813,
-      "avgEndTurn": 11.88,
-      "earlyEnds": 0,
+      "humanWinRate": 0.375,
+      "avgEndTurn": 10.88,
+      "earlyEnds": 1,
       "endedBeforeHumanAction": 0
     },
     {
       "scenario": "three-crowns",
-      "humanFaction": "crimson",
+      "humanFaction": "violet",
       "difficulty": "normal",
       "games": 16,
       "humanWinRate": 0.25,
-      "avgEndTurn": 11.94,
-      "earlyEnds": 0,
+      "avgEndTurn": 8.88,
+      "earlyEnds": 3,
       "endedBeforeHumanAction": 0
     },
     {
       "scenario": "three-crowns",
-      "humanFaction": "crimson",
+      "humanFaction": "violet",
       "difficulty": "hard",
       "games": 16,
       "humanWinRate": 0.125,
-      "avgEndTurn": 11.5,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "three-crowns",
-      "humanFaction": "violet",
-      "difficulty": "easy",
-      "games": 16,
-      "humanWinRate": 0.813,
-      "avgEndTurn": 11.94,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "three-crowns",
-      "humanFaction": "violet",
-      "difficulty": "normal",
-      "games": 16,
-      "humanWinRate": 0.25,
-      "avgEndTurn": 11.38,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "three-crowns",
-      "humanFaction": "violet",
-      "difficulty": "hard",
-      "games": 16,
-      "humanWinRate": 0.188,
-      "avgEndTurn": 11.13,
-      "earlyEnds": 0,
+      "avgEndTurn": 8.38,
+      "earlyEnds": 2,
       "endedBeforeHumanAction": 0
     },
     {
@@ -101,128 +101,128 @@
       "humanFaction": "azure",
       "difficulty": "easy",
       "games": 16,
-      "humanWinRate": 0.875,
-      "avgEndTurn": 11.88,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "azure",
-      "difficulty": "normal",
-      "games": 16,
-      "humanWinRate": 0.688,
-      "avgEndTurn": 11.81,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "azure",
-      "difficulty": "hard",
-      "games": 16,
-      "humanWinRate": 0.563,
-      "avgEndTurn": 11.69,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "crimson",
-      "difficulty": "easy",
-      "games": 16,
-      "humanWinRate": 0.688,
-      "avgEndTurn": 12,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "crimson",
-      "difficulty": "normal",
-      "games": 16,
-      "humanWinRate": 0.063,
-      "avgEndTurn": 12,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "crimson",
-      "difficulty": "hard",
-      "games": 16,
-      "humanWinRate": 0.188,
-      "avgEndTurn": 11.88,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "violet",
-      "difficulty": "easy",
-      "games": 16,
-      "humanWinRate": 0.688,
-      "avgEndTurn": 12,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "broken-strait",
-      "humanFaction": "violet",
-      "difficulty": "normal",
-      "games": 16,
-      "humanWinRate": 0.063,
+      "humanWinRate": 0.375,
       "avgEndTurn": 11.44,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
     {
       "scenario": "broken-strait",
-      "humanFaction": "violet",
-      "difficulty": "hard",
-      "games": 16,
-      "humanWinRate": 0.063,
-      "avgEndTurn": 11.31,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "crown-heart",
-      "humanFaction": "azure",
-      "difficulty": "easy",
-      "games": 16,
-      "humanWinRate": 0.625,
-      "avgEndTurn": 10.19,
-      "earlyEnds": 0,
-      "endedBeforeHumanAction": 0
-    },
-    {
-      "scenario": "crown-heart",
       "humanFaction": "azure",
       "difficulty": "normal",
       "games": 16,
-      "humanWinRate": 0.5,
-      "avgEndTurn": 11.38,
+      "humanWinRate": 0.25,
+      "avgEndTurn": 11.06,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
     {
-      "scenario": "crown-heart",
+      "scenario": "broken-strait",
       "humanFaction": "azure",
       "difficulty": "hard",
       "games": 16,
-      "humanWinRate": 0.313,
+      "humanWinRate": 0,
+      "avgEndTurn": 10.19,
+      "earlyEnds": 1,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "broken-strait",
+      "humanFaction": "crimson",
+      "difficulty": "easy",
+      "games": 16,
+      "humanWinRate": 0.563,
       "avgEndTurn": 11.19,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
     {
+      "scenario": "broken-strait",
+      "humanFaction": "crimson",
+      "difficulty": "normal",
+      "games": 16,
+      "humanWinRate": 0.313,
+      "avgEndTurn": 10.19,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "broken-strait",
+      "humanFaction": "crimson",
+      "difficulty": "hard",
+      "games": 16,
+      "humanWinRate": 0.188,
+      "avgEndTurn": 10,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "broken-strait",
+      "humanFaction": "violet",
+      "difficulty": "easy",
+      "games": 16,
+      "humanWinRate": 0.688,
+      "avgEndTurn": 10.94,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "broken-strait",
+      "humanFaction": "violet",
+      "difficulty": "normal",
+      "games": 16,
+      "humanWinRate": 0.063,
+      "avgEndTurn": 9.31,
+      "earlyEnds": 3,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "broken-strait",
+      "humanFaction": "violet",
+      "difficulty": "hard",
+      "games": 16,
+      "humanWinRate": 0.313,
+      "avgEndTurn": 9.63,
+      "earlyEnds": 2,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "crown-heart",
+      "humanFaction": "azure",
+      "difficulty": "easy",
+      "games": 16,
+      "humanWinRate": 0.75,
+      "avgEndTurn": 9.06,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "crown-heart",
+      "humanFaction": "azure",
+      "difficulty": "normal",
+      "games": 16,
+      "humanWinRate": 0.625,
+      "avgEndTurn": 10.44,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
+      "scenario": "crown-heart",
+      "humanFaction": "azure",
+      "difficulty": "hard",
+      "games": 16,
+      "humanWinRate": 0.375,
+      "avgEndTurn": 9.44,
+      "earlyEnds": 0,
+      "endedBeforeHumanAction": 0
+    },
+    {
       "scenario": "crown-heart",
       "humanFaction": "crimson",
       "difficulty": "easy",
       "games": 16,
-      "humanWinRate": 0.125,
-      "avgEndTurn": 9.63,
+      "humanWinRate": 0.313,
+      "avgEndTurn": 10.38,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
@@ -231,8 +231,8 @@
       "humanFaction": "crimson",
       "difficulty": "normal",
       "games": 16,
-      "humanWinRate": 0.188,
-      "avgEndTurn": 10.5,
+      "humanWinRate": 0.25,
+      "avgEndTurn": 10.06,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
@@ -241,8 +241,8 @@
       "humanFaction": "crimson",
       "difficulty": "hard",
       "games": 16,
-      "humanWinRate": 0.063,
-      "avgEndTurn": 10.13,
+      "humanWinRate": 0.188,
+      "avgEndTurn": 9.75,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
@@ -251,7 +251,7 @@
       "humanFaction": "violet",
       "difficulty": "easy",
       "games": 16,
-      "humanWinRate": 0.25,
+      "humanWinRate": 0.563,
       "avgEndTurn": 10.31,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
@@ -261,8 +261,8 @@
       "humanFaction": "violet",
       "difficulty": "normal",
       "games": 16,
-      "humanWinRate": 0.25,
-      "avgEndTurn": 9.81,
+      "humanWinRate": 0.188,
+      "avgEndTurn": 9,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     },
@@ -271,13 +271,38 @@
       "humanFaction": "violet",
       "difficulty": "hard",
       "games": 16,
-      "humanWinRate": 0.438,
-      "avgEndTurn": 9.69,
+      "humanWinRate": 0.125,
+      "avgEndTurn": 10.06,
       "earlyEnds": 0,
       "endedBeforeHumanAction": 0
     }
   ],
-  "warnings": [],
+  "warnings": [
+    {
+      "level": "warn",
+      "scenario": "three-crowns",
+      "message": "4턴 이하 종료",
+      "count": 7
+    },
+    {
+      "level": "warn",
+      "scenario": "three-crowns",
+      "message": "인간 핵심목표 인접 전 목표 승리 확정",
+      "count": 1
+    },
+    {
+      "level": "warn",
+      "scenario": "broken-strait",
+      "message": "4턴 이하 종료",
+      "count": 6
+    },
+    {
+      "level": "warn",
+      "scenario": "broken-strait",
+      "message": "인간 핵심목표 인접 전 목표 승리 확정",
+      "count": 1
+    }
+  ],
   "pass": true,
   "failures": [],
   "note": "경고는 자동 대체 정책 통계이며 인간 플레이 검증이 아니다. crown-heart 경고는 강제 FAIL."

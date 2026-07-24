@@ -146,7 +146,7 @@ describe('시작 배치·예측 일관성', () => {
     const state = newGame(99);
     expect(unitsOf(state, 'azure').map((u) => u.type).sort()).toEqual(['archer', 'infantry']);
     expect(unitsOf(state, 'crimson').map((u) => u.type).sort()).toEqual(['cavalry', 'infantry']);
-    expect(unitsOf(state, 'violet').map((u) => u.type).sort()).toEqual(['archer', 'archer']);
+    expect(unitsOf(state, 'violet').map((u) => u.type).sort()).toEqual(['archer', 'cavalry']);
     expect(state.factions.azure.gold).toBe(DOCTRINES.azure.startGold);
     expect(state.factions.crimson.gold).toBe(DOCTRINES.crimson.startGold);
     expect(state.factions.violet.gold).toBe(DOCTRINES.violet.startGold);

@@ -109,15 +109,15 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     seekTerrain: false,
     production: 'balanced',
     crownDenyBonus: 0,
-    // 보통: 처치·부상 집결과 완벽한 반격 최적화를 완화해 교환비를 낮춘다
-    killBonusBase: 12,
-    killValueScale: 1,
-    woundedWeight: 0.1,
-    counterWeight: 0.4,
+    // 보통: 처치·부상 집결을 완화해 hard와의 난이도 계단을 확보한다
+    killBonusBase: 8,
+    killValueScale: 0.8,
+    woundedWeight: 0.05,
+    counterWeight: 0.3,
     suicidePenaltyScale: 2,
-    multiHitDampening: 14,
-    softCandidateBand: 6,
-    chaseWoundedWeight: 0.5,
+    multiHitDampening: 28,
+    softCandidateBand: 10,
+    chaseWoundedWeight: 0.3,
   },
   hard: {
     moveAttack: true,
@@ -127,15 +127,15 @@ const PROFILES: Record<Difficulty, AiProfile> = {
     focusFire: true,
     seekTerrain: true,
     production: 'adaptive',
-    crownDenyBonus: 200,
-    killBonusBase: 25,
-    killValueScale: 2,
-    woundedWeight: 0.6,
-    counterWeight: 0.8,
-    suicidePenaltyScale: 3,
+    crownDenyBonus: 250,
+    killBonusBase: 45,
+    killValueScale: 2.8,
+    woundedWeight: 1.0,
+    counterWeight: 0.95,
+    suicidePenaltyScale: 3.5,
     multiHitDampening: 0,
     softCandidateBand: 0,
-    chaseWoundedWeight: 2,
+    chaseWoundedWeight: 3.2,
   },
 };
 
@@ -155,6 +155,8 @@ interface Analysis {
   crownTile: Tile | null;
   /** hold-building 승리 조건이 있는 시나리오(왕관의 심장 등) */
   crownScenario: boolean;
+  /** conquest 승리 조건이 있는 정복형 시나리오 */
+  conquestScenario: boolean;
   crownOwner: FactionId | null;
   crownActive: boolean;
   crownHeldTurns: number;
@@ -250,6 +252,24 @@ function analyze(state: GameState, faction: FactionId, profile: AiProfile): Anal
     crownObjValue += profile.crownDenyBonus;
   }
 
+  const turnsLeft = Math.max(0, state.maxTurns - state.turn + 1);
+  const hasConquest = flattenVictory(state.objectives.victory).some((c) => c.type === 'conquest');
+  // 정복 시나리오만 수도 우선·마을 억제(턴 제한 점수전 ≤70%). 수비·캠페인은 기존 가치 유지.
+  let capitalBase: number;
+  if (crownDenyImminent) capitalBase = 90;
+  else if (hasConquest) {
+    capitalBase = turnsLeft <= 4 ? 240 : turnsLeft <= 7 ? 200 : turnsLeft <= 9 ? 170 : 150;
+  } else {
+    capitalBase = 100;
+  }
+  const villageBase = hasConquest
+    ? turnsLeft <= 6
+      ? 16
+      : turnsLeft <= 9
+        ? 26
+        : 36
+    : 50;
+
   const objectives: Objective[] = [];
   for (const t of state.tiles) {
     if (!t.building || t.owner === faction) continue;
@@ -257,11 +277,8 @@ function analyze(state: GameState, faction: FactionId, profile: AiProfile): Anal
       t.building === 'crown'
         ? crownObjValue
         : t.building === 'capital'
-          ? // 적 왕관 임박 시 수도 공격보다 왕관 저지를 우선(가치 상한)
-            crownDenyImminent
-            ? 90
-            : 100
-          : 50;
+          ? capitalBase
+          : villageBase;
     objectives.push({ q: t.q, r: t.r, value, claimed: 0 });
   }
 
@@ -316,6 +333,7 @@ function analyze(state: GameState, faction: FactionId, profile: AiProfile): Anal
     capitalThreats,
     crownTile,
     crownScenario: isCrownScenario,
+    conquestScenario: hasConquest,
     crownOwner,
     crownActive,
     crownHeldTurns,
@@ -368,6 +386,11 @@ function assignRoles(
 
   if (profile.defend && an.myCapital && an.capitalThreats.length > 0) {
     const cap = an.myCapital;
+    // 초반 위협: 방어 인원을 넉넉히 두어 4턴 이하 전멸·수도 상실을 줄인다
+    const need = Math.min(
+      state.turn <= 4 ? 3 : 2,
+      Math.max(1, an.capitalThreats.length),
+    );
     // 수호대를 수도 방어에 우선 배정
     const defenders = units
       .filter((u) => !roles.has(u.id))
@@ -375,7 +398,7 @@ function assignRoles(
         const typeBias = (u: Unit) => (u.type === 'guardian' ? -2 : 0);
         return typeBias(a) - typeBias(b) || hexDistance(a, cap) - hexDistance(b, cap);
       })
-      .slice(0, Math.min(2, an.capitalThreats.length));
+      .slice(0, need);
     for (const d of defenders) roles.set(d.id, 'defend');
   }
 
@@ -659,11 +682,15 @@ function tryAttack(
       if (profile.avoidBadTrades && fc.attackerDies && !fc.defenderDies) continue;
 
       let score = fc.damage.total;
+      // 어려움 초반(1~3): 처치 가산 완화 — 4턴 이하 전멸 즉시와 중후반 차이를 계단화
+      const earlyHardSoft =
+        profile.production === 'adaptive' && state.turn <= 3 ? 0.5 : 1;
       if (fc.defenderDies) {
-        score += profile.killBonusBase + unitValue(enemy) * profile.killValueScale;
+        score +=
+          (profile.killBonusBase + unitValue(enemy) * profile.killValueScale) * earlyHardSoft;
       }
       const missingHp = UNIT_STATS[enemy.type].hp - enemy.hp;
-      score += missingHp * profile.woundedWeight;
+      score += missingHp * profile.woundedWeight * earlyHardSoft;
       if (profile.counterAware && fc.counter) {
         score -= fc.counter.total * profile.counterWeight;
         if (fc.attackerDies) {
@@ -909,7 +936,10 @@ function tryAdvance(
   const horizon = profile.horizon ?? Infinity;
   for (const o of an.objectives) {
     if (hexDistance(unit, o) > horizon) continue; // 쉬움: 먼 목표를 보지 못한다
-    const score = o.value - hexDistance(unit, o) * 8 - o.claimed * 25;
+    // 정복 목표(고가치 수도)는 거리 페널티를 완화해 원거리 진격을 유지한다
+    const distCost = o.value >= 150 ? 5 : 8;
+    const claimCost = o.value >= 150 ? 15 : 25;
+    const score = o.value - hexDistance(unit, o) * distCost - o.claimed * claimCost;
     if (score > goalScore) {
       goalScore = score;
       goal = o;
@@ -964,31 +994,42 @@ function scoreProductionType(
   // 생산 후 즉시 행동 불가 — 비싸면 약간 감점
   score -= cost * 0.05;
 
-  // 공용 비율 목표
-  // 자원(violet) 궁병은 장궁 교리 골격 — 시작 2기 이후에도 범용 원거리 비율을 유지한다.
+  // 공용 비율 목표 — 보병 편중 억제, 기병 최소 비중 확보(공용 대비 ≥8%)
+  // 자원(violet) 궁병은 장궁 교리 골격 — 시작 이후에도 범용 원거리 비율을 유지한다.
   if (type === 'infantry') {
-    const target = Math.ceil((count + 1) * 0.35);
-    score += ofType < target ? 25 : 5 - ofType * 3;
+    const target = Math.ceil((count + 1) * 0.3);
+    score += ofType < target ? 20 : 3 - ofType * 3;
   } else if (type === 'archer') {
-    const archerRatio = faction === 'violet' ? 0.32 : 0.25;
+    const archerRatio = faction === 'violet' ? 0.32 : 0.24;
     const target = Math.ceil((count + 1) * archerRatio);
     const under = ofType < target;
     score += under ? (faction === 'violet' ? 26 : 20) : 4 - ofType * (faction === 'violet' ? 2 : 3);
   } else if (type === 'cavalry') {
-    score += ofType <= Math.ceil((count + 1) * 0.25) ? 18 : 2 - ofType * 4;
+    // 기병 목표 비율을 올려 공용 비중 게이트를 확보한다
+    const cavTarget = Math.max(1, Math.ceil((count + 1) * 0.16));
+    score += ofType < cavTarget ? 28 : ofType === cavTarget ? 10 : -2 - ofType * 2;
+    // 정복형 후반: 기동으로 수도 압박 (캠페인 비정복에는 적용하지 않음)
+    if (an.conquestScenario && an.turnsLeft <= 5) score += 14;
+    // 왕관 경합: 기동 병종으로 선점
+    if (an.crownScenario) score += 12;
   }
 
-  // 고유 병종: 최소 1기는 유도, 과다 생산 억제
+  // 고유 병종: 최소 1기 유도 + 기계적 과생산 억제(적격 40~95%)
   if (isUniqueUnit(type)) {
-    if (ofType === 0) score += 22;
-    else if (ofType === 1) score += 6;
-    else score -= 12 * ofType; // 과사용 금지
+    if (ofType === 0) {
+      // 쇠뇌대는 0생산 붕괴 방지, 약탈대는 95% 상한을 넘지 않게 약하게
+      score += type === 'crossbow' ? 36 : type === 'raider' ? 14 : 22;
+    } else if (ofType === 1) {
+      score += type === 'raider' ? -6 : 2;
+    } else {
+      score -= 16 * ofType;
+    }
   }
 
-  // 수호대: 방어·거점·왕관 시나리오
+  // 수호대: 방어·거점 우선. 왕관 시나리오에서는 과생산을 억제한다.
   if (type === 'guardian') {
     if (an.capitalThreats.length > 0) score += 22;
-    if (an.crownScenario) score += 12;
+    if (an.crownScenario) score -= 10;
     if (an.holdTiles.length > 0) score += 15;
     const enemyRaiders = an.enemies.filter((e) => e.type === 'cavalry' || e.type === 'raider').length;
     if (an.enemies.length > 0 && enemyRaiders / an.enemies.length >= 0.3) score += 18;
@@ -1001,8 +1042,8 @@ function scoreProductionType(
     const emptyBuildings = state.tiles.filter(
       (t) => t.building && t.owner !== faction && !unitAt(state, t.q, t.r),
     ).length;
-    score += Math.min(20, emptyBuildings * 4);
-    if (an.crownScenario) score += 14;
+    score += Math.min(18, emptyBuildings * 3);
+    if (an.crownScenario) score += 12;
     const enemyRanged = an.enemies.filter((e) => e.type === 'archer' || e.type === 'crossbow').length;
     if (an.enemies.length > 0 && enemyRanged / an.enemies.length >= 0.3) score += 12;
     // 남은 턴이 매우 적으면 저렴한 보병 선호
@@ -1013,7 +1054,7 @@ function scoreProductionType(
   if (type === 'archer') {
     if (faction === 'violet') {
       // 장궁(사거리 +1)이 실제 생산 이유로 남도록 세력 보너스
-      score += 10;
+      score += 12;
     }
     if (an.enemies.length > 0) {
       // 기본 방어 2 이하·비수호 = 연·중방어. 관통 특화가 불필요한 상대.
@@ -1021,8 +1062,8 @@ function scoreProductionType(
         (e) => e.type !== 'guardian' && UNIT_STATS[e.type].def <= 2,
       ).length;
       const softRatio = softMed / an.enemies.length;
-      if (softRatio >= 0.5) score += 14;
-      else if (softRatio >= 0.3) score += 7;
+      if (softRatio >= 0.5) score += 18;
+      else if (softRatio >= 0.3) score += 8;
       // 고방어가 지배적이면 쇠뇌대에 양보 (완전 제외는 아님)
       const highArmor = an.enemies.filter(
         (e) => e.type === 'guardian' || UNIT_STATS[e.type].def >= 3,
@@ -1040,12 +1081,12 @@ function scoreProductionType(
       const hardRatio = highArmor / an.enemies.length;
       if (hardRatio >= 0.2) score += 24;
       else if (hardRatio > 0) score += 12;
-      else score -= 10; // 고방어 없으면 궁병·보병이 비용효율 우위
+      else score -= 6; // 고방어 없으면 약가산 억제(완전 사장 방지)
       // 연·중방어 다수면 쇠뇌대 억제 (전 상황 상위호환 방지)
       const softMed = an.enemies.filter(
         (e) => e.type !== 'guardian' && UNIT_STATS[e.type].def <= 2,
       ).length;
-      if (softMed / an.enemies.length >= 0.55) score -= 12;
+      if (softMed / an.enemies.length >= 0.55) score -= 10;
     }
     if (an.enemies.some((e) => e.type === 'guardian')) score += 16;
     // 기병·약탈 다수면 억제
@@ -1067,7 +1108,12 @@ function scoreProductionType(
       if (type === 'raider') score -= 8;
     }
     if (enemyArc >= 0.4) {
-      if (type === 'cavalry' || type === 'raider') score += 14;
+      // 연·중방어 원거리 다수면 기병 돌격보다 궁병 견제가 효율 — 가산 완화
+      const softHeavy =
+        an.enemies.filter((e) => e.type !== 'guardian' && UNIT_STATS[e.type].def <= 2).length /
+          an.enemies.length >=
+        0.5;
+      if (type === 'cavalry' || type === 'raider') score += softHeavy ? 8 : 14;
     }
     // 수호대 비중 높을 때만 쇠뇌대 가산 (연·중방어 일반 보병과 분리)
     if (enemyGuard >= 0.2 && type === 'crossbow') score += 18;
@@ -1110,6 +1156,20 @@ function pickProductionType(
 
   // 남은 턴이 1 이하면 저렴한 유닛으로 점수를 극대화한다
   if (an.turnsLeft <= 1) return 'infantry';
+
+  // 자원(violet): 공용 3기 이상·고유 미보유 시 쇠뇌대 1기 강제(0생산 붕괴 방지)
+  if (faction === 'violet') {
+    const unique = roster.find((t) => isUniqueUnit(t));
+    const sharedCount = mine.filter((u) => !isUniqueUnit(u.type)).length;
+    if (
+      unique &&
+      sharedCount >= 3 &&
+      !mine.some((u) => isUniqueUnit(u.type)) &&
+      fs.gold >= unitCost(faction, unique, state.config.modifier)
+    ) {
+      return unique;
+    }
+  }
 
   let best: UnitTypeId = 'infantry';
   let bestScore = -Infinity;

@@ -66,14 +66,15 @@ export const DOCTRINES: Record<FactionId, Doctrine> = {
     style: '원거리 화력과 풍부한 수입으로 후반을 지배한다',
     abilityName: '장궁',
     abilityDesc: `궁병의 사거리 +${VIOLET_ARCHER_RANGE}`,
-    bonusDesc: '마을 수입 +8, 궁병 생산 비용 -3',
-    startDesc: '궁병 2기로 시작 (금 60)',
+    bonusDesc: '마을 수입 +12, 궁병 생산 비용 -3',
+    startDesc: '궁병·기병으로 시작 (금 65)',
     recommended: '신중한 플레이어에게 추천',
-    startGold: 60,
-    startUnits: ['archer', 'archer'],
+    // azure 시작 금은 유지. 자원은 기동 기병 시작·경제 소폭 강화로 정복 약세만 보정한다.
+    startGold: 65,
+    startUnits: ['archer', 'cavalry'],
     // 장궁 교리 골격: 범용 궁병을 쇠뇌대보다 싸게 유지 (관통 특화와 역할 분리)
     unitCostDelta: { archer: -3 },
-    villageIncomeBonus: 8,
+    villageIncomeBonus: 12,
     captureGold: 0,
   },
 };
