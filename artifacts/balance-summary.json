@@ -1,65 +1,65 @@
 {
-  "generatedAt": "2026-07-24T07:11:20.433Z",
-  "elapsedSec": 22.3,
+  "generatedAt": "2026-07-24T07:38:17.692Z",
+  "elapsedSec": 21.1,
   "totalGames": 1080,
   "seedsPerCombo": 40,
   "unfinishedGames": 0,
   "illegalGames": 0,
   "draws": 3,
   "overallWinRates": {
-    "azure": 0.3361,
-    "crimson": 0.363,
-    "violet": 0.2981
+    "azure": 0.3417,
+    "crimson": 0.3556,
+    "violet": 0.3
   },
   "proxyWinRateByFaction": {
-    "azure": 0.411,
-    "crimson": 0.419,
-    "violet": 0.339
+    "azure": 0.403,
+    "crimson": 0.392,
+    "violet": 0.336
   },
   "proxyWinRateByDifficulty": {
-    "easy": 0.544,
-    "normal": 0.339,
-    "hard": 0.286
+    "easy": 0.517,
+    "normal": 0.336,
+    "hard": 0.278
   },
   "perDifficulty": [
     {
       "difficulty": "easy",
       "games": 360,
       "endReasons": {
-        "conquest": 101,
-        "crown-hold": 84,
-        "turn-limit": 175,
+        "conquest": 95,
+        "crown-hold": 94,
+        "turn-limit": 171,
         "unfinished": 0
       },
-      "proxyWinRateTurnLimit": 0.611,
-      "proxyWinRateDecisive": 0.481,
-      "avgEndTurn": 10.46
+      "proxyWinRateTurnLimit": 0.591,
+      "proxyWinRateDecisive": 0.45,
+      "avgEndTurn": 10.43
     },
     {
       "difficulty": "normal",
       "games": 360,
       "endReasons": {
-        "conquest": 139,
-        "crown-hold": 71,
-        "turn-limit": 150,
+        "conquest": 133,
+        "crown-hold": 92,
+        "turn-limit": 135,
         "unfinished": 0
       },
-      "proxyWinRateTurnLimit": 0.393,
-      "proxyWinRateDecisive": 0.3,
-      "avgEndTurn": 10.24
+      "proxyWinRateTurnLimit": 0.415,
+      "proxyWinRateDecisive": 0.289,
+      "avgEndTurn": 9.8
     },
     {
       "difficulty": "hard",
       "games": 360,
       "endReasons": {
-        "conquest": 177,
-        "crown-hold": 59,
-        "turn-limit": 124,
+        "conquest": 176,
+        "crown-hold": 67,
+        "turn-limit": 117,
         "unfinished": 0
       },
-      "proxyWinRateTurnLimit": 0.218,
-      "proxyWinRateDecisive": 0.322,
-      "avgEndTurn": 10.07
+      "proxyWinRateTurnLimit": 0.231,
+      "proxyWinRateDecisive": 0.3,
+      "avgEndTurn": 9.91
     }
   ],
   "perScenario": [
@@ -67,231 +67,231 @@
       "scenario": "three-crowns",
       "games": 360,
       "winRates": {
-        "azure": 0.2833,
-        "crimson": 0.4139,
+        "azure": 0.275,
+        "crimson": 0.4222,
         "violet": 0.2944
       },
       "endReasons": {
-        "conquest": 170,
+        "conquest": 165,
         "crown-hold": 0,
-        "turn-limit": 190,
+        "turn-limit": 195,
         "unfinished": 0
       },
-      "turnLimitRate": 0.5278,
+      "turnLimitRate": 0.5417,
       "seeds": 360,
-      "avgEndTurn": 10.2
+      "avgEndTurn": 10.24
     },
     {
       "scenario": "broken-strait",
       "games": 360,
       "winRates": {
-        "azure": 0.3139,
-        "crimson": 0.4278,
+        "azure": 0.3222,
+        "crimson": 0.4194,
         "violet": 0.2583
       },
       "endReasons": {
-        "conquest": 180,
+        "conquest": 182,
         "crown-hold": 0,
-        "turn-limit": 180,
+        "turn-limit": 178,
         "unfinished": 0
       },
-      "turnLimitRate": 0.5,
+      "turnLimitRate": 0.4944,
       "seeds": 360,
-      "avgEndTurn": 10.24
+      "avgEndTurn": 10.23
     },
     {
       "scenario": "crown-heart",
       "games": 360,
       "winRates": {
-        "azure": 0.4111,
-        "crimson": 0.2472,
-        "violet": 0.3417
+        "azure": 0.4278,
+        "crimson": 0.225,
+        "violet": 0.3472
       },
       "endReasons": {
-        "conquest": 67,
-        "crown-hold": 214,
-        "turn-limit": 79,
+        "conquest": 57,
+        "crown-hold": 253,
+        "turn-limit": 50,
         "unfinished": 0
       },
-      "turnLimitRate": 0.2194,
+      "turnLimitRate": 0.1389,
       "seeds": 360,
-      "avgEndTurn": 10.33
+      "avgEndTurn": 9.66
     }
   ],
   "unitStats": {
     "infantry": {
-      "produced": 7506,
-      "spawned": 9666,
-      "alive": 4119,
-      "share": 0.3084,
-      "survivalRate": 0.4261,
-      "gamesProduced": 1048,
+      "produced": 6982,
+      "spawned": 9142,
+      "alive": 3947,
+      "share": 0.3027,
+      "survivalRate": 0.4317,
+      "gamesProduced": 1031,
       "eligibleGames": 1080,
-      "produceRate": 0.9704,
+      "produceRate": 0.9546,
       "byFaction": {
-        "azure": 2954,
-        "crimson": 3140,
-        "violet": 1412
+        "azure": 2723,
+        "crimson": 2962,
+        "violet": 1297
       },
       "byScenario": {
-        "three-crowns": 2491,
-        "broken-strait": 2493,
-        "crown-heart": 2522
+        "three-crowns": 2524,
+        "broken-strait": 2486,
+        "crown-heart": 1972
       }
     },
     "archer": {
-      "produced": 8423,
-      "spawned": 10583,
-      "alive": 3601,
-      "share": 0.346,
-      "survivalRate": 0.3403,
-      "gamesProduced": 1074,
+      "produced": 7763,
+      "spawned": 9923,
+      "alive": 3652,
+      "share": 0.3366,
+      "survivalRate": 0.368,
+      "gamesProduced": 1072,
       "eligibleGames": 1080,
-      "produceRate": 0.9944,
+      "produceRate": 0.9926,
       "byFaction": {
-        "azure": 2364,
-        "crimson": 3032,
-        "violet": 3027
+        "azure": 2028,
+        "crimson": 2917,
+        "violet": 2818
       },
       "byScenario": {
-        "three-crowns": 2492,
-        "broken-strait": 2579,
-        "crown-heart": 3352
+        "three-crowns": 2504,
+        "broken-strait": 2578,
+        "crown-heart": 2681
       }
     },
     "cavalry": {
-      "produced": 3909,
-      "spawned": 6069,
-      "alive": 1646,
-      "share": 0.1606,
-      "survivalRate": 0.2712,
-      "gamesProduced": 956,
+      "produced": 3730,
+      "spawned": 5890,
+      "alive": 1623,
+      "share": 0.1617,
+      "survivalRate": 0.2756,
+      "gamesProduced": 963,
       "eligibleGames": 1080,
-      "produceRate": 0.8852,
+      "produceRate": 0.8917,
       "byFaction": {
-        "azure": 1209,
-        "crimson": 1455,
-        "violet": 1245
+        "azure": 1191,
+        "crimson": 1374,
+        "violet": 1165
       },
       "byScenario": {
-        "three-crowns": 1019,
-        "broken-strait": 1215,
-        "crown-heart": 1675
+        "three-crowns": 1022,
+        "broken-strait": 1209,
+        "crown-heart": 1499
       }
     },
     "guardian": {
-      "produced": 954,
-      "spawned": 954,
-      "alive": 638,
-      "share": 0.0392,
-      "survivalRate": 0.6688,
-      "gamesProduced": 792,
+      "produced": 1086,
+      "spawned": 1086,
+      "alive": 695,
+      "share": 0.0471,
+      "survivalRate": 0.64,
+      "gamesProduced": 913,
       "eligibleGames": 1080,
-      "produceRate": 0.7333,
+      "produceRate": 0.8454,
       "byFaction": {
-        "azure": 954,
+        "azure": 1086,
         "crimson": 0,
         "violet": 0
       },
       "byScenario": {
-        "three-crowns": 354,
-        "broken-strait": 423,
-        "crown-heart": 177
+        "three-crowns": 359,
+        "broken-strait": 424,
+        "crown-heart": 303
       }
     },
     "raider": {
-      "produced": 2416,
-      "spawned": 2416,
-      "alive": 414,
-      "share": 0.0993,
-      "survivalRate": 0.1714,
-      "gamesProduced": 978,
+      "produced": 2305,
+      "spawned": 2305,
+      "alive": 434,
+      "share": 0.0999,
+      "survivalRate": 0.1883,
+      "gamesProduced": 986,
       "eligibleGames": 1080,
-      "produceRate": 0.9056,
+      "produceRate": 0.913,
       "byFaction": {
         "azure": 0,
-        "crimson": 2416,
+        "crimson": 2305,
         "violet": 0
       },
       "byScenario": {
-        "three-crowns": 732,
-        "broken-strait": 767,
-        "crown-heart": 917
+        "three-crowns": 734,
+        "broken-strait": 768,
+        "crown-heart": 803
       }
     },
     "crossbow": {
-      "produced": 1133,
-      "spawned": 1133,
-      "alive": 588,
-      "share": 0.0465,
-      "survivalRate": 0.519,
-      "gamesProduced": 688,
+      "produced": 1200,
+      "spawned": 1200,
+      "alive": 633,
+      "share": 0.052,
+      "survivalRate": 0.5275,
+      "gamesProduced": 735,
       "eligibleGames": 1080,
-      "produceRate": 0.637,
+      "produceRate": 0.6806,
       "byFaction": {
         "azure": 0,
         "crimson": 0,
-        "violet": 1133
+        "violet": 1200
       },
       "byScenario": {
-        "three-crowns": 348,
-        "broken-strait": 342,
-        "crown-heart": 443
+        "three-crowns": 355,
+        "broken-strait": 344,
+        "crown-heart": 501
       }
     }
   },
   "productionShare": {
-    "infantry": 0.3084,
-    "archer": 0.346,
-    "cavalry": 0.1606,
-    "guardian": 0.0392,
-    "raider": 0.0993,
-    "crossbow": 0.0465
+    "infantry": 0.3027,
+    "archer": 0.3366,
+    "cavalry": 0.1617,
+    "guardian": 0.0471,
+    "raider": 0.0999,
+    "crossbow": 0.052
   },
   "survivalRate": {
-    "infantry": 0.4261,
-    "archer": 0.3403,
-    "cavalry": 0.2712,
-    "guardian": 0.6688,
-    "raider": 0.1714,
-    "crossbow": 0.519
+    "infantry": 0.4317,
+    "archer": 0.368,
+    "cavalry": 0.2756,
+    "guardian": 0.64,
+    "raider": 0.1883,
+    "crossbow": 0.5275
   },
   "uniqueProduceRates": {
-    "guardian": 0.7333,
-    "raider": 0.9056,
-    "crossbow": 0.637
+    "guardian": 0.8454,
+    "raider": 0.913,
+    "crossbow": 0.6806
   },
   "rosterByFaction": {
     "azure": {
-      "infantry": 2954,
-      "archer": 2364,
-      "cavalry": 1209,
-      "guardian": 954,
+      "infantry": 2723,
+      "archer": 2028,
+      "cavalry": 1191,
+      "guardian": 1086,
       "raider": 0,
       "crossbow": 0
     },
     "crimson": {
-      "infantry": 3140,
-      "archer": 3032,
-      "cavalry": 1455,
+      "infantry": 2962,
+      "archer": 2917,
+      "cavalry": 1374,
       "guardian": 0,
-      "raider": 2416,
+      "raider": 2305,
       "crossbow": 0
     },
     "violet": {
-      "infantry": 1412,
-      "archer": 3027,
-      "cavalry": 1245,
+      "infantry": 1297,
+      "archer": 2818,
+      "cavalry": 1165,
       "guardian": 0,
       "raider": 0,
-      "crossbow": 1133
+      "crossbow": 1200
     }
   },
-  "sharedProducedTotal": 19838,
-  "cavalrySharedShare": 0.197,
-  "idlePhaseRate": 0.018,
-  "avgCapturesPerGame": 9.5,
-  "maxPhaseMs": 7.5,
+  "sharedProducedTotal": 18475,
+  "cavalrySharedShare": 0.2019,
+  "idlePhaseRate": 0.024,
+  "avgCapturesPerGame": 8.86,
+  "maxPhaseMs": 6.8,
   "pass": true,
   "failures": [],
   "gateFailures": [],
