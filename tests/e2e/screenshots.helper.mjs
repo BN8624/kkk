@@ -14,7 +14,9 @@ await page.waitForTimeout(800);
 await page.screenshot({ path: `${outDir}/01-title.png` });
 
 await page.getByRole('button', { name: '빠른 전투' }).click();
-await page.waitForFunction(() => window.__tc?.state() !== null);
+await page.waitForFunction(
+  () => window.__tc?.state() !== null && window.__tc.boardReady(),
+);
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${outDir}/02-board.png` });
 

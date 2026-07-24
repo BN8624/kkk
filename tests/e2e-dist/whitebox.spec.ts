@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test';
 interface Bridge {
   state: () => { turn: number; over: boolean; seed?: number } | null;
   busy: () => boolean;
+  boardReady: () => boolean;
   mode: () => string;
   digest: () => string | null;
 }
@@ -17,7 +18,12 @@ async function playOneTurnDigest(page: import('@playwright/test').Page): Promise
   await page.waitForFunction(() => !!window.__tc?.digest);
   await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
-  await page.waitForFunction(() => window.__tc!.mode!() === 'play' && !window.__tc!.busy!());
+  await page.waitForFunction(
+    () =>
+      window.__tc!.mode!() === 'play' &&
+      window.__tc!.boardReady!() &&
+      !window.__tc!.busy!(),
+  );
   await page.getByRole('button', { name: '턴 종료' }).click();
   await page.waitForFunction(() => {
     const s = window.__tc!.state!();

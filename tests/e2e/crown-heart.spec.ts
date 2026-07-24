@@ -16,6 +16,7 @@ interface TcState {
 interface CrownBridge {
   state: () => TcState | null;
   busy: () => boolean;
+  boardReady: () => boolean;
   screenPos: (q: number, r: number) => { x: number; y: number } | undefined;
   crownHold?: () => { owner: string | null; turns: number } | null;
 }
@@ -61,7 +62,10 @@ async function startCrownHeart(page: Page, seed = 42): Promise<void> {
   await page.getByRole('button', { name: /청람 왕국/ }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
   await page.waitForFunction(
-    () => (window as unknown as { __tc?: CrownBridge }).__tc?.state() !== null,
+    () => {
+      const bridge = (window as unknown as { __tc?: CrownBridge }).__tc;
+      return bridge !== undefined && bridge.state() !== null && bridge.boardReady();
+    },
   );
   await waitIdle(page);
 }

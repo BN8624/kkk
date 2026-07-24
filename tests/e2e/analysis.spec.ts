@@ -47,7 +47,9 @@ test('플레이 분석: 리플레이 생성 후 단일·다중 분석과 보고�
   await page.goto('/?seed=20260719');
   await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
-  await page.waitForFunction(() => window.__tc?.state() !== null);
+  await page.waitForFunction(
+    () => window.__tc !== undefined && window.__tc.state() !== null && window.__tc.boardReady(),
+  );
   await playToEnd(page);
 
   // 결과 화면 → 타이틀로

@@ -6,13 +6,15 @@ test('한 판이 제한 턴 안에 끝나고 결과 화면이 표시된다', asy
   await page.addInitScript(() => {
     localStorage.setItem(
       'three-crowns-settings',
-      JSON.stringify({ soundOn: false, tutorialDone: true }),
+      JSON.stringify({ soundOn: false, tutorialDone: true, aiSpeed: 0 }),
     );
   });
   await page.goto('/?seed=20260719');
   await page.getByRole('button', { name: '빠른 전투' }).click();
   await page.getByRole('button', { name: '이 왕국으로 시작' }).click();
-  await page.waitForFunction(() => window.__tc?.state() !== null);
+  await page.waitForFunction(
+    () => window.__tc !== undefined && window.__tc.state() !== null && window.__tc.boardReady(),
+  );
 
   // 플레이어는 매 턴 수도에서 생산만 시도하고 턴을 종료한다(수비 위주 소극 플레이)
   for (let round = 0; round < 14; round++) {
