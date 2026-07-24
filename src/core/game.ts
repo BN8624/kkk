@@ -481,8 +481,11 @@ export function evaluateVictory(state: GameState): void {
       fs.eliminated = true;
     }
   }
+  // 왕관의 심장: 왕관 활성(3)·보유(4) 타이밍 전 정복·단독 생존 즉시 종료를 4턴 이하에 확정하지 않는다.
+  // 인간 탈락은 회복 불가라 유예하지 않는다(조기 탈락 자체는 배치·밸런스로 방지).
+  const crownEarlyGrace = state.config.scenario === 'crown-heart' && state.turn <= 4;
   // 정복 조건: 한 세력이 모든 수도를 점령하면 즉시 승리(모든 세력에 대칭 적용)
-  if (hasConquest(state)) {
+  if (hasConquest(state) && !crownEarlyGrace) {
     const total = totalCapitals(state);
     for (const fid of state.order) {
       if (total > 0 && capitalsOwned(state, fid) === total) {
@@ -498,8 +501,6 @@ export function evaluateVictory(state: GameState): void {
     state.winner = 'draw';
     return;
   }
-  // 왕관의 심장: 왕관 활성(3)·보유(4) 타이밍 전 전멸 즉시 4턴 이하 종료를 확정하지 않는다
-  const crownEarlyGrace = state.config.scenario === 'crown-heart' && state.turn <= 4;
   if (alive.length === 1 && !crownEarlyGrace) {
     state.over = true;
     state.winner = alive[0];
@@ -507,7 +508,7 @@ export function evaluateVictory(state: GameState): void {
   }
   const me = humanFaction(state);
   // 인간 세력이 탈락하면 게임 종료: 남은 세력 중 최고 점수가 승자
-  if (state.factions[me].eliminated && !crownEarlyGrace) {
+  if (state.factions[me].eliminated) {
     state.over = true;
     const winner = scoreWinner(state, alive);
     state.winner = winner === 'draw' ? alive[0] : winner;
