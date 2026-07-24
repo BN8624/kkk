@@ -62,6 +62,7 @@ export class EditorScene extends Phaser.Scene {
   /** 새 문서로 전체를 다시 그린다(문서 교체·크기 변경 시). */
   setDoc(doc: ScenarioDocumentV1): void {
     this.doc = doc;
+    if (!this.view) return;
     this.children.removeAll(true);
     this.view.resetRefs();
     this.buildAll();
@@ -79,6 +80,7 @@ export class EditorScene extends Phaser.Scene {
 
   /** 문서와 화면을 동기화한다. 지형은 바뀐 타일만 증분 갱신한다. */
   refresh(): void {
+    if (!this.view) return;
     this.view.syncTerrain(this.doc.board.tiles as Tile[]);
     this.view.syncBuildings(this.doc.board.tiles as Tile[]);
     const units: ViewUnit[] = this.doc.units.map((u, i) => ({
@@ -95,6 +97,7 @@ export class EditorScene extends Phaser.Scene {
   }
 
   showSelection(h: Axial | null): void {
+    if (!this.selectRing) return;
     if (!h) {
       this.selectRing.setVisible(false);
       return;

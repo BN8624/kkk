@@ -73,6 +73,7 @@ export class BoardScene extends Phaser.Scene {
   /** 새 게임 상태로 보드를 다시 그린다. */
   setState(state: GameState): void {
     this.state = state;
+    if (!this.view) return;
     this.children.removeAll(true);
     this.view.resetRefs();
     this.highlightPool = [];
@@ -96,6 +97,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** 상태와 화면을 동기화한다(건물 소유·유닛 위치·체력·사망). */
   refresh(): void {
+    if (!this.view) return;
     this.view.syncBuildings(this.state.tiles);
     const humanTurn = this.state.controllers[this.state.current] === 'human';
     const units: ViewUnit[] = this.state.units.map((u) => ({
@@ -133,6 +135,7 @@ export class BoardScene extends Phaser.Scene {
 
   showSelection(h: Axial | null): void {
     this.ringTween?.stop();
+    if (!this.selectRing) return;
     if (!h) {
       this.selectRing.setVisible(false);
       return;

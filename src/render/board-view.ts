@@ -8,6 +8,12 @@ import { clearCameraFit, registerCameraFit } from './camera-fit-lifecycle';
 export { clearCameraFit, getCameraFitHandler, registerCameraFit } from './camera-fit-lifecycle';
 
 export const UNIT_Y_OFFSET = -8;
+const TERRAIN_DISPLAY_OVERLAP = 8;
+const BUILDING_DISPLAY = {
+  village: { size: 62, yOffset: -7 },
+  capital: { size: 76, yOffset: -9 },
+  crown: { size: 76, yOffset: -9 },
+} as const;
 
 /** 렌더 계층이 그리는 유닛 표현(게임 유닛·에디터 배치 유닛 공용). */
 export interface ViewUnit {
@@ -119,7 +125,10 @@ export class BoardView {
   private createTerrainSprite(tile: Tile): void {
     const { x, y } = this.pos(tile);
     const img = this.scene.add.image(x, y, textureKey(`terrain.${tile.terrain}` as AssetId));
-    img.setDisplaySize(Math.sqrt(3) * HEX_SIZE + 4, HEX_SIZE * 2 + 4);
+    img.setDisplaySize(
+      Math.sqrt(3) * HEX_SIZE + TERRAIN_DISPLAY_OVERLAP,
+      HEX_SIZE * 2 + TERRAIN_DISPLAY_OVERLAP,
+    );
     img.setDepth(0);
     this.terrainSprites.set(hexKey(tile.q, tile.r), img);
   }
@@ -135,15 +144,15 @@ export class BoardView {
       const assetId = `building.${tile.building}.${owner}` as AssetId;
       let sprite = this.buildingSprites.get(key);
       const { x, y } = this.pos(tile);
+      const display = BUILDING_DISPLAY[tile.building];
       if (!sprite) {
-        sprite = this.scene.add.image(x, y - 4, textureKey(assetId));
+        sprite = this.scene.add.image(x, y + display.yOffset, textureKey(assetId));
         sprite.setDepth(1 + y / 10000);
         this.buildingSprites.set(key, sprite);
       } else if (sprite.texture.key !== textureKey(assetId)) {
         sprite.setTexture(textureKey(assetId));
       }
-      const size = tile.building === 'village' ? 54 : 62;
-      sprite.setDisplaySize(size, size);
+      sprite.setDisplaySize(display.size, display.size);
     }
     for (const [key, sprite] of this.buildingSprites) {
       if (!present.has(key)) {
