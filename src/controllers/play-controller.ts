@@ -6,7 +6,14 @@ import { todayKey, type ModifierId } from '../core/daily';
 import { attackTargets, forecastAttack, newGame, unitCost } from '../core/game';
 import { reachableDestinations } from '../core/pathfind';
 import { loadRecords, recordGame, saveRecords, type RecordOutcome } from '../core/records';
-import { clearSave, loadGame, saveGame, saveSettings } from '../core/save';
+import {
+  clearSave,
+  isStorageAvailable,
+  loadGame,
+  saveGame,
+  saveSettings,
+  shouldWarnSaveFailure,
+} from '../core/save';
 import { SCENARIO_IDS, SCENARIOS } from '../core/scenarios';
 import type { Axial, FactionId, GameState, ScenarioId, Tile, Unit, UnitTypeId } from '../core/types';
 import { producibleUnits } from '../core/units';
@@ -117,11 +124,21 @@ export class PlayController implements AppController, PlaySession {
 
   /** 일반 플레이 자동 저장. 테스트 플레이는 실제 저장을 오염시키지 않는다. */
   private persist(state: GameState): void {
-    if (!this.testPlay) saveGame(state);
+    if (this.testPlay) return;
+    const ok = saveGame(state);
+    if (!ok) this.warnSaveFailureOnce();
+  }
+
+  /** 세션 최초 1회만 저장 실패 경고를 띄운다. 전투는 중단하지 않는다. */
+  private warnSaveFailureOnce(): void {
+    if (shouldWarnSaveFailure()) this.ctx.hud.toast(t('save.failed'));
   }
 
   persistOnExit(): void {
-    if (this._state && !this._state.over && !this.testPlay) saveGame(this._state);
+    if (this._state && !this._state.over && !this.testPlay) {
+      const ok = saveGame(this._state);
+      if (!ok) this.warnSaveFailureOnce();
+    }
   }
 
   /** 보드 씬 생성 직후 HUD를 현재 상태로 맞춘다. */
@@ -171,6 +188,7 @@ export class PlayController implements AppController, PlaySession {
   showDataManagement(): void {
     this.ctx.enterMode('settings');
     showDataManagementScreen(this.ctx.overlay, {
+      storageAvailable: isStorageAvailable(),
       onExport: (categories) => void this.exportBackup(categories),
       onImport: (file) => void this.importBackup(file),
       onBack: () => this.showPause(),
@@ -740,7 +758,7 @@ export class PlayController implements AppController, PlaySession {
       state,
       state.config.mode === 'daily' ? todayKey() : undefined,
     );
-    saveRecords(outcome.records);
+    if (!saveRecords(outcome.records)) this.warnSaveFailureOnce();
     this.ctx.replays.captureReplay(state);
 
     // 캠페인: 진행(별·최고 기록·해금)을 반영하고 전용 결과 화면을 연다
