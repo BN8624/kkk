@@ -86,6 +86,23 @@ function alphaAt(png: DecodedPng, x: number, y: number): number {
   return png.pixels[(y * png.width + x) * 4 + 3];
 }
 
+function opaqueBounds(png: DecodedPng): { width: number; height: number } {
+  let minX = png.width;
+  let minY = png.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < png.width; x++) {
+      if (alphaAt(png, x, y) < 64) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  return { width: maxX - minX + 1, height: maxY - minY + 1 };
+}
+
 function averageOpaqueLuminance(png: DecodedPng): number {
   let total = 0;
   let count = 0;
@@ -133,6 +150,9 @@ describe('Phase 2A 외부 보병 에셋', () => {
       expect(alphaAt(png, png.width - 1, 0)).toBe(0);
       expect(alphaAt(png, 0, png.height - 1)).toBe(0);
       expect(alphaAt(png, png.width - 1, png.height - 1)).toBe(0);
+      const bounds = opaqueBounds(png);
+      expect(bounds.width, `${url} opaque width`).toBeGreaterThanOrEqual(150);
+      expect(bounds.height, `${url} opaque height`).toBeGreaterThanOrEqual(210);
     }
   });
 
