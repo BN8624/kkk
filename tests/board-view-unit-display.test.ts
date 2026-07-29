@@ -11,7 +11,7 @@ const SOURCE = readFileSync(
 describe('보드 유닛 표시 설정', () => {
   it('보병만 2.5D 스프라이트 크기와 낮은 체력 막대를 사용한다', () => {
     expect(SOURCE).toMatch(
-      /UNIT_DISPLAY[\s\S]*?infantry:\s*\{\s*width:\s*56,\s*height:\s*66,\s*hpBarY:\s*33,\s*yOffset:\s*-12,/,
+      /UNIT_DISPLAY[\s\S]*?infantry:\s*\{\s*width:\s*60,\s*height:\s*70,\s*hpBarY:\s*35,\s*yOffset:\s*-13,/,
     );
   });
 

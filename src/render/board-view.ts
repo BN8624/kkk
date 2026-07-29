@@ -31,10 +31,10 @@ export const DEFAULT_UNIT_DISPLAY: UnitDisplay = {
 
 export const UNIT_DISPLAY: Partial<Record<UnitTypeId, UnitDisplay>> = {
   infantry: {
-    width: 56,
-    height: 66,
-    hpBarY: 33,
-    yOffset: -12,
+    width: 60,
+    height: 70,
+    hpBarY: 35,
+    yOffset: -13,
   },
 };
 
