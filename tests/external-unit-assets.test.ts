@@ -151,8 +151,8 @@ describe('Phase 2A 외부 보병 에셋', () => {
       expect(alphaAt(png, 0, png.height - 1)).toBe(0);
       expect(alphaAt(png, png.width - 1, png.height - 1)).toBe(0);
       const bounds = opaqueBounds(png);
-      expect(bounds.width, `${url} opaque width`).toBeGreaterThanOrEqual(150);
-      expect(bounds.height, `${url} opaque height`).toBeGreaterThanOrEqual(210);
+      expect(bounds.width, `${url} opaque width`).toBeGreaterThanOrEqual(210);
+      expect(bounds.height, `${url} opaque height`).toBeGreaterThanOrEqual(232);
     }
   });
 
