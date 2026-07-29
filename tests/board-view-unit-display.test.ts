@@ -25,6 +25,7 @@ describe('보드 유닛 표시 설정', () => {
     expect(SOURCE).toContain(
       'this.drawHpBar(view.hpBar, unit.hpRatio, display.hpBarY);',
     );
+    expect(SOURCE).toContain('view.container.setAlpha(unit.dim ? 0.68 : 1);');
   });
 
   it('체력 막대가 없는 에디터 유닛은 계속 그리기를 건너뛴다', () => {

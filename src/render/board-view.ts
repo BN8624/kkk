@@ -216,7 +216,7 @@ export class BoardView {
       view.container.setPosition(x, y + display.yOffset);
       view.container.setDepth(3 + y / 10000);
       this.drawHpBar(view.hpBar, unit.hpRatio, display.hpBarY);
-      view.container.setAlpha(unit.dim ? 0.55 : 1);
+      view.container.setAlpha(unit.dim ? 0.68 : 1);
     }
   }
 
