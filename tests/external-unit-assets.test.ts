@@ -86,6 +86,20 @@ function alphaAt(png: DecodedPng, x: number, y: number): number {
   return png.pixels[(y * png.width + x) * 4 + 3];
 }
 
+function averageOpaqueLuminance(png: DecodedPng): number {
+  let total = 0;
+  let count = 0;
+  for (let i = 0; i < png.pixels.length; i += 4) {
+    if (png.pixels[i + 3] < 64) continue;
+    total +=
+      png.pixels[i] * 0.2126 +
+      png.pixels[i + 1] * 0.7152 +
+      png.pixels[i + 2] * 0.0722;
+    count++;
+  }
+  return total / count;
+}
+
 describe('Phase 2A 외부 보병 에셋', () => {
   it('보병 3세력을 등록하고 나머지 병종은 fallback으로 유지한다', () => {
     expect(
@@ -131,6 +145,13 @@ describe('Phase 2A 외부 보병 에셋', () => {
     expect(paths.reduce((sum, path) => sum + statSync(path).size, 0)).toBeLessThanOrEqual(
       1024 * 1024,
     );
+  });
+
+  it('축소 표시에서도 어두운 지형과 분리되는 평균 명도를 유지한다', () => {
+    for (const url of Object.values(REQUIRED_UNITS)) {
+      const png = decodeRgbaPng(publicFile(url));
+      expect(averageOpaqueLuminance(png), url).toBeGreaterThanOrEqual(85);
+    }
   });
 
   it('Phase 1 지형·건물 15개 등록을 유지한다', () => {
